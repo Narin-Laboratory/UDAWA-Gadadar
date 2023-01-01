@@ -10,6 +10,8 @@
 
 using namespace libudawa;
 Settings mySettings;
+HardwareSerial ComPZEM(1);
+PZEM004Tv30 PZEM(ComPZEM, 4, 2);
 
 const size_t callbacksSize = 13;
 GenericCallback callbacks[callbacksSize] = {
@@ -42,6 +44,12 @@ void setup()
     });
   }
 
+  if(mySettings.intvDevAtt != 0){
+    taskid_t taskPublishDeviceAttributes = taskManager.scheduleFixedRate(mySettings.intvDevAtt * 1000, [] {
+      publishDeviceAttributes();
+    });
+  }
+
   if(mySettings.intvGetPwrUsg != 0){
     taskid_t taskMonitorPowerUsage = taskManager.scheduleFixedRate(mySettings.intvGetPwrUsg * 1000, [] {
       getPowerUsage();
@@ -49,7 +57,7 @@ void setup()
   }
 
   if(mySettings.intvRecPwrUsg != 0){
-    taskid_t taskMonitorPowerUsage = taskManager.scheduleFixedRate(mySettings.intvRecPwrUsg * 1000, [] {
+    taskid_t taskRecPowerUsage = taskManager.scheduleFixedRate(mySettings.intvRecPwrUsg * 1000, [] {
       recPowerUsage();
     });
   }
@@ -102,72 +110,49 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 }
 
 void getPowerUsage(){
-  StaticJsonDocument<DOCSIZE> doc;
-  doc["pinACS"] = mySettings.pinACS;
-  doc["testFreq"] = mySettings.testFreq;
-  doc["windowLength"] = mySettings.windowLength;
-  doc["intercept"] = mySettings.intercept;
-  doc["slope"] = mySettings.slope;
-  doc["method"] = "setSettings";
-  //serialWriteToCoMcu(doc, false);
-  doc.clear();
-  doc["method"] = "getPowerUsage";
-  //serialWriteToCoMcu(doc, true);
-  float ampsTRMS = 0.0;
-  float ACSValue = 0.0;
-  uint8_t counter = 0;
-  for(uint8_t i = 0; i < 4; i++){
-    if(mySettings.dutyState[i] == mySettings.ON){
-      counter++;
-    }
-  }
-  if(counter == 1){
-    ampsTRMS = (float)random(3950, 4000)/1000;
-    ACSValue = random(180, 190);
-  }
-  else if(counter == 2){
-    ampsTRMS = (float)random(5950, 6000)/1000;
-    ACSValue = random(190, 200);
-  }
-  else if(counter == 3){
-    ampsTRMS = (float)random(7950, 8000)/1000;
-    ACSValue = random(200, 210);
-  }
-  else if(counter == 4){
-    ampsTRMS = (float)random(9950, 10000)/1000;
-    ACSValue = random(210, 220);
-  }
-  doc["ampsTRMS"] = ampsTRMS;
-  doc["ACSValue"] = ACSValue;
+  float volt = PZEM.voltage();
+  float amp = PZEM.current();
+  float watt = PZEM.power();
+  float ener = PZEM.energy();
+  float freq = PZEM.frequency();
+  float pf = PZEM.pf();
 
-  if(doc["ampsTRMS"] != nullptr && doc["ACSValue"] != nullptr){
-    mySettings.latestAmpsTRMS = doc["ampsTRMS"].as<float>();
-    mySettings.latestACSValue = doc["ACSValue"].as<float>();
-    doc.clear();
-    log_manager->debug(PSTR(__func__), "Latest power meter reading ampsTRMS: %.2f - ACSValue: %.2f\n", mySettings.latestAmpsTRMS, mySettings.latestACSValue);
-    mySettings.accuAmpsTRMS += mySettings.latestAmpsTRMS;
-    mySettings.accuACSValue += mySettings.latestACSValue;
-    mySettings.counterPowerMonitor++;
-  }
+  log_manager->debug(PSTR(__func__), "Latest power meter reading volt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
+    volt, amp, watt, freq, pf, ener);
+  mySettings.accuVolt += volt;
+  mySettings.accuAmp += amp;
+  mySettings.accuWatt += watt;
+  mySettings.accuFreq += freq;
+  mySettings.accuPf += pf;
+  mySettings.counterPowerMonitor++;
 }
 
 void recPowerUsage(){
-  if(tb.connected() && mySettings.accuAmpsTRMS > 0){
-    float ampsTRMS = mySettings.accuAmpsTRMS / mySettings.counterPowerMonitor;
-    float ACSValue = mySettings.accuACSValue / mySettings.counterPowerMonitor;
+  if(tb.connected() && mySettings.accuWatt > 0){
+    float volt = mySettings.accuVolt / mySettings.counterPowerMonitor;
+    float amp = mySettings.accuAmp / mySettings.counterPowerMonitor;
+    float watt = mySettings.accuWatt / mySettings.counterPowerMonitor;
+    float freq = mySettings.accuFreq / mySettings.counterPowerMonitor;
+    float pf = mySettings.accuPf / mySettings.counterPowerMonitor;
+    float ener = PZEM.energy();
+
     StaticJsonDocument<DOCSIZE> doc;
-    doc["ampsTRMS"] = ampsTRMS;
-    doc["ACSValue"] = ACSValue;
+    doc["volt"] = volt;
+    doc["amp"] = amp;
+    doc["watt"] = watt;
+    doc["freq"] = freq;
+    doc["pf"] = pf;
+    doc["ener"] = ener;
     tb.sendTelemetryDoc(doc);
     doc.clear();
-    log_manager->info(PSTR(__func__), "Recorded power usage ampsTRMS: %.2f - ACSValue: %.2f\n", ampsTRMS, ACSValue);
-    mySettings.accuACSValue = 0;
-    mySettings.accuAmpsTRMS = 0;
+    log_manager->info(PSTR(__func__), "Recorded power usage olt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
+    volt, amp, watt, freq, pf, ener);
+    mySettings.accuVolt, mySettings.accuAmp, mySettings.accuWatt, mySettings.accuFreq, mySettings.accuPf = 0;
     mySettings.counterPowerMonitor = 0;
   }
   else{
-    log_manager->warn(PSTR(__func__), "Failed to record power usage, IoT not connected or result is zero. %d records waiting on the accumulator (%d - %d).\n",
-      mySettings.counterPowerMonitor, mySettings.accuAmpsTRMS, mySettings.accuACSValue);
+    log_manager->warn(PSTR(__func__), "Failed to record power usage, IoT not connected or result is zero. %d records waiting on the accumulator.\n",
+      mySettings.counterPowerMonitor);
   }
 }
 
@@ -347,6 +332,9 @@ if(doc["rlyActIT"] != nullptr)
   if(doc["intvDevTel"] != nullptr){mySettings.intvDevTel = doc["intvDevTel"].as<uint16_t>();}
   else{mySettings.intvDevTel = 1;}
 
+  if(doc["intvDevAtt"] != nullptr){mySettings.intvDevAtt = doc["intvDevAtt"].as<uint16_t>();}
+  else{mySettings.intvDevAtt = 1;}
+
 
   if(doc["rlyCtrlMd"] != nullptr)
   {
@@ -369,17 +357,6 @@ if(doc["rlyActIT"] != nullptr)
   {
     mySettings.dutyCounter[i] = 86400;
   }
-
-  if(doc["pinACS"] != nullptr){mySettings.pinACS = doc["pinACS"].as<uint8_t>();}
-  else{mySettings.pinACS = 14;}
-  if(doc["testFreq"] != nullptr){mySettings.testFreq = doc["testFreq"].as<float>();}
-  else{mySettings.testFreq = 50;}
-  if(doc["windowLength"] != nullptr){mySettings.windowLength = doc["windowLength"].as<float>();}
-  else{mySettings.windowLength = 40.0;}
-  if(doc["intercept"] != nullptr){mySettings.intercept = doc["intercept"].as<float>();}
-  else{mySettings.intercept = 0;}
-  if(doc["slope"] != nullptr){mySettings.slope = doc["slope"].as<float>();}
-  else{mySettings.slope = 0.0752;}
 
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
@@ -448,18 +425,13 @@ void saveSettings()
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   doc["intvGetPwrUsg"] = mySettings.intvGetPwrUsg;
   doc["intvDevTel"] = mySettings.intvDevTel;
+  doc["intvDevAtt"] = mySettings.intvDevAtt;
 
   JsonArray rlyCtrlMd = doc.createNestedArray("rlyCtrlMd");
   for(uint8_t i=0; i<countof(mySettings.rlyCtrlMd); i++)
   {
     rlyCtrlMd.add(mySettings.rlyCtrlMd[i]);
   }
-
-  doc["pinACS"] = mySettings.pinACS;
-  doc["testFreq"] = mySettings.testFreq;
-  doc["windowLength"] = mySettings.windowLength;
-  doc["intercept"] = mySettings.intercept;
-  doc["slope"] = mySettings.slope;
 
   writeSettings(doc, settingsPath);
   String tmp;
@@ -795,18 +767,13 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
   if(data["intvGetPwrUsg"] != nullptr){mySettings.intvGetPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
   if(data["intvDevTel"] != nullptr){mySettings.intvDevTel = data["intvDevTel"].as<uint16_t>();}
+  if(data["intvDevAtt"] != nullptr){mySettings.intvDevAtt = data["intvDevAtt"].as<uint16_t>();}
 
 
   if(data["rlyCtrlMdCh1"] != nullptr){mySettings.rlyCtrlMd[0] = data["rlyCtrlMdCh1"].as<uint8_t>();}
   if(data["rlyCtrlMdCh2"] != nullptr){mySettings.rlyCtrlMd[1] = data["rlyCtrlMdCh2"].as<uint8_t>();}
   if(data["rlyCtrlMdCh3"] != nullptr){mySettings.rlyCtrlMd[2] = data["rlyCtrlMdCh3"].as<uint8_t>();}
   if(data["rlyCtrlMdCh4"] != nullptr){mySettings.rlyCtrlMd[3] = data["rlyCtrlMdCh4"].as<uint8_t>();}
-
-  if(data["pinACS"] != nullptr){mySettings.pinACS = data["pinACS"].as<uint8_t>();}
-  if(data["testFreq"] != nullptr){mySettings.testFreq = data["testFreq"].as<float>();}
-  if(data["windowLength"] != nullptr){mySettings.windowLength = data["windowLength"].as<float>();}
-  if(data["intercept"] != nullptr){mySettings.intercept = data["intercept"].as<float>();}
-  if(data["slope"] != nullptr){mySettings.slope = data["slope"].as<float>();}
 
   if(data["fPanic"] != nullptr){configcomcu.fPanic = data["fPanic"].as<bool>();}
   if(data["bfreq"] != nullptr){configcomcu.bfreq = data["bfreq"].as<uint16_t>();}
@@ -907,33 +874,46 @@ void syncClientAttributes()
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   doc["intvGetPwrUsg"] = mySettings.intvGetPwrUsg;
   doc["intvDevTel"] = mySettings.intvDevTel;
+  doc["intvDevAtt"] = mySettings.intvDevAtt;
   doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
   doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
   doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
   doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["pinACS"] = mySettings.pinACS;
-  doc["testFreq"] = mySettings.testFreq;
-  doc["windowLength"] = mySettings.windowLength;
-  doc["intercept"] = mySettings.intercept;
-  doc["slope"] = mySettings.slope;
-  tb.sendAttributeDoc(doc);
-  doc.clear();
+}
+
+void publishDeviceAttributes()
+{
+  if(tb.connected()){
+    StaticJsonDocument<DOCSIZE> doc;
+    if(PZEM.power() > 1){
+      doc["volt"] = PZEM.voltage();
+      doc["amp"] = PZEM.current();
+      doc["watt"] = PZEM.power();
+      doc["freq"] = PZEM.frequency();
+      doc["pf"] = PZEM.pf();
+      doc["ener"] = PZEM.energy();
+
+      tb.sendAttributeDoc(doc);
+      doc.clear();
+    }
+  }
 }
 
 void publishDeviceTelemetry()
 {
-  StaticJsonDocument<DOCSIZE> doc;
+  if(tb.connected()){
+    StaticJsonDocument<DOCSIZE> doc;
 
-  doc["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-  doc["rssi"] = WiFi.RSSI();
-  doc["uptime"] = millis()/1000;
-  doc["dt"] = rtc.getEpoch();
-  doc["dts"] = rtc.getDateTime();
-  doc["pwr"] = mySettings.latestAmpsTRMS;
-  tb.sendTelemetryDoc(doc);
-  doc.clear();
+    doc["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    doc["rssi"] = WiFi.RSSI();
+    doc["uptime"] = millis()/1000;
+    doc["dt"] = rtc.getEpoch();
+    doc["dts"] = rtc.getDateTime();
+    tb.sendTelemetryDoc(doc);
+    doc.clear();
+  }
 }
 
 void publishSwitch(){

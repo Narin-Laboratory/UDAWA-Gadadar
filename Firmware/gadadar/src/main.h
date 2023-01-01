@@ -50,7 +50,8 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define DOCSIZE 1024
 #include <libudawa.h>
 #include <TimeLib.h>
-
+#include <HardwareSerial.h>
+#include <PZEM004Tv30.h>
 
 #define CURRENT_FIRMWARE_TITLE "UDAWA-Gadadar"
 #define CURRENT_FIRMWARE_VERSION "0.0.6"
@@ -71,6 +72,7 @@ struct Settings
     uint16_t intvRecPwrUsg = 600;
     uint16_t intvGetPwrUsg = 1;
     uint16_t intvDevTel = 1;
+    uint16_t intvDevAtt = 1;
     uint32_t rlyActDT[4];
     uint32_t rlyActIT[4];
     unsigned long rlyActDr[4];
@@ -78,17 +80,13 @@ struct Settings
     unsigned long rlyActITOnTs[4];
     bool publishSwitch[4] = {false, false, false, false};
 
-    uint8_t pinACS = 14;
-
-    float testFreq = 50;
-    float windowLength = 40.0;
-    float intercept = 0;
-    float slope = 0.0752;
-    float latestAmpsTRMS;
-    float latestACSValue;
-    long counterPowerMonitor = 0;
-    float accuAmpsTRMS;
-    float accuACSValue;
+    float accuVolt;
+    float accuAmp;
+    float accuWatt;
+    uint8_t counterKWH;
+    unsigned long counterPowerMonitor;
+    float accuFreq;
+    float accuPf;
 };
 
 callbackResponse processSaveConfig(const callbackData &data);
@@ -109,6 +107,7 @@ void relayControlBydtCyc();
 void relayControlByDateTime();
 void relayControlByIntrvl();
 void syncClientAttributes();
+void publishDeviceAttributes();
 void publishDeviceTelemetry();
 void setSwitch(String  ch, String state);
 void publishSwitch();
