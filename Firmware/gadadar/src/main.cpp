@@ -526,7 +526,7 @@ void setSwitch(String ch, String state)
     fState = !mySettings.ON;
   }
 
-  setCoMCUPin(pin, 'D', OUTPUT, 0, fState);
+  setCoMCUPin(pin, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
 }
 
