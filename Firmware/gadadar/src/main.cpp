@@ -68,6 +68,18 @@ void setup()
     });
   }
 
+  if(mySettings.intvGetWthr != 0){
+    taskid_t taskMonitorWeather = taskManager.scheduleFixedRate(mySettings.intvGetWthr * 1000, [] {
+      getWeatherData();
+    });
+  }
+
+  if(mySettings.intvRecWthr != 0){
+    taskid_t taskRecWeather = taskManager.scheduleFixedRate(mySettings.intvRecWthr * 1000, [] {
+      recWeatherData();
+    });
+  }
+
 }
 
 void loop()
