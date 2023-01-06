@@ -52,9 +52,13 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <TimeLib.h>
 #include <HardwareSerial.h>
 #include <PZEM004Tv30.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 
 #define CURRENT_FIRMWARE_TITLE "UDAWA-Gadadar"
 #define CURRENT_FIRMWARE_VERSION "0.0.6"
+#define SEALEVELPRESSURE_HPA (1013.25)
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -71,6 +75,8 @@ struct Settings
     unsigned long dutyCounter[4];
     uint16_t intvRecPwrUsg = 600;
     uint16_t intvGetPwrUsg = 1;
+    uint16_t intvRecWthr = 600;
+    uint16_t intvGetWthr = 1;
     uint16_t intvDevTel = 1;
     uint16_t intvDevAtt = 1;
     uint32_t rlyActDT[4];
@@ -87,6 +93,14 @@ struct Settings
     unsigned long counterPowerMonitor;
     float accuFreq;
     float accuPf;
+
+    float accuCelc;
+    float accuRh;
+    float accuHpa;
+    float accuAlt;
+    unsigned long counterWeatherSensor;
+
+    bool flag_bme280 = false;
 };
 
 callbackResponse processSaveConfig(const callbackData &data);
@@ -113,6 +127,8 @@ void setSwitch(String  ch, String state);
 void publishSwitch();
 void getPowerUsage();
 void recPowerUsage();
+void getWeatherData();
+void recWeatherData();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
 
 #endif

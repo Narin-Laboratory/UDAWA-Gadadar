@@ -12,6 +12,7 @@ using namespace libudawa;
 Settings mySettings;
 HardwareSerial ComPZEM(1);
 PZEM004Tv30 PZEM(ComPZEM, 4, 2);
+Adafruit_BME280 bme;
 
 const size_t callbacksSize = 13;
 GenericCallback callbacks[callbacksSize] = {
@@ -34,6 +35,11 @@ void setup()
   startup();
   loadSettings();
   configCoMCULoad();
+
+  mySettings.flag_bme280 = bme.begin();
+  if(!mySettings.flag_bme280){
+    log_manager->error(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
+  }
 
   networkInit();
   tb.setBufferSize(DOCSIZE);
@@ -145,7 +151,7 @@ void recPowerUsage(){
     doc["ener"] = ener;
     tb.sendTelemetryDoc(doc);
     doc.clear();
-    log_manager->info(PSTR(__func__), "Recorded power usage olt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
+    log_manager->info(PSTR(__func__), "Recorded power usage volt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
     volt, amp, watt, freq, pf, ener);
     mySettings.accuVolt, mySettings.accuAmp, mySettings.accuWatt, mySettings.accuFreq, mySettings.accuPf = 0;
     mySettings.counterPowerMonitor = 0;
@@ -153,6 +159,45 @@ void recPowerUsage(){
   else{
     log_manager->warn(PSTR(__func__), "Failed to record power usage, IoT not connected or result is zero. %d records waiting on the accumulator.\n",
       mySettings.counterPowerMonitor);
+  }
+}
+
+void getWeatherData(){
+  float celc = bme.readTemperature();
+  float rh = bme.readHumidity();
+  float hpa = bme.readPressure() / 100.0F;
+  float alt = bme.readAltitude(SEALEVELPRESSURE_HPA);
+
+  log_manager->debug(PSTR(__func__), "Latest BME280 readings Celc: %.2f - rH: %.2f - hPa: %.2f - Alt: %.2f\n", celc, rh, hpa, alt);
+  mySettings.accuCelc += celc;
+  mySettings.accuRh += rh;
+  mySettings.accuHpa += hpa;
+  mySettings.accuAlt += alt;
+  mySettings.counterWeatherSensor++;
+}
+
+void recWeatherData(){
+  if(tb.connected() && mySettings.flag_bme280){
+    float celc = mySettings.accuCelc / mySettings.counterWeatherSensor;
+    float rh = mySettings.accuRh / mySettings.counterWeatherSensor;
+    float hpa = mySettings.accuHpa / mySettings.counterWeatherSensor;
+    float alt = mySettings.accuAlt / mySettings.counterWeatherSensor;
+
+    StaticJsonDocument<DOCSIZE> doc;
+    doc["celc"] = celc;
+    doc["rh"] = rh;
+    doc["hpa"] = hpa;
+    doc["alt"] = alt;
+    tb.sendTelemetryDoc(doc);
+    doc.clear();
+
+    log_manager->debug(PSTR(__func__), "Recorded BME280 readings Celc: %.2f - rH: %.2f - hPa: %.2f - Alt: %.2f\n", celc, rh, hpa, alt);
+
+    mySettings.accuCelc, mySettings.accuRh, mySettings.accuHpa, mySettings.accuAlt = 0;
+    mySettings.counterWeatherSensor = 0;
+  }else{
+    log_manager->warn(PSTR(__func__), "Failed to record weather data, IoT not connected or the sensor is fail. %d records waiting on the accumulator.\n",
+      mySettings.counterWeatherSensor);
   }
 }
 
@@ -329,6 +374,12 @@ if(doc["rlyActIT"] != nullptr)
   if(doc["intvGetPwrUsg"] != nullptr){mySettings.intvGetPwrUsg = doc["intvGetPwrUsg"].as<uint16_t>();}
   else{mySettings.intvGetPwrUsg = 1;}
 
+  if(doc["intvRecWthr"] != nullptr){mySettings.intvRecWthr = doc["intvRecWthr"].as<uint16_t>();}
+  else{mySettings.intvRecWthr = 600;}
+
+  if(doc["intvGetWthr"] != nullptr){mySettings.intvGetWthr = doc["intvGetWthr"].as<uint16_t>();}
+  else{mySettings.intvGetWthr = 1;}
+
   if(doc["intvDevTel"] != nullptr){mySettings.intvDevTel = doc["intvDevTel"].as<uint16_t>();}
   else{mySettings.intvDevTel = 1;}
 
@@ -424,6 +475,8 @@ void saveSettings()
   doc["ON"] = mySettings.ON;
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   doc["intvGetPwrUsg"] = mySettings.intvGetPwrUsg;
+  doc["intvRecWthr"] = mySettings.intvRecWthr;
+  doc["intvGetWthr"] = mySettings.intvGetWthr;
   doc["intvDevTel"] = mySettings.intvDevTel;
   doc["intvDevAtt"] = mySettings.intvDevAtt;
 
@@ -766,6 +819,8 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["ON"] != nullptr){mySettings.ON = data["ON"].as<bool>();}
   if(data["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
   if(data["intvGetPwrUsg"] != nullptr){mySettings.intvGetPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
+  if(data["intvRecWthr"] != nullptr){mySettings.intvRecWthr = data["intvRecWthr"].as<uint16_t>();}
+  if(data["intvGetWthr"] != nullptr){mySettings.intvGetWthr = data["intvGetWthr"].as<uint16_t>();}
   if(data["intvDevTel"] != nullptr){mySettings.intvDevTel = data["intvDevTel"].as<uint16_t>();}
   if(data["intvDevAtt"] != nullptr){mySettings.intvDevAtt = data["intvDevAtt"].as<uint16_t>();}
 
@@ -873,6 +928,8 @@ void syncClientAttributes()
   doc["ON"] = mySettings.ON;
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   doc["intvGetPwrUsg"] = mySettings.intvGetPwrUsg;
+  doc["intvRecWthr"] = mySettings.intvRecWthr;
+  doc["intvGetWthr"] = mySettings.intvGetWthr;
   doc["intvDevTel"] = mySettings.intvDevTel;
   doc["intvDevAtt"] = mySettings.intvDevAtt;
   doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
@@ -894,6 +951,11 @@ void publishDeviceAttributes()
       doc["freq"] = PZEM.frequency();
       doc["pf"] = PZEM.pf();
       doc["ener"] = PZEM.energy();
+
+      doc["celc"] = bme.readTemperature();
+      doc["rh"] = bme.readHumidity();
+      doc["hpa"] = bme.readPressure() / 100.0F;
+      doc["alt"] = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
       tb.sendAttributeDoc(doc);
       doc.clear();
