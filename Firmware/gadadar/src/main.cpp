@@ -129,20 +129,23 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 
 void getPowerUsage(){
   float volt = PZEM.voltage();
-  float amp = PZEM.current();
-  float watt = PZEM.power();
-  float ener = PZEM.energy();
-  float freq = PZEM.frequency();
-  float pf = PZEM.pf();
+  if(volt > 0){
+    float volt = PZEM.voltage();
+    float amp = PZEM.current();
+    float watt = PZEM.power();
+    float ener = PZEM.energy();
+    float freq = PZEM.frequency();
+    float pf = PZEM.pf();
 
-  log_manager->debug(PSTR(__func__), "Latest power meter reading volt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
-    volt, amp, watt, freq, pf, ener);
-  mySettings.accuVolt += volt;
-  mySettings.accuAmp += amp;
-  mySettings.accuWatt += watt;
-  mySettings.accuFreq += freq;
-  mySettings.accuPf += pf;
-  mySettings.counterPowerMonitor++;
+    log_manager->debug(PSTR(__func__), "Latest power meter reading volt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
+      volt, amp, watt, freq, pf, ener);
+    mySettings.accuVolt += volt;
+    mySettings.accuAmp += amp;
+    mySettings.accuWatt += watt;
+    mySettings.accuFreq += freq;
+    mySettings.accuPf += pf;
+    mySettings.counterPowerMonitor++;
+  }
 }
 
 void recPowerUsage(){
@@ -167,15 +170,6 @@ void recPowerUsage(){
     volt, amp, watt, freq, pf, ener);
     mySettings.accuVolt, mySettings.accuAmp, mySettings.accuWatt, mySettings.accuFreq, mySettings.accuPf = 0;
     mySettings.counterPowerMonitor = 0;
-  }
-  else{
-    log_manager->warn(PSTR(__func__), "Failed to record power usage, IoT not connected or result is zero. %d records waiting on the accumulator.\n",
-      mySettings.counterPowerMonitor);
-      if(mySettings.accuWatt <= 0){
-        mySettings.accuVolt, mySettings.accuAmp, mySettings.accuWatt, mySettings.accuFreq, mySettings.accuPf = 0;
-        mySettings.counterPowerMonitor = 0;
-        log_manager->warn(PSTR(__func__), "Accumulator was resetted.\n");
-      }
   }
 }
 
@@ -214,9 +208,6 @@ void recWeatherData(){
 
     mySettings.accuCelc, mySettings.accuRh, mySettings.accuHpa, mySettings.accuAlt = 0;
     mySettings.counterWeatherSensor = 0;
-  }else{
-    log_manager->warn(PSTR(__func__), "Failed to record weather data, IoT not connected or the sensor is fail. %d records waiting on the accumulator.\n",
-      mySettings.counterWeatherSensor);
   }
 }
 
