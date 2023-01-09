@@ -171,21 +171,28 @@ void recPowerUsage(){
   else{
     log_manager->warn(PSTR(__func__), "Failed to record power usage, IoT not connected or result is zero. %d records waiting on the accumulator.\n",
       mySettings.counterPowerMonitor);
+      if(mySettings.accuWatt <= 0){
+        mySettings.accuVolt, mySettings.accuAmp, mySettings.accuWatt, mySettings.accuFreq, mySettings.accuPf = 0;
+        mySettings.counterPowerMonitor = 0;
+        log_manager->warn(PSTR(__func__), "Accumulator was resetted.\n");
+      }
   }
 }
 
 void getWeatherData(){
-  float celc = bme.readTemperature();
-  float rh = bme.readHumidity();
-  float hpa = bme.readPressure() / 100.0F;
-  float alt = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  if(mySettings.flag_bme280){
+    float celc = bme.readTemperature();
+    float rh = bme.readHumidity();
+    float hpa = bme.readPressure() / 100.0F;
+    float alt = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
-  log_manager->debug(PSTR(__func__), "Latest BME280 readings Celc: %.2f - rH: %.2f - hPa: %.2f - Alt: %.2f\n", celc, rh, hpa, alt);
-  mySettings.accuCelc += celc;
-  mySettings.accuRh += rh;
-  mySettings.accuHpa += hpa;
-  mySettings.accuAlt += alt;
-  mySettings.counterWeatherSensor++;
+    log_manager->debug(PSTR(__func__), "Latest BME280 readings Celc: %.2f - rH: %.2f - hPa: %.2f - Alt: %.2f\n", celc, rh, hpa, alt);
+    mySettings.accuCelc += celc;
+    mySettings.accuRh += rh;
+    mySettings.accuHpa += hpa;
+    mySettings.accuAlt += alt;
+    mySettings.counterWeatherSensor++;
+  }
 }
 
 void recWeatherData(){
