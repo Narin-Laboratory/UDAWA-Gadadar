@@ -36,7 +36,7 @@ void setup()
   loadSettings();
   configCoMCULoad();
 
-  mySettings.flag_bme280 = bme.begin();
+  mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
     log_manager->error(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }
