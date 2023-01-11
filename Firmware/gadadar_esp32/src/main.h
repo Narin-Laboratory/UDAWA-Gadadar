@@ -47,7 +47,8 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 -----END CERTIFICATE-----
 )EOF";
 
-#define DOCSIZE 1024
+#define DOCSIZE 2048
+#define USE_SERIAL2
 #include <libudawa.h>
 #include <TimeLib.h>
 #include <HardwareSerial.h>

@@ -35,6 +35,7 @@ void setup()
   startup();
   loadSettings();
   configCoMCULoad();
+  syncConfigCoMCU();
 
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
@@ -521,7 +522,7 @@ callbackResponse processSaveConfigCoMCU(const callbackData &data)
 {
   configCoMCUSave();
   configCoMCULoad();
-  syncConfigCoMCU();
+  //syncConfigCoMCU();
   return callbackResponse("saveConfigCoMCU", 1);
 }
 
