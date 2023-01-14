@@ -6,12 +6,13 @@
  * prita.undiknas.ac.id | narin.co.id
 **/
 #include "main.h"
-
+#define S1_TX 2
+#define S1_RX 4
 
 using namespace libudawa;
 Settings mySettings;
 HardwareSerial ComPZEM(1);
-PZEM004Tv30 PZEM(ComPZEM, 4, 2);
+PZEM004Tv30 PZEM(ComPZEM, S1_RX, S1_TX, 0xF8);
 Adafruit_BME280 bme;
 
 const size_t callbacksSize = 13;
@@ -129,8 +130,8 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 }
 
 void getPowerUsage(){
-  float volt = PZEM.voltage();
-  if(volt > 0){
+  //float volt = PZEM.voltage();
+  //if(volt > 0){
     float volt = PZEM.voltage();
     float amp = PZEM.current();
     float watt = PZEM.power();
@@ -146,7 +147,7 @@ void getPowerUsage(){
     mySettings.accuFreq += freq;
     mySettings.accuPf += pf;
     mySettings.counterPowerMonitor++;
-  }
+  //}
 }
 
 void recPowerUsage(){
