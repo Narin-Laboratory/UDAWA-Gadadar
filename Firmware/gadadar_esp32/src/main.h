@@ -74,32 +74,15 @@ struct Settings
     bool ON;
     bool dutyState[4];
     unsigned long dutyCounter[4];
-    uint16_t intvRecPwrUsg = 600;
-    uint16_t intvGetPwrUsg = 1;
-    uint16_t intvRecWthr = 600;
-    uint16_t intvGetWthr = 1;
+    uint16_t intvRecPwrUsg = 1;
+    uint16_t intvRecWthr = 1;
     uint16_t intvDevTel = 1;
-    uint16_t intvDevAtt = 1;
     uint32_t rlyActDT[4];
     uint32_t rlyActIT[4];
     unsigned long rlyActDr[4];
     unsigned long rlyActITOn[4];
     unsigned long rlyActITOnTs[4];
     bool publishSwitch[4] = {false, false, false, false};
-
-    float accuVolt;
-    float accuAmp;
-    float accuWatt;
-    uint8_t counterKWH;
-    unsigned long counterPowerMonitor;
-    float accuFreq;
-    float accuPf;
-
-    float accuCelc;
-    float accuRh;
-    float accuHpa;
-    float accuAlt;
-    unsigned long counterWeatherSensor;
 
     bool flag_bme280 = false;
 };
@@ -126,9 +109,7 @@ void publishDeviceAttributes();
 void publishDeviceTelemetry();
 void setSwitch(String  ch, String state);
 void publishSwitch();
-void getPowerUsage();
 void recPowerUsage();
-void getWeatherData();
 void recWeatherData();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
 

@@ -6,13 +6,11 @@
  * prita.undiknas.ac.id | narin.co.id
 **/
 #include "main.h"
-#define S1_TX 2
-#define S1_RX 4
+#define S1_TX 33
+#define S1_RX 32
 
 using namespace libudawa;
 Settings mySettings;
-HardwareSerial ComPZEM(1);
-PZEM004Tv30 PZEM(ComPZEM, S1_RX, S1_TX, 0xF8);
 Adafruit_BME280 bme;
 
 const size_t callbacksSize = 13;
@@ -52,27 +50,9 @@ void setup()
     });
   }
 
-  if(mySettings.intvDevAtt != 0){
-    taskid_t taskPublishDeviceAttributes = taskManager.scheduleFixedRate(mySettings.intvDevAtt * 1000, [] {
-      publishDeviceAttributes();
-    });
-  }
-
-  if(mySettings.intvGetPwrUsg != 0){
-    taskid_t taskMonitorPowerUsage = taskManager.scheduleFixedRate(mySettings.intvGetPwrUsg * 1000, [] {
-      getPowerUsage();
-    });
-  }
-
   if(mySettings.intvRecPwrUsg != 0){
     taskid_t taskRecPowerUsage = taskManager.scheduleFixedRate(mySettings.intvRecPwrUsg * 1000, [] {
       recPowerUsage();
-    });
-  }
-
-  if(mySettings.intvGetWthr != 0){
-    taskid_t taskMonitorWeather = taskManager.scheduleFixedRate(mySettings.intvGetWthr * 1000, [] {
-      getWeatherData();
     });
   }
 
@@ -129,74 +109,22 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
   return ans;
 }
 
-void getPowerUsage(){
-  //float volt = PZEM.voltage();
-  //if(volt > 0){
-    float volt = PZEM.voltage();
-    float amp = PZEM.current();
-    float watt = PZEM.power();
-    float ener = PZEM.energy();
-    float freq = PZEM.frequency();
-    float pf = PZEM.pf();
-
-    log_manager->debug(PSTR(__func__), "Latest power meter reading volt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
-      volt, amp, watt, freq, pf, ener);
-    mySettings.accuVolt += volt;
-    mySettings.accuAmp += amp;
-    mySettings.accuWatt += watt;
-    mySettings.accuFreq += freq;
-    mySettings.accuPf += pf;
-    mySettings.counterPowerMonitor++;
-  //}
-}
 
 void recPowerUsage(){
-  if(tb.connected() && mySettings.accuWatt > 0){
-    float volt = mySettings.accuVolt / mySettings.counterPowerMonitor;
-    float amp = mySettings.accuAmp / mySettings.counterPowerMonitor;
-    float watt = mySettings.accuWatt / mySettings.counterPowerMonitor;
-    float freq = mySettings.accuFreq / mySettings.counterPowerMonitor;
-    float pf = mySettings.accuPf / mySettings.counterPowerMonitor;
-    float ener = PZEM.energy();
-
+  if(tb.connected()){
     StaticJsonDocument<DOCSIZE> doc;
-    doc["volt"] = volt;
-    doc["amp"] = amp;
-    doc["watt"] = watt;
-    doc["freq"] = freq;
-    doc["pf"] = pf;
-    doc["ener"] = ener;
+    doc["method"] = "getPowerUsage";
+    serialWriteToCoMcu(doc, true);
     tb.sendTelemetryDoc(doc);
-    doc.clear();
-    log_manager->info(PSTR(__func__), "Recorded power usage volt: %.2f - amp: %.2f - watt: %.2f - freq: %.2f - pf: %.2f - ener: %.2f\n",
-    volt, amp, watt, freq, pf, ener);
-    mySettings.accuVolt, mySettings.accuAmp, mySettings.accuWatt, mySettings.accuFreq, mySettings.accuPf = 0;
-    mySettings.counterPowerMonitor = 0;
-  }
-}
-
-void getWeatherData(){
-  if(mySettings.flag_bme280){
-    float celc = bme.readTemperature();
-    float rh = bme.readHumidity();
-    float hpa = bme.readPressure() / 100.0F;
-    float alt = bme.readAltitude(SEALEVELPRESSURE_HPA);
-
-    log_manager->debug(PSTR(__func__), "Latest BME280 readings Celc: %.2f - rH: %.2f - hPa: %.2f - Alt: %.2f\n", celc, rh, hpa, alt);
-    mySettings.accuCelc += celc;
-    mySettings.accuRh += rh;
-    mySettings.accuHpa += hpa;
-    mySettings.accuAlt += alt;
-    mySettings.counterWeatherSensor++;
   }
 }
 
 void recWeatherData(){
   if(tb.connected() && mySettings.flag_bme280){
-    float celc = mySettings.accuCelc / mySettings.counterWeatherSensor;
-    float rh = mySettings.accuRh / mySettings.counterWeatherSensor;
-    float hpa = mySettings.accuHpa / mySettings.counterWeatherSensor;
-    float alt = mySettings.accuAlt / mySettings.counterWeatherSensor;
+    float celc = bme.readTemperature();
+    float rh = bme.readHumidity();
+    float hpa = bme.readPressure() / 100.0F;
+    float alt = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
     StaticJsonDocument<DOCSIZE> doc;
     doc["celc"] = celc;
@@ -204,12 +132,6 @@ void recWeatherData(){
     doc["hpa"] = hpa;
     doc["alt"] = alt;
     tb.sendTelemetryDoc(doc);
-    doc.clear();
-
-    log_manager->debug(PSTR(__func__), "Recorded BME280 readings Celc: %.2f - rH: %.2f - hPa: %.2f - Alt: %.2f\n", celc, rh, hpa, alt);
-
-    mySettings.accuCelc, mySettings.accuRh, mySettings.accuHpa, mySettings.accuAlt = 0;
-    mySettings.counterWeatherSensor = 0;
   }
 }
 
@@ -383,21 +305,11 @@ if(doc["rlyActIT"] != nullptr)
   if(doc["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = doc["intvRecPwrUsg"].as<uint16_t>();}
   else{mySettings.intvRecPwrUsg = 600;}
 
-  if(doc["intvGetPwrUsg"] != nullptr){mySettings.intvGetPwrUsg = doc["intvGetPwrUsg"].as<uint16_t>();}
-  else{mySettings.intvGetPwrUsg = 1;}
-
   if(doc["intvRecWthr"] != nullptr){mySettings.intvRecWthr = doc["intvRecWthr"].as<uint16_t>();}
   else{mySettings.intvRecWthr = 600;}
 
-  if(doc["intvGetWthr"] != nullptr){mySettings.intvGetWthr = doc["intvGetWthr"].as<uint16_t>();}
-  else{mySettings.intvGetWthr = 1;}
-
   if(doc["intvDevTel"] != nullptr){mySettings.intvDevTel = doc["intvDevTel"].as<uint16_t>();}
   else{mySettings.intvDevTel = 1;}
-
-  if(doc["intvDevAtt"] != nullptr){mySettings.intvDevAtt = doc["intvDevAtt"].as<uint16_t>();}
-  else{mySettings.intvDevAtt = 1;}
-
 
   if(doc["rlyCtrlMd"] != nullptr)
   {
@@ -486,11 +398,8 @@ void saveSettings()
 
   doc["ON"] = mySettings.ON;
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
-  doc["intvGetPwrUsg"] = mySettings.intvGetPwrUsg;
   doc["intvRecWthr"] = mySettings.intvRecWthr;
-  doc["intvGetWthr"] = mySettings.intvGetWthr;
   doc["intvDevTel"] = mySettings.intvDevTel;
-  doc["intvDevAtt"] = mySettings.intvDevAtt;
 
   JsonArray rlyCtrlMd = doc.createNestedArray("rlyCtrlMd");
   for(uint8_t i=0; i<countof(mySettings.rlyCtrlMd); i++)
@@ -830,12 +739,8 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
 
   if(data["ON"] != nullptr){mySettings.ON = data["ON"].as<bool>();}
   if(data["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
-  if(data["intvGetPwrUsg"] != nullptr){mySettings.intvGetPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
   if(data["intvRecWthr"] != nullptr){mySettings.intvRecWthr = data["intvRecWthr"].as<uint16_t>();}
-  if(data["intvGetWthr"] != nullptr){mySettings.intvGetWthr = data["intvGetWthr"].as<uint16_t>();}
   if(data["intvDevTel"] != nullptr){mySettings.intvDevTel = data["intvDevTel"].as<uint16_t>();}
-  if(data["intvDevAtt"] != nullptr){mySettings.intvDevAtt = data["intvDevAtt"].as<uint16_t>();}
-
 
   if(data["rlyCtrlMdCh1"] != nullptr){mySettings.rlyCtrlMd[0] = data["rlyCtrlMdCh1"].as<uint8_t>();}
   if(data["rlyCtrlMdCh2"] != nullptr){mySettings.rlyCtrlMd[1] = data["rlyCtrlMdCh2"].as<uint8_t>();}
@@ -939,40 +844,14 @@ void syncClientAttributes()
   doc["pinCh4"] = mySettings.pin[3];
   doc["ON"] = mySettings.ON;
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
-  doc["intvGetPwrUsg"] = mySettings.intvGetPwrUsg;
   doc["intvRecWthr"] = mySettings.intvRecWthr;
-  doc["intvGetWthr"] = mySettings.intvGetWthr;
   doc["intvDevTel"] = mySettings.intvDevTel;
-  doc["intvDevAtt"] = mySettings.intvDevAtt;
   doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
   doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
   doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
   doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-}
-
-void publishDeviceAttributes()
-{
-  if(tb.connected()){
-    StaticJsonDocument<DOCSIZE> doc;
-    if(PZEM.power() > 1){
-      doc["volt"] = PZEM.voltage();
-      doc["amp"] = PZEM.current();
-      doc["watt"] = PZEM.power();
-      doc["freq"] = PZEM.frequency();
-      doc["pf"] = PZEM.pf();
-      doc["ener"] = PZEM.energy();
-
-      doc["celc"] = bme.readTemperature();
-      doc["rh"] = bme.readHumidity();
-      doc["hpa"] = bme.readPressure() / 100.0F;
-      doc["alt"] = bme.readAltitude(SEALEVELPRESSURE_HPA);
-
-      tb.sendAttributeDoc(doc);
-      doc.clear();
-    }
-  }
 }
 
 void publishDeviceTelemetry()
