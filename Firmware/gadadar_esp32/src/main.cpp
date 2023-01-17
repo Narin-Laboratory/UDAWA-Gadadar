@@ -6,14 +6,16 @@
  * prita.undiknas.ac.id | narin.co.id
 **/
 #include "main.h"
-#define S1_TX 33
-#define S1_RX 32
+#define S1_TX 32
+#define S1_RX 4
 
 using namespace libudawa;
 Settings mySettings;
 Adafruit_BME280 bme;
+HardwareSerial PZEMSerial(1);
+PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-const size_t callbacksSize = 13;
+const size_t callbacksSize = 15;
 GenericCallback callbacks[callbacksSize] = {
   { "sharedAttributesUpdate", processSharedAttributesUpdate },
   { "provisionResponse", processProvisionResponse },
@@ -26,7 +28,9 @@ GenericCallback callbacks[callbacksSize] = {
   { "getSwitchCh1", processGetSwitchCh1},
   { "getSwitchCh2", processGetSwitchCh2},
   { "getSwitchCh3", processGetSwitchCh3},
-  { "getSwitchCh4", processGetSwitchCh4}
+  { "getSwitchCh4", processGetSwitchCh4},
+  { "setPanic", processSetPanic},
+  { "bridge", processBridge}
 };
 
 void setup()
@@ -35,6 +39,9 @@ void setup()
   loadSettings();
   configCoMCULoad();
   syncConfigCoMCU();
+  if(String(config.model) == String("Generic")){
+    strlcpy(config.model, "Gadadar", sizeof(config.model));
+  }
 
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
@@ -113,9 +120,17 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 void recPowerUsage(){
   if(tb.connected()){
     StaticJsonDocument<DOCSIZE> doc;
-    doc["method"] = "getPowerUsage";
-    serialWriteToCoMcu(doc, true);
-    tb.sendTelemetryDoc(doc);
+    if(!isnan(PZEM.voltage())){
+      doc["volt"] = PZEM.voltage();
+      doc["amp"] = PZEM.current();
+      doc["watt"] = PZEM.power();
+      doc["ener"] = PZEM.energy();
+      doc["freq"] = PZEM.frequency();
+      doc["pf"] = PZEM.pf();
+
+      tb.sendTelemetryDoc(doc);
+      //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f - Amp: %.2f \n"), PZEM.voltage(), PZEM.current());
+    }
   }
 }
 
@@ -124,7 +139,7 @@ void recWeatherData(){
     float celc = bme.readTemperature();
     float rh = bme.readHumidity();
     float hpa = bme.readPressure() / 100.0F;
-    float alt = bme.readAltitude(SEALEVELPRESSURE_HPA);
+    float alt = bme.readAltitude(mySettings.seaHpa);
 
     StaticJsonDocument<DOCSIZE> doc;
     doc["celc"] = celc;
@@ -303,13 +318,13 @@ if(doc["rlyActIT"] != nullptr)
   }
 
   if(doc["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = doc["intvRecPwrUsg"].as<uint16_t>();}
-  else{mySettings.intvRecPwrUsg = 600;}
+  else{mySettings.intvRecPwrUsg = 0;}
 
   if(doc["intvRecWthr"] != nullptr){mySettings.intvRecWthr = doc["intvRecWthr"].as<uint16_t>();}
-  else{mySettings.intvRecWthr = 600;}
+  else{mySettings.intvRecWthr = 0;}
 
   if(doc["intvDevTel"] != nullptr){mySettings.intvDevTel = doc["intvDevTel"].as<uint16_t>();}
-  else{mySettings.intvDevTel = 1;}
+  else{mySettings.intvDevTel = 0;}
 
   if(doc["rlyCtrlMd"] != nullptr)
   {
@@ -332,6 +347,9 @@ if(doc["rlyActIT"] != nullptr)
   {
     mySettings.dutyCounter[i] = 86400;
   }
+
+  if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
+  else{mySettings.seaHpa = 1019.00;}
 
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
@@ -407,6 +425,8 @@ void saveSettings()
     rlyCtrlMd.add(mySettings.rlyCtrlMd[i]);
   }
 
+  doc["seaHpa"] = mySettings.seaHpa;
+
   writeSettings(doc, settingsPath);
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
@@ -480,6 +500,40 @@ callbackResponse processGetSwitchCh4(const callbackData &data)
   return callbackResponse("ch4", mySettings.dutyState[3] == mySettings.ON ? "ON" : "OFF");
 }
 
+callbackResponse processSetPanic(const callbackData &data)
+{
+
+  StaticJsonDocument<DOCSIZE> doc;
+  doc["method"] = "setPanic";
+  JsonObject params = doc.createNestedObject("params");
+  String state = data["params"]["state"].as<String>();
+  if(state == String("ON")){
+    params["state"] = 1;
+  }
+  else{
+    params["state"] = 0;
+  }
+  serialWriteToCoMcu(doc, 0);
+  return callbackResponse("setPanic", data["params"]["state"].as<int>());
+}
+
+callbackResponse processBridge(const callbackData &data)
+{
+  StaticJsonDocument<DOCSIZE> doc;
+  doc["method"] = data["params"]["method"];
+  doc["params"] = data["params"];
+  if(data["params"]["isRpc"] != nullptr){
+    serialWriteToCoMcu(doc, 1);
+    String result;
+    serializeJson(doc, result);
+    return callbackResponse("bridge", result.c_str());
+  }else{
+    serialWriteToCoMcu(doc, 0);
+    String result;
+    serializeJson(doc, result);
+    return callbackResponse("bridge", result.c_str());
+  }
+}
 
 void setSwitch(String ch, String state)
 {
@@ -747,6 +801,8 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["rlyCtrlMdCh3"] != nullptr){mySettings.rlyCtrlMd[2] = data["rlyCtrlMdCh3"].as<uint8_t>();}
   if(data["rlyCtrlMdCh4"] != nullptr){mySettings.rlyCtrlMd[3] = data["rlyCtrlMdCh4"].as<uint8_t>();}
 
+  if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
+
   if(data["fPanic"] != nullptr){configcomcu.fPanic = data["fPanic"].as<bool>();}
   if(data["bfreq"] != nullptr){configcomcu.bfreq = data["bfreq"].as<uint16_t>();}
   if(data["fBuzz"] != nullptr){configcomcu.fBuzz = data["fBuzz"].as<bool>();}
@@ -754,6 +810,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["pinLedR"] != nullptr){configcomcu.pinLedR = data["pinLedR"].as<uint8_t>();}
   if(data["pinLedG"] != nullptr){configcomcu.pinLedG = data["pinLedG"].as<uint8_t>();}
   if(data["pinLedB"] != nullptr){configcomcu.pinLedB = data["pinLedB"].as<uint8_t>();}
+
 
   mySettings.lastUpdated = millis();
   return callbackResponse("sharedAttributesUpdate", 1);
@@ -850,6 +907,7 @@ void syncClientAttributes()
   doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
   doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
   doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
+  doc["seaHpa"] = mySettings.seaHpa;
   tb.sendAttributeDoc(doc);
   doc.clear();
 }

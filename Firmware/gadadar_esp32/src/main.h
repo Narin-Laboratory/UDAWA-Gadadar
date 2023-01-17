@@ -57,9 +57,8 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 
-#define CURRENT_FIRMWARE_TITLE "UDAWA-Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.6"
-#define SEALEVELPRESSURE_HPA (1013.25)
+#define CURRENT_FIRMWARE_TITLE "Gadadar"
+#define CURRENT_FIRMWARE_VERSION "0.0.7"
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -85,6 +84,7 @@ struct Settings
     bool publishSwitch[4] = {false, false, false, false};
 
     bool flag_bme280 = false;
+    float seaHpa = 1019.00;
 };
 
 callbackResponse processSaveConfig(const callbackData &data);
@@ -98,6 +98,8 @@ callbackResponse processGetSwitchCh2(const callbackData &data);
 callbackResponse processGetSwitchCh3(const callbackData &data);
 callbackResponse processGetSwitchCh4(const callbackData &data);
 callbackResponse processSaveConfigCoMCU(const callbackData &data);
+callbackResponse processSetPanic(const callbackData &data);
+callbackResponse processBridge(const callbackData &data);
 
 void loadSettings();
 void saveSettings();
