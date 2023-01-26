@@ -87,6 +87,13 @@ struct Settings
     float seaHpa = 1019.00;
 
     bool flag_syncClientAttr = 0;
+
+    float _volt = 0.0;
+    float _amp = 0.0;
+    float _watt = 0.0;
+    float _ener = -1;
+    float _freq = 0.0;
+    float _pf = 0.0;
 };
 
 callbackResponse processSaveConfig(const callbackData &data);

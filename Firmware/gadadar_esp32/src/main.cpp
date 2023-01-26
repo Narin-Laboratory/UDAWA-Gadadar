@@ -110,7 +110,7 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 {
   if (hi >= 1000)
   {
-    log_manager->error(PSTR(__func__),"Cannot store milliseconds in uint32!\n");
+    log_manager->error(PSTR(__func__), PSTR("Cannot store milliseconds in uint32!\n"));
   }
 
   uint32_t r = (lo >> 16) + (hi << 16);
@@ -124,17 +124,64 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 
 void recPowerUsage(){
   if(tb.connected()){
-    StaticJsonDocument<DOCSIZE> doc;
     if(!isnan(PZEM.voltage())){
-      doc["volt"] = PZEM.voltage();
-      doc["amp"] = PZEM.current();
-      doc["watt"] = PZEM.power();
-      doc["ener"] = PZEM.energy();
-      doc["freq"] = PZEM.frequency();
-      doc["pf"] = PZEM.pf();
+      StaticJsonDocument<DOCSIZE> doc;
+      float volt = PZEM.voltage();
+      if(volt != mySettings._volt){
+        doc["volt"] = volt;
+        mySettings._volt = volt;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
 
-      tb.sendTelemetryDoc(doc);
-      //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f - Amp: %.2f \n"), PZEM.voltage(), PZEM.current());
+      float amp = PZEM.current();
+      if(amp != mySettings._amp){
+        doc["amp"] = amp;
+        mySettings._amp = amp;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
+
+      float watt = PZEM.power();
+      if(watt != mySettings._watt){
+        doc["watt"] = watt;
+        mySettings._watt = watt;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
+
+      float ener = PZEM.energy();
+      if(mySettings._ener == -1){
+        bool resetPZEM = PZEM.resetEnergy();
+        log_manager->warn(PSTR(__func__), PSTR("Resetting PZEM Energy Counter: %d\n"), (int)resetPZEM);
+        ener = PZEM.energy();
+        doc["ener"] = ener;
+        mySettings._ener = ener;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
+      else if(ener - mySettings._ener > 0){
+        doc["ener"] = ener - mySettings._ener;
+        mySettings._ener = ener;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
+
+      float freq = PZEM.frequency();
+      if(freq != mySettings._freq){
+        doc["freq"] = freq;
+        mySettings._freq = freq;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
+
+      float pf = PZEM.pf();
+      if(pf != mySettings._pf){
+        doc["pf"] = pf;
+        mySettings._pf = pf;
+        tb.sendTelemetryDoc(doc);
+        doc.clear();
+      }
     }
   }
 }
