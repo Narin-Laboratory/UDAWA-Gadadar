@@ -81,10 +81,12 @@ struct Settings
     unsigned long rlyActDr[4];
     unsigned long rlyActITOn[4];
     unsigned long rlyActITOnTs[4];
-    bool publishSwitch[4] = {false, false, false, false};
+    bool publishSwitch[4] = {true, true, true, true};
 
     bool flag_bme280 = false;
     float seaHpa = 1019.00;
+
+    bool flag_syncClientAttr = 0;
 };
 
 callbackResponse processSaveConfig(const callbackData &data);

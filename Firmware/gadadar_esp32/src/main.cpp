@@ -79,6 +79,11 @@ void loop()
   relayControlByIntrvl();
   publishSwitch();
 
+  if(tb.connected() && mySettings.flag_syncClientAttr == 1){
+    syncClientAttributes();
+    mySettings.flag_syncClientAttr = 0;
+  }
+
   if(tb.connected() && FLAG_IOT_SUBSCRIBE)
   {
     if(tb.callbackSubscribe(callbacks, callbacksSize))
@@ -464,7 +469,7 @@ callbackResponse processReboot(const callbackData &data)
 
 callbackResponse processSyncClientAttributes(const callbackData &data)
 {
-  syncClientAttributes();
+  mySettings.flag_syncClientAttr = 1;
   return callbackResponse("syncClientAttributes", 1);
 }
 
@@ -508,11 +513,14 @@ callbackResponse processSetPanic(const callbackData &data)
   String state = data["params"]["state"].as<String>();
   if(state == String("ON")){
     doc["fPanic"] = 1;
+    configcomcu.fPanic = 1;
   }
   else{
     doc["fPanic"] = 0;
+    configcomcu.fPanic = 0;
   }
   serialWriteToCoMcu(doc, 0);
+  mySettings.flag_syncClientAttr = 1;
   return callbackResponse("setPanic", data["params"]["state"].as<int>());
 }
 
