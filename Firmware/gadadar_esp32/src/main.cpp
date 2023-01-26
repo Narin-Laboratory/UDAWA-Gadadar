@@ -504,14 +504,13 @@ callbackResponse processSetPanic(const callbackData &data)
 {
 
   StaticJsonDocument<DOCSIZE> doc;
-  doc["method"] = "setPanic";
-  JsonObject params = doc.createNestedObject("params");
+  doc["method"] = "sCfg";
   String state = data["params"]["state"].as<String>();
   if(state == String("ON")){
-    params["state"] = 1;
+    doc["fPanic"] = 1;
   }
   else{
-    params["state"] = 0;
+    doc["fPanic"] = 0;
   }
   serialWriteToCoMcu(doc, 0);
   return callbackResponse("setPanic", data["params"]["state"].as<int>());
