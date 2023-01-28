@@ -362,7 +362,7 @@ if(doc["rlyActIT"] != nullptr)
 
   if(doc["ON"] != nullptr)
   {
-    mySettings.ON = doc["ON"].as<bool>();
+    mySettings.ON = doc["ON"].as<uint8_t>();
   }
   else
   {
@@ -987,7 +987,7 @@ void publishSwitch(){
       if(mySettings.publishSwitch[i]){
         StaticJsonDocument<DOCSIZE> doc;
         String chName = "ch" + String(i+1);
-        doc[chName.c_str()] = (int)mySettings.dutyState[i];
+        doc[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
         tb.sendTelemetryDoc(doc);
         doc.clear();
 

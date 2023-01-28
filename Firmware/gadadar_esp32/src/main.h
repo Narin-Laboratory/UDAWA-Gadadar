@@ -70,7 +70,7 @@ struct Settings
     unsigned long dtRngFS[4];
     uint8_t pin[4];
     uint32_t lastUpdated;
-    bool ON;
+    uint8_t ON;
     bool dutyState[4];
     unsigned long dutyCounter[4];
     uint16_t intvRecPwrUsg = 1;
