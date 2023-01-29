@@ -81,6 +81,10 @@ void loop()
 
   if(tb.connected() && mySettings.flag_syncClientAttr == 1){
     syncClientAttributes();
+    mySettings.publishSwitch[0] = true;
+    mySettings.publishSwitch[1] = true;
+    mySettings.publishSwitch[2] = true;
+    mySettings.publishSwitch[3] = true;
     mySettings.flag_syncClientAttr = 0;
   }
 
@@ -101,7 +105,7 @@ void loop()
       log_manager->info(PSTR(__func__),PSTR("Firmware up-to-date.\n"));
     }
 
-    syncClientAttributes();
+    mySettings.flag_syncClientAttr = 1;
   }
 }
 
@@ -864,7 +868,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["pinLedR"] != nullptr){configcomcu.pinLedR = data["pinLedR"].as<uint8_t>();}
   if(data["pinLedG"] != nullptr){configcomcu.pinLedG = data["pinLedG"].as<uint8_t>();}
   if(data["pinLedB"] != nullptr){configcomcu.pinLedB = data["pinLedB"].as<uint8_t>();}
-
+  if(data["ledON"] != nullptr){configcomcu.ledON = data["ledON"].as<uint8_t>();}
 
   mySettings.lastUpdated = millis();
   return callbackResponse("sharedAttributesUpdate", 1);
@@ -962,6 +966,17 @@ void syncClientAttributes()
   doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
   doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
   doc["seaHpa"] = mySettings.seaHpa;
+  tb.sendAttributeDoc(doc);
+  doc.clear();
+  doc["pinBuzzer"] = configcomcu.pinBuzzer;
+  doc["pinLedR"] = configcomcu.pinLedR;
+  doc["pinLedG"] = configcomcu.pinLedG;
+  doc["pinLedB"] = configcomcu.pinLedB;
+  doc["ledON"] = configcomcu.ledON;
+  doc["bfreq"] = configcomcu.bfreq;
+  doc["fPanic"] = configcomcu.fPanic;
+  doc["fBuzz"] = configcomcu.fBuzz;
+  doc["bfreq"] = configcomcu.bfreq;
   tb.sendAttributeDoc(doc);
   doc.clear();
 }
