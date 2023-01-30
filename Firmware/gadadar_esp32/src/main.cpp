@@ -15,7 +15,7 @@ Adafruit_BME280 bme;
 HardwareSerial PZEMSerial(1);
 PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-const size_t callbacksSize = 15;
+const size_t callbacksSize = 16;
 GenericCallback callbacks[callbacksSize] = {
   { "sharedAttributesUpdate", processSharedAttributesUpdate },
   { "provisionResponse", processProvisionResponse },
@@ -30,7 +30,8 @@ GenericCallback callbacks[callbacksSize] = {
   { "getSwitchCh3", processGetSwitchCh3},
   { "getSwitchCh4", processGetSwitchCh4},
   { "setPanic", processSetPanic},
-  { "bridge", processBridge}
+  { "bridge", processBridge},
+  { "resetConfig",  processResetConfig}
 };
 
 void setup()
@@ -596,6 +597,12 @@ callbackResponse processBridge(const callbackData &data)
   }
 }
 
+callbackResponse processResetConfig(const callbackData &data){
+  configReset();
+  reboot();
+  return callbackResponse("resetConfig", 1);
+}
+
 void setSwitch(String ch, String state)
 {
   bool fState = 0;
@@ -754,6 +761,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["dssid"] != nullptr){strlcpy(config.dssid, data["dssid"].as<const char*>(), sizeof(config.dssid));}
   if(data["dpass"] != nullptr){strlcpy(config.dpass, data["dpass"].as<const char*>(), sizeof(config.dpass));}
   if(data["upass"] != nullptr){strlcpy(config.upass, data["upass"].as<const char*>(), sizeof(config.upass));}
+  if(data["accessToken"] != nullptr){strlcpy(config.accessToken, data["accessToken"].as<const char*>(), sizeof(config.accessToken));}
   if(data["provisionDeviceKey"] != nullptr){strlcpy(config.provisionDeviceKey, data["provisionDeviceKey"].as<const char*>(), sizeof(config.provisionDeviceKey));}
   if(data["provisionDeviceSecret"] != nullptr){strlcpy(config.provisionDeviceSecret, data["provisionDeviceSecret"].as<const char*>(), sizeof(config.provisionDeviceSecret));}
   if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>();}
@@ -904,7 +912,7 @@ void syncClientAttributes()
   doc["broker"] = config.broker;
   doc["port"] = config.port;
   doc["wssid"] = config.wssid;
-  doc["ap"] = WiFi.SSID().c_str();
+  doc["ap"] = WiFi.SSID();
   tb.sendAttributeDoc(doc);
   doc.clear();
   doc["wpass"] = config.wpass;

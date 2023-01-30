@@ -59,7 +59,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <Adafruit_BME280.h>
 
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.7"
+#define CURRENT_FIRMWARE_VERSION "0.0.2"
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -110,6 +110,7 @@ callbackResponse processGetSwitchCh4(const callbackData &data);
 callbackResponse processSaveConfigCoMCU(const callbackData &data);
 callbackResponse processSetPanic(const callbackData &data);
 callbackResponse processBridge(const callbackData &data);
+callbackResponse processResetConfig(const callbackData &data);
 
 void loadSettings();
 void saveSettings();
