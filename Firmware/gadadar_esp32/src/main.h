@@ -48,6 +48,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 )EOF";
 
 #define DOCSIZE 2048
+#define DOCSIZE_MIN 384
 #define USE_SERIAL2
 #include <libudawa.h>
 #include <TimeLib.h>
@@ -122,6 +123,7 @@ void setSwitch(String  ch, String state);
 void publishSwitch();
 void recPowerUsage();
 void recWeatherData();
+uint8_t activeBeep();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
 
 #endif
