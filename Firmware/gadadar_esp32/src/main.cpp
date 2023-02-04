@@ -1049,7 +1049,7 @@ uint8_t activeBeep(){
     }
   }
   if(counter > 0){
-    setAlarm(0, 65534, 1000 / counter);
+    setAlarm(0, -1, 1000 / counter);
   }
   else{
     setAlarm(0, 3, 100);
