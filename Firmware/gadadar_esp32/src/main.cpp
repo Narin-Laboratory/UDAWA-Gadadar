@@ -14,6 +14,8 @@ Settings mySettings;
 Adafruit_BME280 bme;
 HardwareSerial PZEMSerial(1);
 PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+AsyncWebServer web(80);
+AsyncWebSocket ws("/ws");
 
 const size_t callbacksSize = 16;
 GenericCallback callbacks[callbacksSize] = {
@@ -57,6 +59,20 @@ void setup()
   networkInit();
   tb.setBufferSize(DOCSIZE);
 
+  web.begin();
+  web.serveStatic("/", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
+  web.serveStatic("/about", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
+  web.serveStatic("/dashboard", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
+  web.serveStatic("/configuration", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
+
+  ws.onEvent(onWsEvent);
+  web.addHandler(&ws);
+
+  String hostname = String(config.name) + String(".local");
+  MDNS.begin(hostname.c_str());
+  MDNS.addService("http", "tcp", 80);
+  log_manager->info(PSTR(__func__),PSTR("Started MDNS on %s\n"), hostname.c_str());
+
   if(mySettings.intvDevTel != 0){
     taskid_t taskPublishDeviceTelemetry = taskManager.scheduleFixedRate(mySettings.intvDevTel * 1000, [] {
       publishDeviceTelemetry();
@@ -83,6 +99,7 @@ void loop()
   relayControlBydtCyc();
   relayControlByIntrvl();
   publishSwitch();
+  ws.cleanupClients();
 
   if(tb.connected() && mySettings.flag_syncClientAttr == 1){
     syncClientAttributes();
@@ -128,6 +145,78 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
   ans = (ans << 16) + r / 1000;
 
   return ans;
+}
+
+void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
+  if(type == WS_EVT_CONNECT){
+    log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] connect\n"), server->url(), client->id());
+    client->printf("Hello Client %u :)", client->id());
+    client->ping();
+  } else if(type == WS_EVT_DISCONNECT){
+    log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] disconnect\n"), server->url(), client->id());
+  } else if(type == WS_EVT_ERROR){
+    log_manager->error(PSTR(__func__), PSTR("ws[%s][%u] error(%u): %s\n"), server->url(), client->id(), *((uint16_t*)arg), (char*)data);
+  } else if(type == WS_EVT_PONG){
+    log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] pong[%u]: %s\n"), server->url(), client->id(), len, (len)?(char*)data:"");
+  } else if(type == WS_EVT_DATA){
+    AwsFrameInfo * info = (AwsFrameInfo*)arg;
+    String msg = "";
+    if(info->final && info->index == 0 && info->len == len){
+      //the whole message is in a single frame and we got all of it's data
+      log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message[%llu]: \n"), server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
+
+      if(info->opcode == WS_TEXT){
+        for(size_t i=0; i < info->len; i++) {
+          msg += (char) data[i];
+        }
+      } else {
+        char buff[3];
+        for(size_t i=0; i < info->len; i++) {
+          sprintf(buff, "%02x ", (uint8_t) data[i]);
+          msg += buff ;
+        }
+      }
+      Serial.printf("%s\n",msg.c_str());
+
+      if(info->opcode == WS_TEXT)
+        client->text("I got your text message");
+      else
+        client->binary("I got your binary message");
+    } else {
+      //message is comprised of multiple frames or the frame is split into multiple packets
+      if(info->index == 0){
+        if(info->num == 0)
+          log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message start\n"), server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
+        log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] start[%llu]\n"), server->url(), client->id(), info->num, info->len);
+      }
+
+      log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] %s[%llu - %llu]: \n"), server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
+
+      if(info->opcode == WS_TEXT){
+        for(size_t i=0; i < len; i++) {
+          msg += (char) data[i];
+        }
+      } else {
+        char buff[3];
+        for(size_t i=0; i < len; i++) {
+          sprintf(buff, "%02x ", (uint8_t) data[i]);
+          msg += buff ;
+        }
+      }
+      log_manager->info(PSTR(__func__), PSTR("%s\n"),msg.c_str());
+
+      if((info->index + len) == info->len){
+        log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] end[%llu]\n"), server->url(), client->id(), info->num, info->len);
+        if(info->final){
+          log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message end\n"), server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
+          if(info->message_opcode == WS_TEXT)
+            client->text("I got your text message");
+          else
+            client->binary("I got your binary message");
+        }
+      }
+    }
+  }
 }
 
 void recPowerUsage(){
@@ -411,6 +500,12 @@ if(doc["rlyActIT"] != nullptr)
   if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
   else{mySettings.seaHpa = 1019.00;}
 
+  if(doc["httpUname"] != nullptr){mySettings.httpUname = doc["httpUname"].as<String>();}
+  else{mySettings.httpUname = "UDAWA";}
+
+  if(doc["httpPass"] != nullptr){mySettings.httpPass = doc["httpPass"].as<String>();}
+  else{mySettings.httpPass = "defaultkey";}
+
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
   log_manager->debug(PSTR(__func__), "Loaded settings:\n %s \n", tmp.c_str());
@@ -486,6 +581,9 @@ void saveSettings()
   }
 
   doc["seaHpa"] = mySettings.seaHpa;
+
+  doc["httpUname"] = mySettings.httpUname;
+  doc["httpPass"] = mySettings.httpPass;
 
   writeSettings(doc, settingsPath);
   String tmp;
@@ -873,6 +971,9 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
 
   if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
 
+  if(data["httpUname"] != nullptr){mySettings.httpUname = data["httpUname"].as<String>();}
+  if(data["httpPass"] != nullptr){mySettings.httpPass = data["httpPass"].as<String>();}
+
   if(data["fPanic"] != nullptr){configcomcu.fPanic = data["fPanic"].as<bool>();}
   if(data["bfreq"] != nullptr){configcomcu.bfreq = data["bfreq"].as<uint16_t>();}
   if(data["fBuzz"] != nullptr){configcomcu.fBuzz = data["fBuzz"].as<bool>();}
@@ -999,6 +1100,8 @@ void syncClientAttributes()
   doc["pinLedR"] = configcomcu.pinLedR;
   doc["pinLedG"] = configcomcu.pinLedG;
   doc["pinLedB"] = configcomcu.pinLedB;
+  doc["httpUname"] = mySettings.httpUname;
+  doc["httpPass"] = mySettings.httpPass;
   tb.sendAttributeDoc(doc);
   doc.clear();
   doc["ledON"] = configcomcu.ledON;

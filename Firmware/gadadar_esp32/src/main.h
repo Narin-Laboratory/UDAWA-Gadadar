@@ -57,9 +57,12 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
 
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.3"
+#define CURRENT_FIRMWARE_VERSION "0.0.4"
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -95,6 +98,9 @@ struct Settings
     float _ener = -1;
     float _freq = 0.0;
     float _pf = 0.0;
+
+    String httpUname;
+    String httpPass;
 };
 
 callbackResponse processSaveConfig(const callbackData &data);
@@ -126,5 +132,6 @@ void recPowerUsage();
 void recWeatherData();
 uint8_t activeBeep();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
+void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len);
 
 #endif
