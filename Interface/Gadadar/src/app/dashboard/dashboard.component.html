@@ -1,4 +1,171 @@
 <mat-tab-group>
-    <mat-tab label="Control"> Control </mat-tab>
-    <mat-tab label="Monitor"> Monitor </mat-tab>
+    <mat-tab label="Monitor">
+        <div class="container-fluid mt-3">
+            <div class="row">
+                <div class="col-sm-12 col-lg-6">
+                    <div class="card mb-3">
+                        <div class="card-body text-center">
+                            <h1 class="card-title">Environmental Sensors</h1>
+                            <div class="row">
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Temperature</h3>
+                                    <div class="display-6">
+                                        {{celc}}°C
+                                    </div>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Humidity</h3>
+                                    <div class="display-6">
+                                        {{rh}}%
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Air Pressure</h3>
+                                    <div class="display-6">{{hpa}}hpa</div>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Altitude (Approx.)</h3>
+                                    <div class="display-6">{{alt}}m</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-12 col-lg-6">
+                    <div class="card mb-3">
+                        <div class="card-body text-center">
+                            <h1 class="card-title">Power Sensors</h1>
+                            <div class="row">
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Voltage</h3>
+                                    <div class="display-6">{{volt}}V</div>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Amperage</h3>
+                                    <div class="display-6">{{amp}}A</div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Watt</h3>
+                                    <div class="display-6">{{watt}}W</div>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <h3>Freq. & Power Factor</h3>
+                                    <div class="display-6">{{freq}}Hz / {{pf}}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </mat-tab>
+    <mat-tab label="Control">
+        <div class="container-fluid mt-3">
+            <div class="row">
+                <div class="col-sm-12 col-lg-6 mb-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="form-floating mb-3">
+                                <select class="form-select" id="udawa-rlch-mode" aria-label="Floating label select">
+                                <option value="0">Manual</option>
+                                <option value="1">Duty Cycle</option>
+                                <option value="2">Datetime</option>
+                                <option value="3">Time Daily</option>
+                                <option value="4">Interval</option>
+                                <option value="5">Environmental Condition</option>
+                                </select>
+                                <label for="udawa-rlch-mode">Operation mode</label>
+                            </div>
+
+                            <div id="udawa-card-dutycycle" class="card mb-3">
+                                <div class="card-body">
+                                <div class="form-floating input-group mb-3">
+                                    <input type="range" class="form-control form-range" min="0" max="100" id="udawa-rlch-dutycycle">
+                                    <label for="udawa-rlch-dutycycle">Duty Cycle</label>
+                                </div>
+
+                                <div class="form-floating input-group">
+                                    <input type="text" class="form-control" id="udawa-rlch-dutyrange">
+                                    <label for="udawa-rlch-dutyrange">Duty Range</label>
+                                    <span class="input-group-text">Seconds</span>
+                                </div>
+                                </div>
+                            </div>
+
+                            <div id="udawa-card-datetime" class="card mb-3">
+                                <div class="card-body">
+                                <div class="form-floating input-group mb-3">
+                                    <input type="text" class="form-control" id="udawa-rlch-datetime">
+                                    <label for="udawa-rlch-datetime">Datetime</label>
+                                    <span class="input-group-text">YYYY-MM-DD HH:II:SS</span>
+                                </div>
+
+                                <div class="form-floating input-group mb-3">
+                                    <input type="text" class="form-control" id="udawa-rlch-datetime-on-duration">
+                                    <label for="udawa-rlch-datetime-on-duration">ON duration</label>
+                                    <span class="input-group-text">Seconds</span>
+                                </div>
+                                </div>
+                            </div>
+
+                            <div id="udawa-card-timedaily" class="card mb-3">
+                                <div class="card-body">
+                                <div class="form-floating input-group mb-3">
+                                    <input type="text" class="form-control" id="udawa-rlch-timedaily">
+                                    <label for="udawa-rlch-timedaily">Time daily</label>
+                                    <span class="input-group-text">HH:II:SS</span>
+                                </div>
+
+                                <div class="form-floating input-group mb-3">
+                                    <input type="text" class="form-control" id="udawa-rlch-timedaily-on-duration">
+                                    <label for="udawa-rlch-timedaily-on-duration">ON duration</label>
+                                    <span class="input-group-text">Seconds</span>
+                                </div>
+                                </div>
+                            </div>
+
+                            <div id="udawa-card-interval" class="card mb-3">
+                                <div class="card-body">
+                                <div class="form-floating input-group mb-3">
+                                    <input type="text" class="form-control" id="udawa-rlch-interval">
+                                    <label for="udawa-rlch-interval">Interval</label>
+                                    <span class="input-group-text">Seconds</span>
+                                </div>
+
+                                <div class="form-floating input-group mb-3">
+                                    <input type="text" class="form-control" id="udawa-rlch-interval-on-duration">
+                                    <label for="udawa-rlch-interval-on-duration">ON duration</label>
+                                    <span class="input-group-text">Seconds</span>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-12 col-lg-6 mb-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <h1>Relay Control Highlight</h1>
+                            <p>Currently, UDAWA Gadadar supports six modes of control operation. Here is the detail:</p>
+                            <ol>
+                                <li>Manual Switch: You can switch the relay manually via the switch button.</li>
+                                <li>Duty Cycle: You can switch the relay by using a time range and duty cycle. For example, a 50% duty cycle over a 10 minute time range would give you 5 minutes on and 5 minutes off.</li>
+                                <li>Date Time: You can switch the relay precisely at the selected datetime and adjust the on duration.</li>
+                                <li>Time Daily: You can switch the relay on at a selected time daily and adjust the on duration.</li>
+                                <li>Interval: You can switch the relay to on by interval and adjust the on duration.</li>
+                                <li>Environmental Condition: You can use the environmental data as a parameter to adjust when to turn on the switch and for how long it stays on.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </mat-tab>
 </mat-tab-group>
+

@@ -66,6 +66,7 @@ void setup()
   web.serveStatic("/configuration", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
 
   ws.onEvent(onWsEvent);
+  ws.setAuthentication(mySettings.httpUname.c_str(), mySettings.httpPass.c_str());
   web.addHandler(&ws);
 
   String hostname = String(config.name) + String(".local");
@@ -90,6 +91,15 @@ void setup()
       recWeatherData();
     });
   }
+
+  taskid_t taskWsSendTelemetry = taskManager.scheduleFixedRate(1000, [] {
+    wsSendTelemetry();
+  });
+
+  taskid_t taskWsSendSensors = taskManager.scheduleFixedRate(1000, [] {
+    wsSendSensors();
+  });
+
 }
 
 void loop()
@@ -150,8 +160,7 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
   if(type == WS_EVT_CONNECT){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] connect\n"), server->url(), client->id());
-    client->printf("Hello Client %u :)", client->id());
-    client->ping();
+    wsSendAttributes(client);
   } else if(type == WS_EVT_DISCONNECT){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] disconnect\n"), server->url(), client->id());
   } else if(type == WS_EVT_ERROR){
@@ -289,13 +298,13 @@ void recWeatherData(){
     float rh = bme.readHumidity();
     float hpa = bme.readPressure() / 100.0F;
     float alt = bme.readAltitude(mySettings.seaHpa);
-
     StaticJsonDocument<DOCSIZE_MIN> doc;
     doc["celc"] = celc;
     doc["rh"] = rh;
     doc["hpa"] = hpa;
     doc["alt"] = alt;
     tb.sendTelemetryDoc(doc);
+
   }
 }
 
@@ -1136,6 +1145,7 @@ void publishSwitch(){
         String chName = "ch" + String(i+1);
         doc[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
         tb.sendTelemetryDoc(doc);
+        wsSend(doc);
         doc.clear();
 
         mySettings.publishSwitch[i] = false;
@@ -1158,4 +1168,166 @@ uint8_t activeBeep(){
     setAlarm(0, 3, 100);
   }
   return counter;
+}
+
+void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc){
+  String buffer;
+  serializeJson(doc, buffer);
+  ws.textAll(buffer.c_str());
+}
+void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client){
+  String buffer;
+  serializeJson(doc, buffer);
+  ws.text(client->id(), buffer.c_str());
+}
+
+void wsSendTelemetry(){
+  if(ws.count() > 0){
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+
+    doc["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    doc["rssi"] = WiFi.RSSI();
+    doc["uptime"] = millis()/1000;
+    doc["dt"] = rtc.getEpoch();
+    doc["dts"] = rtc.getDateTime();
+    wsSend(doc);
+  }
+}
+
+void wsSendSensors(){
+  if(ws.count() > 0){
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    /*if(!isnan(PZEM.voltage())){
+      doc["volt"] = PZEM.voltage();
+      doc["amp"] = PZEM.current();
+      doc["watt"] = PZEM.power();
+      doc["freq"] = PZEM.frequency();
+      doc["pf"] = PZEM.pf();
+      wsSend(doc);
+      doc.clear();
+    }
+    if(mySettings.flag_bme280){
+      doc["celc"] = bme.readTemperature();
+      doc["rh"] = bme.readHumidity();
+      doc["hpa"] = bme.readPressure() / 100.0F;
+      doc["alt"] = bme.readAltitude(mySettings.seaHpa);
+      wsSend(doc);
+      doc.clear();
+    }*/
+    if(true){
+      long volt = random(220, 250);
+      long amp = random(1, 10);
+      doc["volt"] = volt;
+      doc["amp"] = amp;
+      doc["watt"] = volt * amp;
+      doc["freq"] = random(50, 60);
+      doc["pf"] = random(0.2, 1);
+      wsSend(doc);
+      doc.clear();
+    }
+    if(true){
+      doc["celc"] = random(17, 40);
+      doc["rh"] = random(20, 100);
+      doc["hpa"] = random(1000, 1100);
+      doc["alt"] = random(100, 200);
+      wsSend(doc);
+      doc.clear();
+    }
+  }
+}
+
+void wsSendAttributes(AsyncWebSocketClient * client){
+  StaticJsonDocument<DOCSIZE_MIN> doc;
+
+  IPAddress ip = WiFi.localIP();
+  char ipa[25];
+  sprintf(ipa, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  doc["ipad"] = ipa;
+  doc["compdate"] = COMPILED;
+  doc["fmTitle"] = CURRENT_FIRMWARE_TITLE;
+  doc["fmVersion"] = CURRENT_FIRMWARE_VERSION;
+  doc["stamac"] = WiFi.macAddress();
+  wsSend(doc, client);
+  doc.clear();
+  doc["apmac"] = WiFi.softAPmacAddress();
+  doc["flashFree"] = ESP.getFreeSketchSpace();
+  doc["firmwareSize"] = ESP.getSketchSize();
+  doc["flashSize"] = ESP.getFlashChipSize();
+  doc["sdkVer"] = ESP.getSdkVersion();
+  wsSend(doc, client);
+  doc.clear();
+  doc["model"] = config.model;
+  doc["group"] = config.group;
+  doc["broker"] = config.broker;
+  doc["port"] = config.port;
+  doc["wssid"] = config.wssid;
+  doc["ap"] = WiFi.SSID();
+  doc["wpass"] = config.wpass;
+  doc["gmtOffset"] = config.gmtOffset;
+  wsSend(doc, client);
+  doc.clear();
+  doc["dtCycCh1"] = mySettings.dtCyc[0];
+  doc["dtCycCh2"] = mySettings.dtCyc[1];
+  doc["dtCycCh3"] = mySettings.dtCyc[2];
+  doc["dtCycCh4"] = mySettings.dtCyc[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["dtRngCh1"] = mySettings.dtRng[0];
+  doc["dtRngCh2"] = mySettings.dtRng[1];
+  doc["dtRngCh3"] = mySettings.dtRng[2];
+  doc["dtRngCh4"] = mySettings.dtRng[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["dtCycFSCh1"] = mySettings.dtCycFS[0];
+  doc["dtCycFSCh2"] = mySettings.dtCycFS[1];
+  doc["dtCycFSCh3"] = mySettings.dtCycFS[2];
+  doc["dtCycFSCh4"] = mySettings.dtCycFS[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["dtRngFSCh1"] = mySettings.dtRngFS[0];
+  doc["dtRngFSCh2"] = mySettings.dtRngFS[1];
+  doc["dtRngFSCh3"] = mySettings.dtRngFS[2];
+  doc["dtRngFSCh4"] = mySettings.dtRngFS[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["rlyActDTCh1"] = (uint64_t)mySettings.rlyActDT[0] * 1000;
+  doc["rlyActDTCh2"] = (uint64_t)mySettings.rlyActDT[1] * 1000;
+  doc["rlyActDTCh3"] = (uint64_t)mySettings.rlyActDT[2] * 1000;
+  doc["rlyActDTCh4"] = (uint64_t)mySettings.rlyActDT[3] * 1000;
+  wsSend(doc, client);
+  doc.clear();
+  doc["rlyActDrCh1"] = mySettings.rlyActDr[0];
+  doc["rlyActDrCh2"] = mySettings.rlyActDr[1];
+  doc["rlyActDrCh3"] = mySettings.rlyActDr[2];
+  doc["rlyActDrCh4"] = mySettings.rlyActDr[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["rlyActITCh1"] = mySettings.rlyActIT[0];
+  doc["rlyActITCh2"] = mySettings.rlyActIT[1];
+  doc["rlyActITCh3"] = mySettings.rlyActIT[2];
+  doc["rlyActITCh4"] = mySettings.rlyActIT[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["rlyActITOnCh1"] = mySettings.rlyActITOn[0];
+  doc["rlyActITOnCh2"] = mySettings.rlyActITOn[1];
+  doc["rlyActITOnCh3"] = mySettings.rlyActITOn[2];
+  doc["rlyActITOnCh4"] = mySettings.rlyActITOn[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
+  doc["intvRecWthr"] = mySettings.intvRecWthr;
+  doc["intvDevTel"] = mySettings.intvDevTel;
+  wsSend(doc, client);
+  doc.clear();
+  doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
+  doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
+  doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
+  doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
+  wsSend(doc, client);
+  doc.clear();
+  doc["httpUname"] = mySettings.httpUname;
+  doc["httpPass"] = mySettings.httpPass;
+  doc["name"] = config.name;
+  wsSend(doc, client);
+  doc.clear();
 }

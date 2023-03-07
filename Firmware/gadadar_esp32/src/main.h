@@ -133,5 +133,10 @@ void recWeatherData();
 uint8_t activeBeep();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len);
+void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc);
+void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client);
+void wsSendTelemetry();
+void wsSendSensors();
+void wsSendAttributes(AsyncWebSocketClient * client);
 
 #endif
