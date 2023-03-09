@@ -137,6 +137,6 @@ void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc);
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client);
 void wsSendTelemetry();
 void wsSendSensors();
-void wsSendAttributes(AsyncWebSocketClient * client);
+void wsSendAttributes();
 
 #endif

@@ -5,12 +5,9 @@ import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 //const CHAT_URL = "ws://" + window.location.hostname + "/ws";
-const CHAT_URL = "ws://" + "172.100.11.97" + "/ws";
+const UDAWA_WS = "ws://" + "UDAWA8C2B31C4F5FC.local" + "/ws";
 
-export interface Message {
-    source: string;
-    content: string;
-}
+export interface Message {}
 
 @Injectable()
 export class WebsocketService {
@@ -18,10 +15,10 @@ export class WebsocketService {
     public messages: Subject<Message>;
 
     constructor() {
-        this.messages = <Subject<Message>>this.connect(CHAT_URL).pipe(
+        this.messages = <Subject<Message>>this.connect(UDAWA_WS).pipe(
             map(
                 (response: MessageEvent): Message => {
-                    console.log(response.data);
+                    //console.log(response.data);
                     let data = JSON.parse(response.data)
                     return data;
                 }

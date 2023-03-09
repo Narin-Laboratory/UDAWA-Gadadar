@@ -18,6 +18,8 @@ import { DashboardComponent } from './dashboard/dashboard.component';
 import { AboutComponent } from './about/about.component';
 import { NavbarComponent } from './navbar/navbar.component';
 import { ConfigComponent } from './config/config.component';
+import { FormsModule } from '@angular/forms';
+import { RelayControlComponent } from './relay-control/relay-control.component';
 
 @NgModule({
   declarations: [
@@ -25,7 +27,8 @@ import { ConfigComponent } from './config/config.component';
     DashboardComponent,
     AboutComponent,
     NavbarComponent,
-    ConfigComponent
+    ConfigComponent,
+    RelayControlComponent
   ],
   imports: [
     BrowserModule,
@@ -40,7 +43,8 @@ import { ConfigComponent } from './config/config.component';
     MatToolbarModule,
     MatSidenavModule,
     MatListModule,
-    MatTabsModule
+    MatTabsModule,
+    FormsModule
   ],
   providers: [],
   bootstrap: [AppComponent]

@@ -1,0 +1,89 @@
+<div [ngSwitch]="mode">
+    <div *ngSwitchCase=0>
+        <div id="udawa-card-dutycycle" class="card mb-3">
+            <div class="card-body">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDefault" [(ngModel)]="state" (change)="changeState()">
+                    <label class="form-check-label" for="flexSwitchCheckDefault">{{state ? 'ON' : 'OFF'}}</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div *ngSwitchCase=1>
+        <div id="udawa-card-dutycycle" class="card mb-3">
+            <div class="card-body">
+            <div class="form-floating input-group mb-3">
+                <input type="range" class="form-control form-range" min="0" max="100" id="udawa-rlch-dutycycle">
+                <label for="udawa-rlch-dutycycle">Duty Cycle</label>
+            </div>
+
+            <div class="form-floating input-group">
+                <input type="text" class="form-control" id="udawa-rlch-dutyrange">
+                <label for="udawa-rlch-dutyrange">Duty Range</label>
+                <span class="input-group-text">Seconds</span>
+            </div>
+            </div>
+        </div>
+
+    </div>
+    <div *ngSwitchCase=2>
+        <div id="udawa-card-datetime" class="card mb-3">
+            <div class="card-body">
+            <div class="form-floating input-group mb-3">
+                <input type="text" class="form-control" id="udawa-rlch-datetime">
+                <label for="udawa-rlch-datetime">Datetime</label>
+                <span class="input-group-text">YYYY-MM-DD HH:II:SS</span>
+            </div>
+
+            <div class="form-floating input-group mb-3">
+                <input type="text" class="form-control" id="udawa-rlch-datetime-on-duration">
+                <label for="udawa-rlch-datetime-on-duration">ON duration</label>
+                <span class="input-group-text">Seconds</span>
+            </div>
+            </div>
+        </div>
+    </div>
+    <div *ngSwitchCase=3>
+        <div id="udawa-card-timedaily" class="card mb-3">
+            <div class="card-body">
+            <div class="form-floating input-group mb-3">
+                <input type="text" class="form-control" id="udawa-rlch-timedaily">
+                <label for="udawa-rlch-timedaily">Time daily</label>
+                <span class="input-group-text">HH:II:SS</span>
+            </div>
+
+            <div class="form-floating input-group mb-3">
+                <input type="text" class="form-control" id="udawa-rlch-timedaily-on-duration">
+                <label for="udawa-rlch-timedaily-on-duration">ON duration</label>
+                <span class="input-group-text">Seconds</span>
+            </div>
+            </div>
+        </div>
+    </div>
+    <div *ngSwitchCase=4>
+        <div id="udawa-card-interval" class="card mb-3">
+            <div class="card-body">
+            <div class="form-floating input-group mb-3">
+                <input type="text" class="form-control" id="udawa-rlch-interval">
+                <label for="udawa-rlch-interval">Interval</label>
+                <span class="input-group-text">Seconds</span>
+            </div>
+
+            <div class="form-floating input-group mb-3">
+                <input type="text" class="form-control" id="udawa-rlch-interval-on-duration">
+                <label for="udawa-rlch-interval-on-duration">ON duration</label>
+                <span class="input-group-text">Seconds</span>
+            </div>
+            </div>
+        </div>
+    </div>
+    <div *ngSwitchCase=5>Unavailable</div>
+    <div *ngSwitchDefault>Failure</div>
+</div>
+
+
+
+
+
+
+

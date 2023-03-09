@@ -160,7 +160,7 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
   if(type == WS_EVT_CONNECT){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] connect\n"), server->url(), client->id());
-    wsSendAttributes(client);
+    wsSendAttributes();
   } else if(type == WS_EVT_DISCONNECT){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] disconnect\n"), server->url(), client->id());
   } else if(type == WS_EVT_ERROR){
@@ -187,10 +187,10 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       }
       Serial.printf("%s\n",msg.c_str());
 
-      if(info->opcode == WS_TEXT)
-        client->text("I got your text message");
-      else
-        client->binary("I got your binary message");
+      if(info->opcode == WS_TEXT){}
+
+      else{}
+
     } else {
       //message is comprised of multiple frames or the frame is split into multiple packets
       if(info->index == 0){
@@ -218,10 +218,10 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
         log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] end[%llu]\n"), server->url(), client->id(), info->num, info->len);
         if(info->final){
           log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message end\n"), server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-          if(info->message_opcode == WS_TEXT)
-            client->text("I got your text message");
-          else
-            client->binary("I got your binary message");
+          if(info->message_opcode == WS_TEXT){}
+
+          else{}
+
         }
       }
     }
@@ -992,6 +992,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["pinLedB"] != nullptr){configcomcu.pinLedB = data["pinLedB"].as<uint8_t>();}
   if(data["ledON"] != nullptr){configcomcu.ledON = data["ledON"].as<uint8_t>();}
 
+  wsSendAttributes();
   mySettings.lastUpdated = millis();
   return callbackResponse("sharedAttributesUpdate", 1);
 }
@@ -1236,7 +1237,7 @@ void wsSendSensors(){
   }
 }
 
-void wsSendAttributes(AsyncWebSocketClient * client){
+void wsSendAttributes(){
   StaticJsonDocument<DOCSIZE_MIN> doc;
 
   IPAddress ip = WiFi.localIP();
@@ -1247,14 +1248,14 @@ void wsSendAttributes(AsyncWebSocketClient * client){
   doc["fmTitle"] = CURRENT_FIRMWARE_TITLE;
   doc["fmVersion"] = CURRENT_FIRMWARE_VERSION;
   doc["stamac"] = WiFi.macAddress();
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["apmac"] = WiFi.softAPmacAddress();
   doc["flashFree"] = ESP.getFreeSketchSpace();
   doc["firmwareSize"] = ESP.getSketchSize();
   doc["flashSize"] = ESP.getFlashChipSize();
   doc["sdkVer"] = ESP.getSdkVersion();
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["model"] = config.model;
   doc["group"] = config.group;
@@ -1264,70 +1265,76 @@ void wsSendAttributes(AsyncWebSocketClient * client){
   doc["ap"] = WiFi.SSID();
   doc["wpass"] = config.wpass;
   doc["gmtOffset"] = config.gmtOffset;
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["dtCycCh1"] = mySettings.dtCyc[0];
   doc["dtCycCh2"] = mySettings.dtCyc[1];
   doc["dtCycCh3"] = mySettings.dtCyc[2];
   doc["dtCycCh4"] = mySettings.dtCyc[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["dtRngCh1"] = mySettings.dtRng[0];
   doc["dtRngCh2"] = mySettings.dtRng[1];
   doc["dtRngCh3"] = mySettings.dtRng[2];
   doc["dtRngCh4"] = mySettings.dtRng[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["dtCycFSCh1"] = mySettings.dtCycFS[0];
   doc["dtCycFSCh2"] = mySettings.dtCycFS[1];
   doc["dtCycFSCh3"] = mySettings.dtCycFS[2];
   doc["dtCycFSCh4"] = mySettings.dtCycFS[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["dtRngFSCh1"] = mySettings.dtRngFS[0];
   doc["dtRngFSCh2"] = mySettings.dtRngFS[1];
   doc["dtRngFSCh3"] = mySettings.dtRngFS[2];
   doc["dtRngFSCh4"] = mySettings.dtRngFS[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["rlyActDTCh1"] = (uint64_t)mySettings.rlyActDT[0] * 1000;
   doc["rlyActDTCh2"] = (uint64_t)mySettings.rlyActDT[1] * 1000;
   doc["rlyActDTCh3"] = (uint64_t)mySettings.rlyActDT[2] * 1000;
   doc["rlyActDTCh4"] = (uint64_t)mySettings.rlyActDT[3] * 1000;
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["rlyActDrCh1"] = mySettings.rlyActDr[0];
   doc["rlyActDrCh2"] = mySettings.rlyActDr[1];
   doc["rlyActDrCh3"] = mySettings.rlyActDr[2];
   doc["rlyActDrCh4"] = mySettings.rlyActDr[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["rlyActITCh1"] = mySettings.rlyActIT[0];
   doc["rlyActITCh2"] = mySettings.rlyActIT[1];
   doc["rlyActITCh3"] = mySettings.rlyActIT[2];
   doc["rlyActITCh4"] = mySettings.rlyActIT[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["rlyActITOnCh1"] = mySettings.rlyActITOn[0];
   doc["rlyActITOnCh2"] = mySettings.rlyActITOn[1];
   doc["rlyActITOnCh3"] = mySettings.rlyActITOn[2];
   doc["rlyActITOnCh4"] = mySettings.rlyActITOn[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   doc["intvRecWthr"] = mySettings.intvRecWthr;
   doc["intvDevTel"] = mySettings.intvDevTel;
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
   doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
   doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
   doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
-  wsSend(doc, client);
+  wsSend(doc);
   doc.clear();
   doc["httpUname"] = mySettings.httpUname;
   doc["httpPass"] = mySettings.httpPass;
   doc["name"] = config.name;
-  wsSend(doc, client);
+  wsSend(doc);
+  doc.clear();
+  doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
+  doc["ch2"] = mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
+  doc["ch3"] = mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
+  doc["ch4"] = mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
+  wsSend(doc);
   doc.clear();
 }
