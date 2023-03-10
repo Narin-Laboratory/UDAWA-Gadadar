@@ -80,15 +80,17 @@
                             </div>
 
                             <div class="form-floating mb-3">
-                                <select class="form-select" id="udawa-rlch-mode" [(ngModel)]="ch[selectedCh-1].rlyCtrlMd" (change)="sendMsg()">
+                                <select class="form-select" id="udawa-rlch-mode" [(ngModel)]="ch[selectedCh-1].rlyCtrlMd" (change)="changeRelayParams()">
                                     <option *ngFor="let mode of opMode" value="{{mode.id}}">{{mode.mode}}</option>
                                 </select>
                                 <label for="udawa-rlch-mode">Operation mode</label>
                             </div>
 
-                            <app-relay-control [mode]="ch[selectedCh-1].rlyCtrlMd" [selectedCh]="selectedCh" [(state)]="ch[selectedCh-1].state"></app-relay-control>
+                            <app-relay-control (switchButton)="switchButton()" (changeRelayParams)="changeRelayParams()" [mode]="ch[selectedCh-1].rlyCtrlMd" [selectedCh]="selectedCh" [(state)]="ch[selectedCh-1].state"
+                                [(dtCyc)]="ch[selectedCh-1].dtCyc" [(dtRng)]="ch[selectedCh-1].dtRng" [(rlyActDT)]="ch[selectedCh-1].rlyActDT"
+                                [(rlyActDr)]="ch[selectedCh-1].rlyActDr" [(rlyActIT)]="ch[selectedCh-1].rlyActIT" [(rlyActITOn)]="ch[selectedCh-1].rlyActITOn"></app-relay-control>
 
-
+                            <button type="button" class="btn btn-primary btn-lg btn-block" (click)="savePermanent()">Save Permanent</button>
                         </div>
                     </div>
                 </div>
@@ -96,7 +98,7 @@
                     <div class="card">
                         <div class="card-body">
                             <h1>Relay Control Highlight</h1>
-                            <p>{{ch | json}}</p>
+
                             <p>Currently, UDAWA Gadadar supports six modes of control operation. Here is the detail:</p>
                             <ol>
                                 <li>Manual Switch: You can switch the relay manually via the switch button.</li>

@@ -168,62 +168,33 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
   } else if(type == WS_EVT_PONG){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] pong[%u]: %s\n"), server->url(), client->id(), len, (len)?(char*)data:"");
   } else if(type == WS_EVT_DATA){
-    AwsFrameInfo * info = (AwsFrameInfo*)arg;
-    String msg = "";
-    if(info->final && info->index == 0 && info->len == len){
-      //the whole message is in a single frame and we got all of it's data
-      log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message[%llu]: \n"), server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
 
-      if(info->opcode == WS_TEXT){
-        for(size_t i=0; i < info->len; i++) {
-          msg += (char) data[i];
-        }
-      } else {
-        char buff[3];
-        for(size_t i=0; i < info->len; i++) {
-          sprintf(buff, "%02x ", (uint8_t) data[i]);
-          msg += buff ;
-        }
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    DeserializationError err = deserializeJson(doc, data);
+    if (err == DeserializationError::Ok)
+    {
+      // Print the values
+      // (we must use as<T>() to resolve the ambiguity)
+      log_manager->error(PSTR(__func__), PSTR("WS message parsing %s\n"), err.c_str());
+      serializeJsonPretty(doc, Serial);
+
+      if(doc["cmd"] == nullptr){return;}
+
+      const char* cmd = doc["cmd"].as<const char*>();
+      if(strcmp(cmd, (const char*) "attr") == 0){
+        JsonObject root = doc.template as<JsonObject>();
+        processSharedAttributesUpdate(root);
       }
-      Serial.printf("%s\n",msg.c_str());
-
-      if(info->opcode == WS_TEXT){}
-
-      else{}
-
-    } else {
-      //message is comprised of multiple frames or the frame is split into multiple packets
-      if(info->index == 0){
-        if(info->num == 0)
-          log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message start\n"), server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-        log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] start[%llu]\n"), server->url(), client->id(), info->num, info->len);
+      else if(strcmp(cmd, (const char*) "save") == 0){
+        saveSettings();
       }
-
-      log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] %s[%llu - %llu]: \n"), server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
-
-      if(info->opcode == WS_TEXT){
-        for(size_t i=0; i < len; i++) {
-          msg += (char) data[i];
-        }
-      } else {
-        char buff[3];
-        for(size_t i=0; i < len; i++) {
-          sprintf(buff, "%02x ", (uint8_t) data[i]);
-          msg += buff ;
-        }
+      else if(strcmp(cmd, (const char*) "switch") == 0){
+        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == mySettings.ON ? "ON" : "OFF");
       }
-      log_manager->info(PSTR(__func__), PSTR("%s\n"),msg.c_str());
-
-      if((info->index + len) == info->len){
-        log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] frame[%u] end[%llu]\n"), server->url(), client->id(), info->num, info->len);
-        if(info->final){
-          log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] %s-message end\n"), server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-          if(info->message_opcode == WS_TEXT){}
-
-          else{}
-
-        }
-      }
+    }
+    else
+    {
+      log_manager->error(PSTR(__func__), PSTR("WS message parsing error: %s\n"), err.c_str());
     }
   }
 }
@@ -856,6 +827,7 @@ void relayControlByIntrvl(){
 
 callbackResponse processSharedAttributesUpdate(const callbackData &data)
 {
+  log_manager->debug(PSTR(__func__), PSTR("Received attributes update request:\n"));
   if(config.logLev >= 4){serializeJsonPretty(data, Serial);}
   Serial.println();
 

@@ -13,12 +13,13 @@
         <div id="udawa-card-dutycycle" class="card mb-3">
             <div class="card-body">
             <div class="form-floating input-group mb-3">
-                <input type="range" class="form-control form-range" min="0" max="100" id="udawa-rlch-dutycycle">
+                <input type="range" class="form-control form-range" min="0" max="100" id="udawa-rlch-dutycycle" [(ngModel)]="dtCyc" (change)="changeDtCyc()">
                 <label for="udawa-rlch-dutycycle">Duty Cycle</label>
+                <span class="input-group-text">{{dtCyc}}%</span>
             </div>
 
             <div class="form-floating input-group">
-                <input type="text" class="form-control" id="udawa-rlch-dutyrange">
+                <input type="text" class="form-control" id="udawa-rlch-dutyrange" [(ngModel)]="dtRng" (change)="changeDtRng()">
                 <label for="udawa-rlch-dutyrange">Duty Range</label>
                 <span class="input-group-text">Seconds</span>
             </div>
@@ -30,13 +31,13 @@
         <div id="udawa-card-datetime" class="card mb-3">
             <div class="card-body">
             <div class="form-floating input-group mb-3">
-                <input type="text" class="form-control" id="udawa-rlch-datetime">
+                <input type="text" class="form-control" id="udawa-rlch-datetime" [(ngModel)]="rlyActDT" (change)="changeRlyActDT()">
                 <label for="udawa-rlch-datetime">Datetime</label>
                 <span class="input-group-text">YYYY-MM-DD HH:II:SS</span>
             </div>
 
             <div class="form-floating input-group mb-3">
-                <input type="text" class="form-control" id="udawa-rlch-datetime-on-duration">
+                <input type="text" class="form-control" id="udawa-rlch-datetime-on-duration" [(ngModel)]="rlyActDr" (change)="changeRlyActDr()">
                 <label for="udawa-rlch-datetime-on-duration">ON duration</label>
                 <span class="input-group-text">Seconds</span>
             </div>
@@ -47,13 +48,13 @@
         <div id="udawa-card-timedaily" class="card mb-3">
             <div class="card-body">
             <div class="form-floating input-group mb-3">
-                <input type="text" class="form-control" id="udawa-rlch-timedaily">
+                <input type="text" class="form-control" id="udawa-rlch-timedaily" [(ngModel)]="rlyActDT" (change)="changeRlyActDT()">
                 <label for="udawa-rlch-timedaily">Time daily</label>
-                <span class="input-group-text">HH:II:SS</span>
+                <span class="input-group-text">only HH:II:SS</span>
             </div>
 
             <div class="form-floating input-group mb-3">
-                <input type="text" class="form-control" id="udawa-rlch-timedaily-on-duration">
+                <input type="text" class="form-control" id="udawa-rlch-timedaily-on-duration" [(ngModel)]="rlyActDr" (change)="changeRlyActDr()">
                 <label for="udawa-rlch-timedaily-on-duration">ON duration</label>
                 <span class="input-group-text">Seconds</span>
             </div>
@@ -64,13 +65,13 @@
         <div id="udawa-card-interval" class="card mb-3">
             <div class="card-body">
             <div class="form-floating input-group mb-3">
-                <input type="text" class="form-control" id="udawa-rlch-interval">
+                <input type="text" class="form-control" id="udawa-rlch-interval" [(ngModel)]="rlyActIT" (change)="changeRlyActIT()">
                 <label for="udawa-rlch-interval">Interval</label>
                 <span class="input-group-text">Seconds</span>
             </div>
 
             <div class="form-floating input-group mb-3">
-                <input type="text" class="form-control" id="udawa-rlch-interval-on-duration">
+                <input type="text" class="form-control" id="udawa-rlch-interval-on-duration" [(ngModel)]="rlyActITOn" (change)="changeRlyActITOn()">
                 <label for="udawa-rlch-interval-on-duration">ON duration</label>
                 <span class="input-group-text">Seconds</span>
             </div>

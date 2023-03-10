@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
 import { WebsocketService } from "../websocket.service";
 import { RelayChannel } from '../relay-channel';
+import { SelectionModel } from '@angular/cdk/collections';
+import { DatePipe } from '@angular/common';
 
 
 @Component({
@@ -26,10 +28,10 @@ export class DashboardComponent {
   freq = '';
   pf = '';
 
-  ch1 = new RelayChannel(1, 0, 0, 0, 0, 0, 0, 0, 0);
-  ch2 = new RelayChannel(2, 0, 0, 0, 0, 0, 0, 0, 0);
-  ch3 = new RelayChannel(3, 0, 0, 0, 0, 0, 0, 0, 0);
-  ch4 = new RelayChannel(4, 0, 0, 0, 0, 0, 0, 0, 0);
+  ch1 = new RelayChannel(1, 0, 0, 0, '', 0, 0, 0, 0);
+  ch2 = new RelayChannel(2, 0, 0, 0, '', 0, 0, 0, 0);
+  ch3 = new RelayChannel(3, 0, 0, 0, '', 0, 0, 0, 0);
+  ch4 = new RelayChannel(4, 0, 0, 0, '', 0, 0, 0, 0);
   ch = [this.ch1, this.ch2, this.ch3, this.ch4];
   selectedCh: number = 1;
 
@@ -85,13 +87,18 @@ export class DashboardComponent {
           this.ch[i-1].dtRng = msg["dtRngCh"+i];
         }
         if(msg["rlyActDTCh"+i] != null){
-          this.ch[i-1].rlyActDT = msg["rlyActDTCh"+i];
+          const datepipe: DatePipe = new DatePipe('en-US')
+          let formattedDate = datepipe.transform(msg["rlyActDTCh"+i], 'YYYY-MM-dd HH:mm:ss');
+          this.ch[i-1].rlyActDT = formattedDate;
         }
         if(msg["rlyActDrCh"+i] != null){
           this.ch[i-1].rlyActDr = msg["rlyActDrCh"+i];
         }
         if(msg["rlyActITCh"+i] != null){
           this.ch[i-1].rlyActIT = msg["rlyActITCh"+i];
+        }
+        if(msg["rlyActITOnh"+i] != null){
+          this.ch[i-1].rlyActITOn = msg["rlyActITOnCh"+i];
         }
         if(msg["ch"+i] != null){
           this.ch[i-1].state = msg["ch"+i];
@@ -100,8 +107,40 @@ export class DashboardComponent {
     });
   }
 
-  sendMsg() {
-    this.sent.push(this.ch[this.selectedCh-1]);
-    this.WebsocketService.messages.next(this.ch[this.selectedCh-1]);
+  changeRelayParams(){
+    var data = {
+      'cmd': 'attr'
+    };
+    data['rlyCtrlMdCh'+this.selectedCh] = this.ch[this.selectedCh-1].rlyCtrlMd;
+    data['dtCycCh'+this.selectedCh] = this.ch[this.selectedCh-1].dtCyc;
+    data['dtRngCh'+this.selectedCh] = this.ch[this.selectedCh-1].dtRng;
+    let ts = new Date(this.ch[this.selectedCh-1].rlyActDT);
+    data['rlyActDTCh'+this.selectedCh] = ts.getTime();
+    data['rlyActDrCh'+this.selectedCh] = this.ch[this.selectedCh-1].rlyActDr;
+    data['rlyActITCh'+this.selectedCh] = this.ch[this.selectedCh-1].rlyActIT;
+    data['rlyActITOnCh'+this.selectedCh] = this.ch[this.selectedCh-1].rlyActITOn;
+
+    this.sent.push(data);
+    this.WebsocketService.messages.next(data);
   }
+
+  savePermanent(){
+    var data = {
+      'cmd': 'save'
+    };
+    this.sent.push(data);
+    this.WebsocketService.messages.next(data);
+  }
+
+  switchButton(){
+    var data = {
+      'cmd': 'switch'
+    };
+    data['ch'] = 'ch' + this.selectedCh;
+    data['state'] = this.ch[this.selectedCh-1].state;
+
+    this.sent.push(data);
+    this.WebsocketService.messages.next(data);
+  }
+
 }
