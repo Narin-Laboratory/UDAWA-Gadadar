@@ -18,7 +18,7 @@ export class WebsocketService {
         this.messages = <Subject<Message>>this.connect(UDAWA_WS).pipe(
             map(
                 (response: MessageEvent): Message => {
-                    //console.log(response.data);
+                    console.log(response.data);
                     let data = JSON.parse(response.data)
                     return data;
                 }

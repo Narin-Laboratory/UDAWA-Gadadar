@@ -15,9 +15,6 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
 import { MatTabsModule } from '@angular/material/tabs';
 import { DashboardComponent } from './dashboard/dashboard.component';
-import { AboutComponent } from './about/about.component';
-import { NavbarComponent } from './navbar/navbar.component';
-import { ConfigComponent } from './config/config.component';
 import { FormsModule } from '@angular/forms';
 import { RelayControlComponent } from './relay-control/relay-control.component';
 
@@ -25,9 +22,6 @@ import { RelayControlComponent } from './relay-control/relay-control.component';
   declarations: [
     AppComponent,
     DashboardComponent,
-    AboutComponent,
-    NavbarComponent,
-    ConfigComponent,
     RelayControlComponent
   ],
   imports: [

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Output, EventEmitter } from '@angular/core';
 import { WebsocketService } from "../websocket.service";
 import { RelayChannel } from '../relay-channel';
 import { SelectionModel } from '@angular/cdk/collections';
@@ -13,6 +13,9 @@ import { DatePipe } from '@angular/common';
 })
 
 export class DashboardComponent {
+
+  @Output() devTel: object;
+
   title = 'socketrv';
   content = '';
   received = [];
@@ -27,6 +30,11 @@ export class DashboardComponent {
   watt = '';
   freq = '';
   pf = '';
+
+  dts = '';
+  heap = '';
+  rssi = '';
+  uptime = '';
 
   ch1 = new RelayChannel(1, 0, 0, 0, '', 0, 0, 0, 0);
   ch2 = new RelayChannel(2, 0, 0, 0, '', 0, 0, 0, 0);
@@ -47,6 +55,20 @@ export class DashboardComponent {
 
   constructor(private WebsocketService: WebsocketService) {
     WebsocketService.messages.subscribe(msg => {
+      if(msg['dts'] != null){
+        this.dts =msg['dts']
+      }
+      if(msg['heap'] != null){
+        this.dts =msg['heap']
+      }
+      if(msg['rssi'] != null){
+        this.dts =msg['rssi']
+      }
+      if(msg['uptime'] != null){
+        this.dts =msg['uptime']
+      }
+
+
       if(msg["celc"] != null){
         this.celc = msg["celc"];
       }
