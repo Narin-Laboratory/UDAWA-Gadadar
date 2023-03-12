@@ -4,8 +4,8 @@ import { AnonymousSubject } from 'rxjs/internal/Subject';
 import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-//const CHAT_URL = "ws://" + window.location.hostname + "/ws";
-const UDAWA_WS = "ws://" + "UDAWA8C2B31C4F5FC.local" + "/ws";
+const UDAWA_WS = "ws://" + window.location.hostname + "/ws";
+//const UDAWA_WS = "ws://" + "UDAWA8C2B31C4F5FC.local" + "/ws";
 
 export interface Message {}
 
@@ -18,7 +18,7 @@ export class WebsocketService {
         this.messages = <Subject<Message>>this.connect(UDAWA_WS).pipe(
             map(
                 (response: MessageEvent): Message => {
-                    console.log(response.data);
+                    //console.log(response.data);
                     let data = JSON.parse(response.data)
                     return data;
                 }

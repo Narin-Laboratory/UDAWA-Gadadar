@@ -61,8 +61,9 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 
+
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.4"
+#define CURRENT_FIRMWARE_VERSION "0.0.1"
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -117,6 +118,7 @@ callbackResponse processSaveConfigCoMCU(const callbackData &data);
 callbackResponse processSetPanic(const callbackData &data);
 callbackResponse processBridge(const callbackData &data);
 callbackResponse processResetConfig(const callbackData &data);
+callbackResponse processUpdateSpiffs(const callbackData &data);
 
 void loadSettings();
 void saveSettings();
@@ -138,5 +140,7 @@ void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client)
 void wsSendTelemetry();
 void wsSendSensors();
 void wsSendAttributes();
+void updateSpiffs();
+double round2(double value);
 
 #endif

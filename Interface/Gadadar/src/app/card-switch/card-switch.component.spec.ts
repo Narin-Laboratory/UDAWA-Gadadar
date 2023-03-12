@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { RelayControlComponent } from './relay-control.component';
+import { CardSwitchComponent } from './card-switch.component';
 
-describe('RelayControlComponent', () => {
-  let component: RelayControlComponent;
-  let fixture: ComponentFixture<RelayControlComponent>;
+describe('CardSwitchComponent', () => {
+  let component: CardSwitchComponent;
+  let fixture: ComponentFixture<CardSwitchComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ RelayControlComponent ]
+      declarations: [ CardSwitchComponent ]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(RelayControlComponent);
+    fixture = TestBed.createComponent(CardSwitchComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

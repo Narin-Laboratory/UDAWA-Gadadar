@@ -17,7 +17,7 @@ PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 AsyncWebServer web(80);
 AsyncWebSocket ws("/ws");
 
-const size_t callbacksSize = 16;
+const size_t callbacksSize = 17;
 GenericCallback callbacks[callbacksSize] = {
   { "sharedAttributesUpdate", processSharedAttributesUpdate },
   { "provisionResponse", processProvisionResponse },
@@ -33,7 +33,8 @@ GenericCallback callbacks[callbacksSize] = {
   { "getSwitchCh4", processGetSwitchCh4},
   { "setPanic", processSetPanic},
   { "bridge", processBridge},
-  { "resetConfig",  processResetConfig}
+  { "resetConfig",  processResetConfig},
+  { "updateSpiffs", processUpdateSpiffs}
 };
 
 void setup()
@@ -45,6 +46,7 @@ void setup()
   if(String(config.model) == String("Generic")){
     strlcpy(config.model, "Gadadar", sizeof(config.model));
   }
+
 
   setSwitch("ch1", "OFF");
   setSwitch("ch2", "OFF");
@@ -141,6 +143,10 @@ void loop()
   }
 }
 
+double round2(double value) {
+   return (int)(value * 100 + 0.5) / 100.0;
+}
+
 const uint32_t MAX_INT = 0xFFFFFFFF;
 uint32_t micro2milli(uint32_t hi, uint32_t lo)
 {
@@ -155,6 +161,10 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
   ans = (ans << 16) + r / 1000;
 
   return ans;
+}
+
+void updateSpiffs(){
+
 }
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
@@ -184,11 +194,15 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       if(strcmp(cmd, (const char*) "attr") == 0){
         JsonObject root = doc.template as<JsonObject>();
         processSharedAttributesUpdate(root);
+        if(tb.connected()){
+          root.remove("cmd");
+          tb.sendAttributeDoc(doc);
+        }
       }
-      else if(strcmp(cmd, (const char*) "save") == 0){
+      else if(strcmp(cmd, (const char*) "saveConfig") == 0){
         saveSettings();
       }
-      else if(strcmp(cmd, (const char*) "switch") == 0){
+      else if(strcmp(cmd, (const char*) "setSwitch") == 0){
         setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == mySettings.ON ? "ON" : "OFF");
       }
     }
@@ -571,6 +585,11 @@ void saveSettings()
   log_manager->debug(PSTR(__func__), "Written settings:\n %s \n", tmp.c_str());
 }
 
+callbackResponse processUpdateSpiffs(const callbackData &data){
+  updateSpiffs();
+  return callbackResponse("updateSpiffs", 1);
+}
+
 callbackResponse processSaveConfig(const callbackData &data)
 {
   configSave();
@@ -676,6 +695,17 @@ callbackResponse processBridge(const callbackData &data)
 }
 
 callbackResponse processResetConfig(const callbackData &data){
+  if(data["params"]["format"] != nullptr){
+    bool formatted = SPIFFS.format();
+    if(formatted)
+    {
+      log_manager->info(PSTR(__func__),PSTR("SPIFFS formatting success.\n"));
+    }
+    else
+    {
+      log_manager->error(PSTR(__func__),PSTR("SPIFFS formatting failed.\n"));
+    }
+  }
   configReset();
   reboot();
   return callbackResponse("resetConfig", 1);
@@ -964,7 +994,10 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["pinLedB"] != nullptr){configcomcu.pinLedB = data["pinLedB"].as<uint8_t>();}
   if(data["ledON"] != nullptr){configcomcu.ledON = data["ledON"].as<uint8_t>();}
 
-  wsSendAttributes();
+
+  if(data["cmd"] == nullptr){
+    wsSendAttributes();
+  }
   mySettings.lastUpdated = millis();
   return callbackResponse("sharedAttributesUpdate", 1);
 }
@@ -1120,7 +1153,6 @@ void publishSwitch(){
         tb.sendTelemetryDoc(doc);
         wsSend(doc);
         doc.clear();
-
         mySettings.publishSwitch[i] = false;
       }
     }
@@ -1157,12 +1189,12 @@ void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client)
 void wsSendTelemetry(){
   if(ws.count() > 0){
     StaticJsonDocument<DOCSIZE_MIN> doc;
-
-    doc["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    doc["rssi"] = WiFi.RSSI();
-    doc["uptime"] = millis()/1000;
-    doc["dt"] = rtc.getEpoch();
-    doc["dts"] = rtc.getDateTime();
+    JsonObject devTel = doc.createNestedObject("devTel");
+    devTel["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    devTel["rssi"] = WiFi.RSSI();
+    devTel["uptime"] = millis()/1000;
+    devTel["dt"] = rtc.getEpoch();
+    devTel["dts"] = rtc.getDateTime();
     wsSend(doc);
   }
 }
@@ -1170,39 +1202,22 @@ void wsSendTelemetry(){
 void wsSendSensors(){
   if(ws.count() > 0){
     StaticJsonDocument<DOCSIZE_MIN> doc;
-    /*if(!isnan(PZEM.voltage())){
-      doc["volt"] = PZEM.voltage();
-      doc["amp"] = PZEM.current();
-      doc["watt"] = PZEM.power();
-      doc["freq"] = PZEM.frequency();
-      doc["pf"] = PZEM.pf();
+    if(!isnan(PZEM.voltage())){
+      JsonObject pzem = doc.createNestedObject("pzem");
+      pzem["volt"] = round2(PZEM.voltage());
+      pzem["amp"] = round2(PZEM.current());
+      pzem["watt"] = round2(PZEM.power());
+      pzem["freq"] = round2(PZEM.frequency());
+      pzem["pf"] = round2(PZEM.pf());
       wsSend(doc);
       doc.clear();
     }
     if(mySettings.flag_bme280){
-      doc["celc"] = bme.readTemperature();
-      doc["rh"] = bme.readHumidity();
-      doc["hpa"] = bme.readPressure() / 100.0F;
-      doc["alt"] = bme.readAltitude(mySettings.seaHpa);
-      wsSend(doc);
-      doc.clear();
-    }*/
-    if(true){
-      long volt = random(220, 250);
-      long amp = random(1, 10);
-      doc["volt"] = volt;
-      doc["amp"] = amp;
-      doc["watt"] = volt * amp;
-      doc["freq"] = random(50, 60);
-      doc["pf"] = random(0.2, 1);
-      wsSend(doc);
-      doc.clear();
-    }
-    if(true){
-      doc["celc"] = random(17, 40);
-      doc["rh"] = random(20, 100);
-      doc["hpa"] = random(1000, 1100);
-      doc["alt"] = random(100, 200);
+      JsonObject bme280 = doc.createNestedObject("bme280");
+      bme280["celc"] = round2(bme.readTemperature());
+      bme280["rh"] = round2(bme.readHumidity());
+      bme280["hpa"] = round2(bme.readPressure() / 100.0F);
+      bme280["alt"] = round2(bme.readAltitude(mySettings.seaHpa));
       wsSend(doc);
       doc.clear();
     }
@@ -1215,92 +1230,97 @@ void wsSendAttributes(){
   IPAddress ip = WiFi.localIP();
   char ipa[25];
   sprintf(ipa, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  doc["ipad"] = ipa;
-  doc["compdate"] = COMPILED;
-  doc["fmTitle"] = CURRENT_FIRMWARE_TITLE;
-  doc["fmVersion"] = CURRENT_FIRMWARE_VERSION;
-  doc["stamac"] = WiFi.macAddress();
+  JsonObject attr = doc.createNestedObject("attr");
+  attr["ipad"] = ipa;
+  attr["compdate"] = COMPILED;
+  attr["fmTitle"] = CURRENT_FIRMWARE_TITLE;
+  attr["fmVersion"] = CURRENT_FIRMWARE_VERSION;
+  attr["stamac"] = WiFi.macAddress();
+  attr["apmac"] = WiFi.softAPmacAddress();
+  attr["flashFree"] = ESP.getFreeSketchSpace();
+  attr["firmwareSize"] = ESP.getSketchSize();
+  attr["flashSize"] = ESP.getFlashChipSize();
+  attr["sdkVer"] = ESP.getSdkVersion();
   wsSend(doc);
   doc.clear();
-  doc["apmac"] = WiFi.softAPmacAddress();
-  doc["flashFree"] = ESP.getFreeSketchSpace();
-  doc["firmwareSize"] = ESP.getSketchSize();
-  doc["flashSize"] = ESP.getFlashChipSize();
-  doc["sdkVer"] = ESP.getSdkVersion();
+  JsonObject cfg = doc.createNestedObject("cfg");
+  cfg["model"] = config.model;
+  cfg["group"] = config.group;
+  cfg["broker"] = config.broker;
+  cfg["port"] = config.port;
+  cfg["wssid"] = config.wssid;
+  cfg["ap"] = WiFi.SSID();
+  cfg["wpass"] = config.wpass;
+  cfg["gmtOffset"] = config.gmtOffset;
+  cfg["httpUname"] = mySettings.httpUname;
+  cfg["httpPass"] = mySettings.httpPass;
+  cfg["name"] = config.name;
+  cfg["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
+  cfg["intvRecWthr"] = mySettings.intvRecWthr;
+  cfg["intvDevTel"] = mySettings.intvDevTel;
   wsSend(doc);
   doc.clear();
-  doc["model"] = config.model;
-  doc["group"] = config.group;
-  doc["broker"] = config.broker;
-  doc["port"] = config.port;
-  doc["wssid"] = config.wssid;
-  doc["ap"] = WiFi.SSID();
-  doc["wpass"] = config.wpass;
-  doc["gmtOffset"] = config.gmtOffset;
+  JsonObject dtCyc = doc.createNestedObject("dtCyc");
+  dtCyc["dtCycCh1"] = mySettings.dtCyc[0];
+  dtCyc["dtCycCh2"] = mySettings.dtCyc[1];
+  dtCyc["dtCycCh3"] = mySettings.dtCyc[2];
+  dtCyc["dtCycCh4"] = mySettings.dtCyc[3];
   wsSend(doc);
   doc.clear();
-  doc["dtCycCh1"] = mySettings.dtCyc[0];
-  doc["dtCycCh2"] = mySettings.dtCyc[1];
-  doc["dtCycCh3"] = mySettings.dtCyc[2];
-  doc["dtCycCh4"] = mySettings.dtCyc[3];
+  JsonObject dtRng = doc.createNestedObject("dtRng");
+  dtRng["dtRngCh1"] = mySettings.dtRng[0];
+  dtRng["dtRngCh2"] = mySettings.dtRng[1];
+  dtRng["dtRngCh3"] = mySettings.dtRng[2];
+  dtRng["dtRngCh4"] = mySettings.dtRng[3];
   wsSend(doc);
   doc.clear();
-  doc["dtRngCh1"] = mySettings.dtRng[0];
-  doc["dtRngCh2"] = mySettings.dtRng[1];
-  doc["dtRngCh3"] = mySettings.dtRng[2];
-  doc["dtRngCh4"] = mySettings.dtRng[3];
+  JsonObject dtCycFS = doc.createNestedObject("dtCycFS");
+  dtCycFS["dtCycFSCh1"] = mySettings.dtCycFS[0];
+  dtCycFS["dtCycFSCh2"] = mySettings.dtCycFS[1];
+  dtCycFS["dtCycFSCh3"] = mySettings.dtCycFS[2];
+  dtCycFS["dtCycFSCh4"] = mySettings.dtCycFS[3];
   wsSend(doc);
   doc.clear();
-  doc["dtCycFSCh1"] = mySettings.dtCycFS[0];
-  doc["dtCycFSCh2"] = mySettings.dtCycFS[1];
-  doc["dtCycFSCh3"] = mySettings.dtCycFS[2];
-  doc["dtCycFSCh4"] = mySettings.dtCycFS[3];
+  JsonObject dtRngFS = doc.createNestedObject("dtRngFS");
+  dtRngFS["dtRngFSCh1"] = mySettings.dtRngFS[0];
+  dtRngFS["dtRngFSCh2"] = mySettings.dtRngFS[1];
+  dtRngFS["dtRngFSCh3"] = mySettings.dtRngFS[2];
+  dtRngFS["dtRngFSCh4"] = mySettings.dtRngFS[3];
   wsSend(doc);
   doc.clear();
-  doc["dtRngFSCh1"] = mySettings.dtRngFS[0];
-  doc["dtRngFSCh2"] = mySettings.dtRngFS[1];
-  doc["dtRngFSCh3"] = mySettings.dtRngFS[2];
-  doc["dtRngFSCh4"] = mySettings.dtRngFS[3];
+  JsonObject rlyActDT = doc.createNestedObject("rlyActDT");
+  rlyActDT["rlyActDTCh1"] = (uint64_t)mySettings.rlyActDT[0] * 1000;
+  rlyActDT["rlyActDTCh2"] = (uint64_t)mySettings.rlyActDT[1] * 1000;
+  rlyActDT["rlyActDTCh3"] = (uint64_t)mySettings.rlyActDT[2] * 1000;
+  rlyActDT["rlyActDTCh4"] = (uint64_t)mySettings.rlyActDT[3] * 1000;
   wsSend(doc);
   doc.clear();
-  doc["rlyActDTCh1"] = (uint64_t)mySettings.rlyActDT[0] * 1000;
-  doc["rlyActDTCh2"] = (uint64_t)mySettings.rlyActDT[1] * 1000;
-  doc["rlyActDTCh3"] = (uint64_t)mySettings.rlyActDT[2] * 1000;
-  doc["rlyActDTCh4"] = (uint64_t)mySettings.rlyActDT[3] * 1000;
+  JsonObject rlyActDr = doc.createNestedObject("rlyActDr");
+  rlyActDr["rlyActDrCh1"] = mySettings.rlyActDr[0];
+  rlyActDr["rlyActDrCh2"] = mySettings.rlyActDr[1];
+  rlyActDr["rlyActDrCh3"] = mySettings.rlyActDr[2];
+  rlyActDr["rlyActDrCh4"] = mySettings.rlyActDr[3];
   wsSend(doc);
   doc.clear();
-  doc["rlyActDrCh1"] = mySettings.rlyActDr[0];
-  doc["rlyActDrCh2"] = mySettings.rlyActDr[1];
-  doc["rlyActDrCh3"] = mySettings.rlyActDr[2];
-  doc["rlyActDrCh4"] = mySettings.rlyActDr[3];
+  JsonObject rlyActIT = doc.createNestedObject("rlyActIT");
+  rlyActIT["rlyActITCh1"] = mySettings.rlyActIT[0];
+  rlyActIT["rlyActITCh2"] = mySettings.rlyActIT[1];
+  rlyActIT["rlyActITCh3"] = mySettings.rlyActIT[2];
+  rlyActIT["rlyActITCh4"] = mySettings.rlyActIT[3];
   wsSend(doc);
   doc.clear();
-  doc["rlyActITCh1"] = mySettings.rlyActIT[0];
-  doc["rlyActITCh2"] = mySettings.rlyActIT[1];
-  doc["rlyActITCh3"] = mySettings.rlyActIT[2];
-  doc["rlyActITCh4"] = mySettings.rlyActIT[3];
+  JsonObject rlyActITOn = doc.createNestedObject("rlyActITOn");
+  rlyActITOn["rlyActITOnCh1"] = mySettings.rlyActITOn[0];
+  rlyActITOn["rlyActITOnCh2"] = mySettings.rlyActITOn[1];
+  rlyActITOn["rlyActITOnCh3"] = mySettings.rlyActITOn[2];
+  rlyActITOn["rlyActITOnCh4"] = mySettings.rlyActITOn[3];
   wsSend(doc);
   doc.clear();
-  doc["rlyActITOnCh1"] = mySettings.rlyActITOn[0];
-  doc["rlyActITOnCh2"] = mySettings.rlyActITOn[1];
-  doc["rlyActITOnCh3"] = mySettings.rlyActITOn[2];
-  doc["rlyActITOnCh4"] = mySettings.rlyActITOn[3];
-  wsSend(doc);
-  doc.clear();
-  doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
-  doc["intvRecWthr"] = mySettings.intvRecWthr;
-  doc["intvDevTel"] = mySettings.intvDevTel;
-  wsSend(doc);
-  doc.clear();
-  doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
-  doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
-  doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
-  doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
-  wsSend(doc);
-  doc.clear();
-  doc["httpUname"] = mySettings.httpUname;
-  doc["httpPass"] = mySettings.httpPass;
-  doc["name"] = config.name;
+  JsonObject rlyCtrlMd = doc.createNestedObject("rlyCtrlMd");
+  rlyCtrlMd["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
+  rlyCtrlMd["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
+  rlyCtrlMd["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
+  rlyCtrlMd["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
   wsSend(doc);
   doc.clear();
   doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;

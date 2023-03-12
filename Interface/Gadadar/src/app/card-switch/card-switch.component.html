@@ -1,0 +1,22 @@
+<div [ngSwitch]="state">
+    <div *ngSwitchCase=0>
+        <div class="card text-bg-danger mb-3">
+            <div class="card-body text-center">
+                <div class="display-6">
+                    {{switch}} {{state == 1 ? 'ON' : 'OFF'}}
+                </div>
+                <p>{{opMode[rlyCtrlMd]}}</p>
+            </div>
+        </div>
+    </div>
+    <div *ngSwitchCase=1>
+        <div class="card text-bg-success mb-3">
+            <div class="card-body text-center">
+                <div class="display-6">
+                    {{switch}} {{state == 1 ? 'ON' : 'OFF'}}
+                </div>
+                <p>{{opMode[rlyCtrlMd]}}</p>
+            </div>
+        </div>
+    </div>
+</div>
