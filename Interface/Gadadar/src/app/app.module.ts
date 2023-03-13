@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { CardSensorComponent } from './card-sensor/card-sensor.component';
 import { CardSwitchComponent } from './card-switch/card-switch.component';
+import { WebsocketService } from './websocket.service';
 
 
 @NgModule({
@@ -27,7 +28,7 @@ import { CardSwitchComponent } from './card-switch/card-switch.component';
     MatTabsModule,
     FormsModule
   ],
-  providers: [],
+  providers: [WebsocketService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

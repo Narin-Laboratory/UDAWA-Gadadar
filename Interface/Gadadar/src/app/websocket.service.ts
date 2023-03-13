@@ -4,12 +4,12 @@ import { AnonymousSubject } from 'rxjs/internal/Subject';
 import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-//const UDAWA_WS = "ws://" + window.location.hostname + "/ws";
-const UDAWA_WS = "ws://" + "UDAWA8C2B31C4F5FC.local" + "/ws";
+const UDAWA_WS = "ws://" + window.location.hostname + "/ws";
+//const UDAWA_WS = "ws://" + "UDAWA8C2B31C4F5FC.local" + "/ws";
 
 export interface Message {}
 
-@Injectable()
+@Injectable({providedIn: 'root'})
 export class WebsocketService {
     private subject: AnonymousSubject<MessageEvent>;
     public messages: Subject<Message>;

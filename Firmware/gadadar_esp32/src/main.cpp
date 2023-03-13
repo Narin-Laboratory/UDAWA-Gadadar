@@ -124,6 +124,7 @@ void loop()
 
   if(tb.connected() && FLAG_IOT_SUBSCRIBE)
   {
+    tb.server_rpc_call("sharedAttributesUpdate", "sharedAttributesUpdate");
     if(tb.callbackSubscribe(callbacks, callbacksSize))
     {
       log_manager->info(PSTR(__func__),PSTR("Callbacks subscribed successfuly!\n"));
