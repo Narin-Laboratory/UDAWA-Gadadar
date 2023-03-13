@@ -199,8 +199,21 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
           tb.sendAttributeDoc(doc);
         }
       }
-      else if(strcmp(cmd, (const char*) "saveConfig") == 0){
+      else if(strcmp(cmd, (const char*) "saveSettings") == 0){
         saveSettings();
+      }
+      else if(strcmp(cmd, (const char*) "saveConfig") == 0){
+        configSave();
+      }
+      else if(strcmp(cmd, (const char*) "setPanic") == 0){
+        StaticJsonDocument<DOCSIZE_MIN> doc;
+        JsonObject params = doc.createNestedObject("params");
+        params["state"]= "ON";
+        JsonObject root = doc.template as<JsonObject>();
+        processSetPanic(root);
+      }
+      else if(strcmp(cmd, (const char*) "reboot") == 0){
+        reboot();
       }
       else if(strcmp(cmd, (const char*) "setSwitch") == 0){
         setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == mySettings.ON ? "ON" : "OFF");

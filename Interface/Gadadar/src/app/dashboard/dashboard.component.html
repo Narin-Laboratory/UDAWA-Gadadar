@@ -49,7 +49,6 @@
                 <div class="col-sm-12 col-lg-6 mb-2">
                     <div class="card">
                         <div class="card-body">
-
                             <div class="form-floating mb-3">
                                 <select id="udawa-rlch" class="form-select" [(ngModel)]="selectedCh" (change)="changeSelectedCh()">
                                     <option *ngFor="let c of channel" value="{{c}}">Channel {{c}}</option>
@@ -161,6 +160,71 @@
                                 <li>Time Daily: You can switch the relay on at a selected time daily and adjust the on duration.</li>
                                 <li>Interval: You can switch the relay to on by interval and adjust the on duration.</li>
                                 <li>Environmental Condition: You can use the environmental data as a parameter to adjust when to turn on the switch and for how long it stays on.</li>
+                                <li><strong>Use the panic button to disable the device in emergency.</strong></li>
+                                <li>Use the reboot button to restart the device.</li>
+                            </ol>
+                            <hr>
+                            <button type="button" class="btn btn-warning btn-sm btn-block" (click)="rebootClick()">
+                                <span class="material-symbols-outlined">restart_alt</span> Reboot
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm btn-block" (click)="panicClick()">
+                                <span class="material-symbols-outlined">warning</span> Panic Button
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </mat-tab>
+    <mat-tab label="Config">
+        <div class="container mt-5">
+            <div class="row">
+                <div class="col-sm-12 col-lg-6 mb-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="udawa-card-ifaceauth" class="card mb-3">
+                                <div class="card-body">
+                                    <p>Built-in web interface can be accessed from <br>
+                                        <a href="http://{{cfg['name']}}.local">http://{{cfg['name']}}.local</a> or <a href="http://{{attr['ipad']}}">http://{{attr['ipad']}}</a>
+                                    </p>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="text" class="form-control" id="udawa-cfg-httpUname" [(ngModel)]="cfg['httpUname']" (change)="changeConfig()">
+                                        <label for="udawa-cfg-httpUser">Built-in Interface Username</label>
+                                    </div>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['httpPass']" (change)="changeConfig()">
+                                        <label for="udawa-cfg-httpPass">Built-in Interface Password</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="udawa-card-ifaceauth" class="card mb-3">
+                                <div class="card-body">
+                                    <p>Currently connected to {{cfg['ap']}}, IP Address {{attr['ipad']}}</p>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="text" class="form-control" id="udawa-cfg-wssid" [(ngModel)]="cfg['wssid']" (change)="changeConfig()">
+                                        <label for="udawa-cfg-httpUser">Network SSID</label>
+                                    </div>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['wpass']" (change)="changeConfig()">
+                                        <label for="udawa-cfg-httpPass">Network Password</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary btn-lg btn-block" (click)="saveConfigClick()">Save Config</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-12 col-lg-6 mb-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <h1>Configuration Highlight</h1>
+                            <p>Here you can change the basic device configuration. Please read the notes below to avoid losing access to your device.</p>
+                            <ol>
+                                <li>Use a strong but memorable username and password for the built-in web interface. For security reasons, there is no mechanism to reset or recover the password manually. The password must be reset or viewed via cloud solutions or a serial debugger.</li>
+                                <li>The device is supposed to be connected to the Internet for the timing function to work properly. Please provide your WiFi SSID and password correctly. If you mistakenly input the wrong WiFi credential, the device will fail to connect, and you will lose access. The solution is that you can turn on WiFi tethering on your phone with UDAWA and defaultkey as the SSID and password. The device will auto-reconnect to that emergency network, and you can reset the access from there.</li>
+                                <li>If your network connection is unreliable, please avoid using any feature that requires a timing function, such as the Datetime and Time Daily channel control modes.</li>
+                                <li>Some changes need reboot to take effect. Use the reboot button on the control tab.</li>
                             </ol>
                         </div>
                     </div>
@@ -168,5 +232,4 @@
             </div>
         </div>
     </mat-tab>
-    <mat-tab label="Config"></mat-tab>
 </mat-tab-group>

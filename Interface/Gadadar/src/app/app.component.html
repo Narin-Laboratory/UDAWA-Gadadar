@@ -13,10 +13,10 @@
 <div class="container">
   <div class="row">
     <div class="col-sm-12">
-      <app-dashboard (savePermanent)="savePermanent()" (chParamsChange)="chParamsChange()" (stateChange)="stateChange()" [(selectedCh)]="selectedCh"
+      <app-dashboard (panic)="panic()" (reboot)="reboot()" (saveConfig)="saveConfig()" (savePermanent)="savePermanent()" (chParamsChange)="chParamsChange()" (stateChange)="stateChange()" [(selectedCh)]="selectedCh"
         [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(rlyCtrlMd)]="rlyCtrlMd"
         [(dtCyc)]="dtCyc" [(dtRng)]="dtRng" [(rlyActDT)]="rlyActDT" [(rlyActDr)]="rlyActDr"
-        [(rlyActIT)]="rlyActIT" [(rlyActITOn)]="rlyActITOn"></app-dashboard>
+        [(rlyActIT)]="rlyActIT" [(rlyActITOn)]="rlyActITOn" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
     </div>
   </div>
 </div>

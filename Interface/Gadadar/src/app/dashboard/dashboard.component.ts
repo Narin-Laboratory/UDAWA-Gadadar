@@ -41,7 +41,16 @@ export class DashboardComponent {
   @Output() rlyActITOnChange = new EventEmitter<any>();
   @Input() rlyActITOn: object;
 
+  @Output() cfgChange = new EventEmitter<any>();
+  @Input() cfg: object;
+
+  @Output() attrChange = new EventEmitter<any>();
+  @Input() attr: object;
+
   @Output() savePermanent = new EventEmitter<any>();
+  @Output() saveConfig = new EventEmitter<any>();
+  @Output() reboot = new EventEmitter<any>();
+  @Output() panic = new EventEmitter<any>();
 
 
 
@@ -77,5 +86,22 @@ export class DashboardComponent {
 
   savePermanentClick(){
     this.savePermanent.emit();
+  }
+
+  changeConfig(){
+    this.cfgChange.emit(this.cfg);
+    this.attrChange.emit(this.attr);
+  }
+
+  saveConfigClick(){
+    this.saveConfig.emit();
+  }
+
+  rebootClick(){
+    this.reboot.emit();
+  }
+
+  panicClick(){
+    this.panic.emit();
   }
 }

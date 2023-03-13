@@ -123,7 +123,28 @@ export class AppComponent {
 
   savePermanent(){
     var data = {
+      'cmd': 'saveSettings'
+    };
+    this.WebsocketService.messages.next(data);
+  }
+
+  saveConfig(){
+    var data = {
       'cmd': 'saveConfig'
+    };
+    this.WebsocketService.messages.next(data);
+  }
+
+  panic(){
+    var data = {
+      'cmd': 'setPanic'
+    };
+    this.WebsocketService.messages.next(data);
+  }
+
+  reboot(){
+    var data = {
+      'cmd': 'reboot'
     };
     this.WebsocketService.messages.next(data);
   }
