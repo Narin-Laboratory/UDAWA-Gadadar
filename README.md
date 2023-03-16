@@ -1,4 +1,4 @@
-# UDAWA Gadadar [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5774602.svg)](https://doi.org/10.5281/zenodo.5774602)
+# UDAWA Gadadar [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7735649.svg)](https://doi.org/10.5281/zenodo.7735649)
 This variant (Gadadar) of the UDAWA Smart System is intended to help farmers automate their greenhouse instruments. The main feature of this variant is a four-channel smart relay that can be plugged into any AC instrument (pump, mixer, blower, lighting, etc.). This subsystem is also equipped with environmental sensors (air temperature, humidity, and pressure). To assist farmers in gaining insight into power usage, a precision power sensor was also added to record the real-time power usage of the controlled instruments, so farmers could see the monthly report of their power consumption.
 
 ### Key Features
