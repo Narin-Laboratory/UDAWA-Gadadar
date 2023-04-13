@@ -217,7 +217,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
         reboot();
       }
       else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == mySettings.ON ? "ON" : "OFF");
+        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
       }
     }
     else
@@ -730,10 +730,10 @@ void setSwitch(String ch, String state)
   bool fState = 0;
   uint8_t pin = 0;
 
-  if(ch == String("ch1")){pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : !mySettings.ON; mySettings.publishSwitch[0] = true;}
-  else if(ch == String("ch2")){pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : !mySettings.ON; mySettings.publishSwitch[1] = true;}
-  else if(ch == String("ch3")){pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : !mySettings.ON; mySettings.publishSwitch[2] = true;}
-  else if(ch == String("ch4")){pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : !mySettings.ON; mySettings.publishSwitch[3] = true;}
+  if(ch == String("ch1")){pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
+  else if(ch == String("ch2")){pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
+  else if(ch == String("ch3")){pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
+  else if(ch == String("ch4")){pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
 
   if(state == String("ON"))
   {
@@ -741,7 +741,7 @@ void setSwitch(String ch, String state)
   }
   else
   {
-    fState = !mySettings.ON;
+    fState = 1 - mySettings.ON;
   }
 
   setCoMCUPin(pin, 1, OUTPUT, 0, fState);
@@ -764,7 +764,7 @@ void relayControlByDateTime(){
       }
       else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.rlyActDr[i]) <=
         (rtc.getEpoch() - mySettings.rlyActDT[i])){
-          mySettings.dutyState[i] = !mySettings.ON;
+          mySettings.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
           log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d changed to %d - ts:%d - tr:%d - exp:%d\n"), i+1,
@@ -800,7 +800,7 @@ void relayControlByDateTime(){
       }
       else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.rlyActDr[i]) <=
         (currentTimeInSec - targetTimeInSec)){
-          mySettings.dutyState[i] = !mySettings.ON;
+          mySettings.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
           log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d changed to %d \n currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
@@ -823,7 +823,7 @@ void relayControlBydtCyc()
       {
         if( mySettings.dtCyc[i] != 100 && (millis() - mySettings.dutyCounter[i] ) >= (float)(( ((float)mySettings.dtCyc[i] / 100) * (float)mySettings.dtRng[i]) * 1000))
         {
-          mySettings.dutyState[i] = !mySettings.ON;
+          mySettings.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
           mySettings.dutyCounter[i] = millis();
@@ -850,7 +850,7 @@ void relayControlByIntrvl(){
   {
     if(mySettings.rlyActIT[i] != 0 && mySettings.rlyActITOn[i] != 0 && mySettings.rlyCtrlMd[i] == 4)
     {
-      if( mySettings.dutyState[i] == !mySettings.ON && (millis() - mySettings.rlyActITOnTs[i]) > (mySettings.rlyActIT[i] * 1000) ){
+      if( mySettings.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.rlyActITOnTs[i]) > (mySettings.rlyActIT[i] * 1000) ){
         mySettings.dutyState[i] = mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "ON");
@@ -859,7 +859,7 @@ void relayControlByIntrvl(){
           mySettings.rlyActIT[i], mySettings.rlyActITOn[i]);
       }
       if( mySettings.dutyState[i] == mySettings.ON && (millis() - mySettings.rlyActITOnTs[i]) > (mySettings.rlyActITOn[i] * 1000) ){
-        mySettings.dutyState[i] = !mySettings.ON;
+        mySettings.dutyState[i] = 1 - mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "OFF");
         log_manager->debug(PSTR(__func__), PSTR("Relay Ch%d has changed to %d - rlyActIT:%d - rlyActITOn:%d\n"), i+1, mySettings.dutyState[i],
