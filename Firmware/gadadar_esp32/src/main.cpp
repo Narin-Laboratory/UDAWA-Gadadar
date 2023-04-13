@@ -101,7 +101,6 @@ void setup()
   taskid_t taskWsSendSensors = taskManager.scheduleFixedRate(1000, [] {
     wsSendSensors();
   });
-
 }
 
 void loop()
@@ -887,7 +886,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["accessToken"] != nullptr){strlcpy(config.accessToken, data["accessToken"].as<const char*>(), sizeof(config.accessToken));}
   if(data["provisionDeviceKey"] != nullptr){strlcpy(config.provisionDeviceKey, data["provisionDeviceKey"].as<const char*>(), sizeof(config.provisionDeviceKey));}
   if(data["provisionDeviceSecret"] != nullptr){strlcpy(config.provisionDeviceSecret, data["provisionDeviceSecret"].as<const char*>(), sizeof(config.provisionDeviceSecret));}
-  if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>();}
+  if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>(); log_manager->set_log_level(PSTR("*"), (LogLevel) config.logLev);;}
   if(data["gmtOffset"] != nullptr){config.gmtOffset = data["gmtOffset"].as<int>();}
 
 
