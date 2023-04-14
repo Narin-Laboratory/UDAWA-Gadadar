@@ -186,7 +186,7 @@ void selfDiagnosticShort(){
   if(!mySettings.flag_bme280){
     setAlarm(111, 1, -1, 1000);
   }
-  if(isnan(PZEM.voltage())){
+  if(isnan(PZEM.voltage()) || PZEM.voltage() <= 0){
     setAlarm(121, 1, -1, 1000);
   }
 
@@ -196,14 +196,6 @@ void selfDiagnosticShort(){
       ACTIVE_CH_COUNTER++;
     }
 
-    if(mySettings.stateOnTs[i] > 0){
-      if(millis() - mySettings.stateOnTs[i] > 3600000){
-        if(i = 0){setAlarm(211, 1, -1, 250);}
-        else if(i = 0){setAlarm(212, 1, -1, 250);}
-        else if(i = 0){setAlarm(213, 1, -1, 250);}
-        else if(i = 0){setAlarm(214, 1, -1, 250);}
-      }
-    }
   }
 
   if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER > 0 && (int)PZEM.power() < 6){
@@ -217,7 +209,14 @@ void selfDiagnosticShort(){
 }
 
 void selfDiagnosticLong(){
-
+  if(mySettings.stateOnTs[i] > 0){
+      if(millis() - mySettings.stateOnTs[i] > 3000000){
+        if(i = 0){setAlarm(211, 1, -1, 250);}
+        else if(i = 0){setAlarm(212, 1, -1, 250);}
+        else if(i = 0){setAlarm(213, 1, -1, 250);}
+        else if(i = 0){setAlarm(214, 1, -1, 250);}
+      }
+    }
 }
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
