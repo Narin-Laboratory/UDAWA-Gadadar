@@ -52,6 +52,7 @@ void setup()
     strlcpy(config.model, "Gadadar", sizeof(config.model));
   }
   cbSubscribe(cb, cbSize);
+  setAlarm(999, 1, 1, 3000);
 
   setSwitch("ch1", "OFF");
   setSwitch("ch2", "OFF");
