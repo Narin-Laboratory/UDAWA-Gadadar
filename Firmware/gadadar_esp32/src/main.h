@@ -77,6 +77,7 @@ struct Settings
     uint32_t lastUpdated;
     uint8_t ON;
     bool dutyState[4];
+    unsigned long stateOnTs[4];
     unsigned long dutyCounter[4];
     uint16_t intvRecPwrUsg = 1;
     uint16_t intvRecWthr = 1;
@@ -119,6 +120,7 @@ callbackResponse processSetPanic(const callbackData &data);
 callbackResponse processBridge(const callbackData &data);
 callbackResponse processResetConfig(const callbackData &data);
 callbackResponse processUpdateSpiffs(const callbackData &data);
+JsonObject processEmitAlarmWs(const JsonObject &data);
 
 void loadSettings();
 void saveSettings();
@@ -132,7 +134,6 @@ void setSwitch(String  ch, String state);
 void publishSwitch();
 void recPowerUsage();
 void recWeatherData();
-uint8_t activeBeep();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len);
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc);
@@ -141,6 +142,8 @@ void wsSendTelemetry();
 void wsSendSensors();
 void wsSendAttributes();
 void updateSpiffs();
+void selfDiagnosticShort();
+void selfDiagnosticLong();
 double round2(double value);
 
 #endif

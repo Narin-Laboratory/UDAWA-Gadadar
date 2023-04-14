@@ -17,6 +17,11 @@ PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 AsyncWebServer web(80);
 AsyncWebSocket ws("/ws");
 
+const size_t cbSize = 1;
+GCB cb[cbSize] = {
+  { "emitAlarmWs", processEmitAlarmWs }
+};
+
 const size_t callbacksSize = 17;
 GenericCallback callbacks[callbacksSize] = {
   { "sharedAttributesUpdate", processSharedAttributesUpdate },
@@ -46,7 +51,7 @@ void setup()
   if(String(config.model) == String("Generic")){
     strlcpy(config.model, "Gadadar", sizeof(config.model));
   }
-
+  cbSubscribe(cb, cbSize);
 
   setSwitch("ch1", "OFF");
   setSwitch("ch2", "OFF");
@@ -55,7 +60,7 @@ void setup()
 
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
-    log_manager->error(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
+    log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }
 
   networkInit();
@@ -100,6 +105,14 @@ void setup()
 
   taskid_t taskWsSendSensors = taskManager.scheduleFixedRate(1000, [] {
     wsSendSensors();
+  });
+
+  taskid_t taskSelfDiagnosticShort = taskManager.scheduleFixedRate(120000, [] {
+    selfDiagnosticShort();
+  });
+
+  taskid_t taskSelfDiagnosticLong = taskManager.scheduleFixedRate(3600000, [] {
+    selfDiagnosticLong();
   });
 }
 
@@ -152,7 +165,7 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 {
   if (hi >= 1000)
   {
-    log_manager->error(PSTR(__func__), PSTR("Cannot store milliseconds in uint32!\n"));
+    log_manager->warn(PSTR(__func__), PSTR("Cannot store milliseconds in uint32!\n"));
   }
 
   uint32_t r = (lo >> 16) + (hi << 16);
@@ -167,6 +180,46 @@ void updateSpiffs(){
 
 }
 
+void selfDiagnosticShort(){
+
+
+  if(!mySettings.flag_bme280){
+    setAlarm(111, 1, -1, 1000);
+  }
+  if(isnan(PZEM.voltage())){
+    setAlarm(121, 1, -1, 1000);
+  }
+
+  uint8_t ACTIVE_CH_COUNTER;
+  for(uint8_t i = 0; i < 4; i++){
+    if(mySettings.dutyState[i] == mySettings.ON){
+      ACTIVE_CH_COUNTER++;
+    }
+
+    if(mySettings.stateOnTs[i] > 0){
+      if(millis() - mySettings.stateOnTs[i] > 3600000){
+        if(i = 0){setAlarm(211, 1, -1, 250);}
+        else if(i = 0){setAlarm(212, 1, -1, 250);}
+        else if(i = 0){setAlarm(213, 1, -1, 250);}
+        else if(i = 0){setAlarm(214, 1, -1, 250);}
+      }
+    }
+  }
+
+  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER > 0 && (int)PZEM.power() < 6){
+    setAlarm(221, 1, -1, 3000);
+  }
+
+  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 6){
+    setAlarm(222, 1, -1, 3000);
+  }
+
+}
+
+void selfDiagnosticLong(){
+
+}
+
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
   if(type == WS_EVT_CONNECT){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] connect\n"), server->url(), client->id());
@@ -174,7 +227,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
   } else if(type == WS_EVT_DISCONNECT){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] disconnect\n"), server->url(), client->id());
   } else if(type == WS_EVT_ERROR){
-    log_manager->error(PSTR(__func__), PSTR("ws[%s][%u] error(%u): %s\n"), server->url(), client->id(), *((uint16_t*)arg), (char*)data);
+    log_manager->warn(PSTR(__func__), PSTR("ws[%s][%u] error(%u): %s\n"), server->url(), client->id(), *((uint16_t*)arg), (char*)data);
   } else if(type == WS_EVT_PONG){
     log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] pong[%u]: %s\n"), server->url(), client->id(), len, (len)?(char*)data:"");
   } else if(type == WS_EVT_DATA){
@@ -185,7 +238,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
     {
       // Print the values
       // (we must use as<T>() to resolve the ambiguity)
-      log_manager->error(PSTR(__func__), PSTR("WS message parsing %s\n"), err.c_str());
+      log_manager->warn(PSTR(__func__), PSTR("WS message parsing %s\n"), err.c_str());
       serializeJsonPretty(doc, Serial);
 
       if(doc["cmd"] == nullptr){return;}
@@ -221,7 +274,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
     }
     else
     {
-      log_manager->error(PSTR(__func__), PSTR("WS message parsing error: %s\n"), err.c_str());
+      log_manager->warn(PSTR(__func__), PSTR("WS message parsing error: %s\n"), err.c_str());
     }
   }
 }
@@ -598,6 +651,13 @@ void saveSettings()
   log_manager->debug(PSTR(__func__), "Written settings:\n %s \n", tmp.c_str());
 }
 
+JsonObject processEmitAlarmWs(const JsonObject &data){
+  StaticJsonDocument<DOCSIZE_MIN> doc;
+  doc = data;
+  wsSend(doc);
+  return data;
+}
+
 callbackResponse processUpdateSpiffs(const callbackData &data){
   updateSpiffs();
   return callbackResponse("updateSpiffs", 1);
@@ -679,6 +739,15 @@ callbackResponse processSetPanic(const callbackData &data)
   if(state == String("ON")){
     doc["fPanic"] = 1;
     configcomcu.fPanic = 1;
+
+    mySettings.rlyCtrlMd[0] = 0;
+    mySettings.rlyCtrlMd[1] = 0;
+    mySettings.rlyCtrlMd[2] = 0;
+    mySettings.rlyCtrlMd[3] = 0;
+    setSwitch("ch1", "OFF");
+    setSwitch("ch2", "OFF");
+    setSwitch("ch3", "OFF");
+    setSwitch("ch4", "OFF");
   }
   else{
     doc["fPanic"] = 0;
@@ -716,7 +785,7 @@ callbackResponse processResetConfig(const callbackData &data){
     }
     else
     {
-      log_manager->error(PSTR(__func__),PSTR("SPIFFS formatting failed.\n"));
+      log_manager->warn(PSTR(__func__),PSTR("SPIFFS formatting failed.\n"));
     }
   }
   configReset();
@@ -728,24 +797,26 @@ void setSwitch(String ch, String state)
 {
   bool fState = 0;
   uint8_t pin = 0;
+  uint8_t id = 0;
 
-  if(ch == String("ch1")){pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
-  else if(ch == String("ch2")){pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
-  else if(ch == String("ch3")){pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
-  else if(ch == String("ch4")){pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
+  if(ch == String("ch1")){id = 1; pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
+  else if(ch == String("ch2")){id = 2; pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
+  else if(ch == String("ch3")){id = 3; pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
+  else if(ch == String("ch4")){id = 4; pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
 
   if(state == String("ON"))
   {
     fState = mySettings.ON;
+    mySettings.stateOnTs[id-1] = millis();
   }
   else
   {
     fState = 1 - mySettings.ON;
+    mySettings.stateOnTs[id-1] = 0;
   }
 
   setCoMCUPin(pin, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
-  activeBeep();
 }
 
 void relayControlByDateTime(){
@@ -1172,22 +1243,6 @@ void publishSwitch(){
   }
 }
 
-uint8_t activeBeep(){
-  uint8_t counter = 0;
-  for(uint8_t i = 0; i < sizeof(mySettings.dutyState); i++){
-    if(mySettings.dutyState[i] == mySettings.ON){
-      counter++;
-    }
-  }
-  if(counter > 0){
-    setAlarm(0, -1, 1000 / counter);
-  }
-  else{
-    setAlarm(0, 3, 100);
-  }
-  return counter;
-}
-
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc){
   String buffer;
   serializeJson(doc, buffer);
@@ -1343,3 +1398,4 @@ void wsSendAttributes(){
   wsSend(doc);
   doc.clear();
 }
+
