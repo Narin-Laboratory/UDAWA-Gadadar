@@ -123,6 +123,7 @@ void loop()
   relayControlByDateTime();
   relayControlBydtCyc();
   relayControlByIntrvl();
+  relayControlByMultiTime();
   publishSwitch();
   ws.cleanupClients();
 
@@ -189,6 +190,9 @@ void selfDiagnosticShort(){
   }
   if(isnan(PZEM.voltage()) || PZEM.voltage() <= 0){
     setAlarm(121, 1, -1, 1000);
+  }
+  if(rtc.getYear() < 2023){
+    setAlarm(131, 1, -1, 1000);
   }
 
   uint8_t ACTIVE_CH_COUNTER;
@@ -568,6 +572,23 @@ if(doc["rlyActIT"] != nullptr)
   if(doc["httpPass"] != nullptr){mySettings.httpPass = doc["httpPass"].as<String>();}
   else{mySettings.httpPass = "defaultkey";}
 
+  if(doc["dtCyMT"] != nullptr)
+  {
+    uint8_t index = 0;
+    for(JsonVariant v : doc["dtCyMT"].as<JsonArray>())
+    {
+        mySettings.dtCyMT[index] = v.as<String>();
+        index++;
+    }
+  }
+  else
+  {
+    for(uint8_t i = 0; i < countof(mySettings.dtCyMT); i++)
+    {
+        mySettings.dtCyMT[i] = "{[]}";
+    }
+  }
+
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
   log_manager->debug(PSTR(__func__), "Loaded settings:\n %s \n", tmp.c_str());
@@ -629,6 +650,12 @@ void saveSettings()
   for(uint8_t i=0; i<countof(mySettings.pin); i++)
   {
     pin.add(mySettings.pin[i]);
+  }
+
+  JsonArray dtCyMT = doc.createNestedArray("dtCyMT");
+  for(uint8_t i=0; i<countof(mySettings.dtCyMT); i++)
+  {
+    dtCyMT.add(mySettings.dtCyMT[i]);
   }
 
   doc["ON"] = mySettings.ON;
@@ -845,27 +872,27 @@ void relayControlByDateTime(){
       }
     }
     else if(mySettings.rlyActDr[i] > 0 && mySettings.rlyCtrlMd[i] == 3){
-      uint32_t currHour = rtc.getHour(true);
-      uint16_t currMinute = rtc.getMinute();
-      uint8_t currSecond = rtc.getSecond();
+      int currHour = rtc.getHour(true);
+      int currMinute = rtc.getMinute();
+      int currSecond = rtc.getSecond();
       String currDT = rtc.getDateTime();
-      uint16_t currentTimeInSec = (currHour * 60 * 60) + (currMinute * 60) + currSecond;
+      int currentTimeInSec = (currHour * 60 * 60) + (currMinute * 60) + currSecond;
 
-      uint32_t rlyActDT = mySettings.rlyActDT[i] + config.gmtOffset;
-      uint32_t targetHour = hour(rlyActDT);
-      uint16_t targetMinute = minute(rlyActDT);
-      uint8_t targetSecond = second(rlyActDT);
+      long rlyActDT = mySettings.rlyActDT[i] + config.gmtOffset;
+      int targetHour = hour(rlyActDT);
+      int targetMinute = minute(rlyActDT);
+      int targetSecond = second(rlyActDT);
       char targetDT[32];
       sprintf(targetDT, "%02d.%02d.%02d %02d:%02d:%02d", day(rlyActDT), month(rlyActDT),
         year(rlyActDT), hour(rlyActDT), minute(rlyActDT), second(rlyActDT));
-      uint16_t targetTimeInSec = (targetHour * 60 * 60) + (targetMinute * 60) + targetSecond;
+      int targetTimeInSec = (targetHour * 60 * 60) + (targetMinute * 60) + targetSecond;
 
       if(targetTimeInSec <= currentTimeInSec && (mySettings.rlyActDr[i]) >=
         (currentTimeInSec - targetTimeInSec) && mySettings.dutyState[i] != mySettings.ON){
           mySettings.dutyState[i] = mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "ON");
-          log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d changed to %d \n currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
+          log_manager->debug(PSTR(__func__),PSTR("currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
             mySettings.dutyState[i], currentTimeInSec, currHour, currMinute, currSecond, currDT.c_str(), rtc.getEpoch(),
             targetTimeInSec, targetHour, targetMinute, targetSecond, targetDT, rlyActDT,
             mySettings.rlyActDr[i], mySettings.rlyActDr[i] - (currentTimeInSec - targetTimeInSec));
@@ -875,7 +902,7 @@ void relayControlByDateTime(){
           mySettings.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
-          log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d changed to %d \n currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
+          log_manager->debug(PSTR(__func__),PSTR("currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
             mySettings.dutyState[i], currentTimeInSec, currHour, currMinute, currSecond, currDT.c_str(), rtc.getEpoch(),
             targetTimeInSec, targetHour, targetMinute, targetSecond, targetDT, rlyActDT,
             mySettings.rlyActDr[i], mySettings.rlyActDr[i] - (currentTimeInSec - targetTimeInSec));
@@ -936,6 +963,63 @@ void relayControlByIntrvl(){
         setSwitch(ch, "OFF");
         log_manager->debug(PSTR(__func__), PSTR("Relay Ch%d has changed to %d - rlyActIT:%d - rlyActITOn:%d\n"), i+1, mySettings.dutyState[i],
           mySettings.rlyActIT[i], mySettings.rlyActITOn[i]);
+      }
+    }
+  }
+}
+
+
+unsigned long relayControlByMultiTime_lastSwitch = 0;
+void relayControlByMultiTime(){
+  for(uint8_t i = 0; i < countof(mySettings.pin); i++){
+    if(mySettings.rlyCtrlMd[i] == 6){
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      DeserializationError error = deserializeJson(doc, mySettings.dtCyMT[i]);
+      if(error != DeserializationError::Ok){
+        log_manager->warn(PSTR(__func__),PSTR("Failed to parse JSON for CH%d: %s\n"),i+1, mySettings.dtCyMT[i].c_str());
+        delay(1000);
+        break;
+      }
+      bool flag_isInTimeWindow = false;
+      int activeTimeWindowCounter = 0;
+      for(JsonVariant v : doc.as<JsonArray>())
+      {
+        int currHour = rtc.getHour(true);
+        int currHourToSec = currHour * 3600;
+        int currMinute = rtc.getMinute();
+        int currMinuteToSec = currMinute * 60;
+        int currSecond = rtc.getSecond();
+        String currDT = rtc.getDateTime();
+        int currentTimeInSec = currHourToSec + currMinuteToSec + currSecond;
+
+        int rlyActDT = v["d"].as<int>();
+        int targetHour = v["h"].as<int>();
+        int targetHourToSec = targetHour * 3600;
+        int targetMinute = v["i"].as<int>();
+        int targetMinuteToSec =targetMinute * 60;
+        int targetSecond =v["s"].as<int>();
+        int targetTimeInSec = targetHourToSec + targetMinuteToSec + targetSecond;
+
+        int activationOffset = targetTimeInSec - currentTimeInSec;
+        int deactivationOffset = activationOffset + rlyActDT;
+        int activeTimeWindow = deactivationOffset - activationOffset;
+        flag_isInTimeWindow = ( activationOffset <= 0 && deactivationOffset >= 0 ) ? true : false;
+        const char * isInTimeWindow = flag_isInTimeWindow ? "TRUE" : "FALSE";
+
+        if(flag_isInTimeWindow){
+          activeTimeWindowCounter++;
+        }
+      }
+      if (mySettings.dutyState[i] != mySettings.ON && activeTimeWindowCounter > 0){
+        mySettings.dutyState[i] = mySettings.ON;
+        String ch = "ch" + String(i+1);
+        setSwitch(ch, "ON");
+        log_manager->info(PSTR(__func__), PSTR("%d ActiveTimeWindow found, turning ON switch: %s\n"), activeTimeWindowCounter, ch.c_str());
+      }else if(mySettings.dutyState[i] == mySettings.ON && activeTimeWindowCounter < 1) {
+        mySettings.dutyState[i] = 1 - mySettings.ON;
+        String ch = "ch" + String(i+1);
+        setSwitch(ch, "OFF");
+        log_manager->info(PSTR(__func__), PSTR("No ActiveTimeWindow found, turning OFF switch: %s\n"), ch.c_str());
       }
     }
   }
@@ -1010,6 +1094,11 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["dtRngFSCh2"] != nullptr){mySettings.dtRngFS[1] = data["dtRngFSCh2"].as<unsigned long>();}
   if(data["dtRngFSCh3"] != nullptr){mySettings.dtRngFS[2] = data["dtRngFSCh3"].as<unsigned long>();}
   if(data["dtRngFSCh4"] != nullptr){mySettings.dtRngFS[3] = data["dtRngFSCh4"].as<unsigned long>();}
+
+  if(data["dtCyMTCh1"] != nullptr){mySettings.dtCyMT[0] = data["dtCyMTCh1"].as<String>();}
+  if(data["dtCyMTCh2"] != nullptr){mySettings.dtCyMT[1] = data["dtCyMTCh2"].as<String>();}
+  if(data["dtCyMTCh3"] != nullptr){mySettings.dtCyMT[2] = data["dtCyMTCh3"].as<String>();}
+  if(data["dtCyMTCh4"] != nullptr){mySettings.dtCyMT[3] = data["dtCyMTCh4"].as<String>();}
 
   if(data["rlyActDTCh1"] != nullptr){
     uint64_t micro = data["rlyActDTCh1"].as<uint64_t>();
@@ -1183,6 +1272,12 @@ void syncClientAttributes()
   doc["pinCh3"] = mySettings.pin[2];
   doc["pinCh4"] = mySettings.pin[3];
   doc["ON"] = mySettings.ON;
+  tb.sendAttributeDoc(doc);
+  doc.clear();
+  doc["dtCyMTCh1"] = mySettings.dtCyMT[0];
+  doc["dtCyMTCh2"] = mySettings.dtCyMT[1];
+  doc["dtCyMTCh3"] = mySettings.dtCyMT[2];
+  doc["dtCyMTCh4"] = mySettings.dtCyMT[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
@@ -1391,6 +1486,12 @@ void wsSendAttributes(){
   rlyCtrlMd["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
   rlyCtrlMd["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
   rlyCtrlMd["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
+  wsSend(doc);
+  doc.clear();
+  doc["dtCyMTCh1"] = mySettings.dtCyMT[0];
+  doc["dtCyMTCh2"] = mySettings.dtCyMT[1];
+  doc["dtCyMTCh3"] = mySettings.dtCyMT[2];
+  doc["dtCyMTCh4"] = mySettings.dtCyMT[3];
   wsSend(doc);
   doc.clear();
   doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;

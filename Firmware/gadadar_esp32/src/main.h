@@ -74,6 +74,7 @@ struct Settings
     uint8_t dtCycFS[4];
     unsigned long dtRngFS[4];
     uint8_t pin[4];
+    String dtCyMT[4];
     uint32_t lastUpdated;
     uint8_t ON;
     bool dutyState[4];
@@ -145,5 +146,6 @@ void updateSpiffs();
 void selfDiagnosticShort();
 void selfDiagnosticLong();
 double round2(double value);
+void relayControlByMultiTime();
 
 #endif
