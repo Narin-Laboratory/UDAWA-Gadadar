@@ -41,6 +41,12 @@ export class DashboardComponent {
   @Output() rlyActITOnChange = new EventEmitter<any>();
   @Input() rlyActITOn: object;
 
+  @Output() dtCyMTChange = new EventEmitter<any>();
+  @Input() dtCyMT: object;
+
+  @Output() labelChange = new EventEmitter<any>();
+  @Input() label: object;
+
   @Output() cfgChange = new EventEmitter<any>();
   @Input() cfg: object;
 
@@ -60,7 +66,8 @@ export class DashboardComponent {
     'Datetime',
     'Time Daily',
     'Interval',
-    'Environment Condition'
+    'Environment Condition',
+    'Multiple Time Daily'
   ];
 
   channel = [1, 2, 3, 4];
@@ -81,6 +88,7 @@ export class DashboardComponent {
     this.rlyActDrChange.emit(this.rlyActDr);
     this.rlyActITChange.emit(this.rlyActIT);
     this.rlyActITOnChange.emit(this.rlyActITOn);
+    this.dtCyMTChange.emit(this.dtCyMT);
     this.chParamsChange.emit();
   }
 
@@ -88,9 +96,10 @@ export class DashboardComponent {
     this.savePermanent.emit();
   }
 
-  changeConfig(){
+  changeAttr(){
     this.cfgChange.emit(this.cfg);
     this.attrChange.emit(this.attr);
+    this.labelChange.emit(this.label);
   }
 
   saveConfigClick(){

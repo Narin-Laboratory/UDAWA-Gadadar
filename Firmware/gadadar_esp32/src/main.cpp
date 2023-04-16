@@ -75,6 +75,11 @@ void setup()
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }
 
+  String hostname = String(config.name) + String(".local");
+  MDNS.begin(hostname.c_str());
+  MDNS.addService("http", "tcp", 80);
+  log_manager->info(PSTR(__func__),PSTR("Started MDNS on %s\n"), hostname.c_str());
+
   networkInit();
   tb.setBufferSize(DOCSIZE);
 
@@ -87,11 +92,6 @@ void setup()
   ws.onEvent(onWsEvent);
   ws.setAuthentication(mySettings.httpUname.c_str(), mySettings.httpPass.c_str());
   web.addHandler(&ws);
-
-  String hostname = String(config.name) + String(".local");
-  MDNS.begin(hostname.c_str());
-  MDNS.addService("http", "tcp", 80);
-  log_manager->info(PSTR(__func__),PSTR("Started MDNS on %s\n"), hostname.c_str());
 
   if(mySettings.intvDevTel != 0){
     taskid_t taskPublishDeviceTelemetry = taskManager.scheduleFixedRate(mySettings.intvDevTel * 1000, [] {
@@ -1419,12 +1419,12 @@ void wsSendSensors(){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     if(!isnan(PZEM.voltage())){
       JsonObject pzem = doc.createNestedObject("pzem");
-      pzem["volt"] = round2(mySettings._volt);
-      pzem["amp"] = round2(mySettings._amp);
-      pzem["watt"] = round2(mySettings._watt);
-      pzem["ener"] = round2(mySettings._ener);
-      pzem["freq"] = round2(mySettings._freq);
-      pzem["pf"] = round2(mySettings._pf);
+      pzem["volt"] = round2(PZEM.voltage());
+      pzem["amp"] = round2(PZEM.current());
+      pzem["watt"] = round2(PZEM.power());
+      pzem["ener"] = round2(PZEM.energy());
+      pzem["freq"] = round2(PZEM.frequency());
+      pzem["pf"] = round2(PZEM.pf());
       wsSend(doc);
       doc.clear();
     }
@@ -1539,10 +1539,11 @@ void wsSendAttributes(){
   rlyCtrlMd["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
   wsSend(doc);
   doc.clear();
-  doc["dtCyMTCh1"] = mySettings.dtCyMT[0];
-  doc["dtCyMTCh2"] = mySettings.dtCyMT[1];
-  doc["dtCyMTCh3"] = mySettings.dtCyMT[2];
-  doc["dtCyMTCh4"] = mySettings.dtCyMT[3];
+  JsonObject dtCyMT = doc.createNestedObject("dtCyMT");
+  dtCyMT["dtCyMTCh1"] = mySettings.dtCyMT[0];
+  dtCyMT["dtCyMTCh2"] = mySettings.dtCyMT[1];
+  dtCyMT["dtCyMTCh3"] = mySettings.dtCyMT[2];
+  dtCyMT["dtCyMTCh4"] = mySettings.dtCyMT[3];
   wsSend(doc);
   doc.clear();
   doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
@@ -1551,10 +1552,11 @@ void wsSendAttributes(){
   doc["ch4"] = mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
   wsSend(doc);
   doc.clear();
-  doc["labelCh1"] = mySettings.label[0];
-  doc["labelCh2"] = mySettings.label[1];
-  doc["labelCh3"] = mySettings.label[2];
-  doc["labelCh4"] = mySettings.label[3];
+  JsonObject label = doc.createNestedObject("label");
+  label["labelCh1"] = mySettings.label[0];
+  label["labelCh2"] = mySettings.label[1];
+  label["labelCh3"] = mySettings.label[2];
+  label["labelCh4"] = mySettings.label[3];
   wsSend(doc);
   doc.clear();
 }

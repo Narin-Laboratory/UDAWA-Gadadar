@@ -3,16 +3,16 @@
         <div class="container mt-5">
             <div class="row">
                 <div  class="col-sm-12 col-md-3">
-                    <app-card-switch [state]="state['ch1']" [switch]="'Switch 1'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh1']" [opMode]="opMode"></app-card-switch>
+                    <app-card-switch [state]="state['ch1']" [switch]="'Switch 1'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh1']" [opMode]="opMode" [label]="label['labelCh1']"></app-card-switch>
                 </div>
                 <div class="col-sm-12 col-md-3">
-                    <app-card-switch [state]="state['ch2']" [switch]="'Switch 2'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh2']" [opMode]="opMode"></app-card-switch>
+                    <app-card-switch [state]="state['ch2']" [switch]="'Switch 2'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh2']" [opMode]="opMode" [label]="label['labelCh2']"></app-card-switch>
                 </div>
                 <div class="col-sm-12 col-md-3">
-                    <app-card-switch [state]="state['ch3']" [switch]="'Switch 3'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh3']" [opMode]="opMode"></app-card-switch>
+                    <app-card-switch [state]="state['ch3']" [switch]="'Switch 3'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh3']" [opMode]="opMode" [label]="label['labelCh3']"></app-card-switch>
                 </div>
                 <div class="col-sm-12 col-md-3">
-                    <app-card-switch [state]="state['ch4']" [switch]="'Switch 4'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh4']" [opMode]="opMode"></app-card-switch>
+                    <app-card-switch [state]="state['ch4']" [switch]="'Switch 4'" [rlyCtrlMd]="rlyCtrlMd['rlyCtrlMdCh4']" [opMode]="opMode" [label]="label['labelCh4']"></app-card-switch>
                 </div>
             </div>
             <div class="row">
@@ -36,7 +36,15 @@
                         </div>
                         <div class="col-sm-12 col-md-6">
                             <app-card-sensor [header]="'Watt'" [value]="pzem['watt']" [unit]="'W'" [icon]="'electric_meter'"></app-card-sensor>
-                            <app-card-sensor [header]="'Freq. & Power Factor (Hz, %)'" [value]="pzem['freq'] + ', ' + pzem['pf']" [unit]="''" [icon]="'show_chart'"></app-card-sensor>
+                            <app-card-sensor [header]="'Internal kWH'" [value]="pzem['ener']" [unit]="'kWH'" [icon]="'electric_meter'"></app-card-sensor>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-12 col-md-6">
+                            <app-card-sensor [header]="'Freq.'" [value]="pzem['freq']" [unit]="'Hz'" [icon]="'show_chart'"></app-card-sensor>
+                        </div>
+                        <div class="col-sm-12 col-md-6">
+                            <app-card-sensor [header]="'Power Factor'" [value]="pzem['pf']" [unit]="'%'" [icon]="'show_chart'"></app-card-sensor>
                         </div>
                     </div>
                 </div>
@@ -51,7 +59,7 @@
                         <div class="card-body">
                             <div class="form-floating mb-3">
                                 <select id="udawa-rlch" class="form-select" [(ngModel)]="selectedCh" (change)="changeSelectedCh()">
-                                    <option *ngFor="let c of channel" value="{{c}}">Channel {{c}}</option>
+                                    <option *ngFor="let c of channel" value="{{c}}">Channel {{c}} ({{label['labelCh'+c]}})</option>
                                 </select>
                                 <label for="udawa-rlch">Select Relay Channel</label>
                             </div>
@@ -141,9 +149,21 @@
                                     </div>
                                 </div>
                                 <div *ngSwitchCase=5>Unavailable</div>
+                                <div *ngSwitchCase=6>
+                                    <div id="udawa-card-timedaily-multiple" class="card mb-3">
+                                        <div class="card-body">
+                                        <div class="form-floating input-group mb-3">
+                                            <input type="text" class="form-control" id="udawa-rlch-timedaily-multiple" [(ngModel)]="dtCyMT['dtCyMTCh'+selectedCh]" (change)="changeChParams()">
+                                            <label for="udawa-rlch-timedaily-multiple">Comma separated value: 8:0:0-3600,18:0:0-7200</label>
+                                            <span class="input-group-text">H:I:S-D</span>
+                                            <p><small>H = hour in 0-24 format. I = minute in 0-60 format. S = second in 0-60 format. D = ON Duration in second. <strong>E.g: 8:0:0-3600,18:0:0-7200</strong> will turns ON at 8 AM for 1 hour and 6 PM for 2 hours.</small></p>
+                                        </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div *ngSwitchDefault>System failure!</div>
                             </div>
-                            <button type="button" class="btn btn-primary btn-lg btn-block" (click)="savePermanentClick()">Save Permanent</button>
+                            <button type="button" class="btn btn-primary btn-sm btn-block" (click)="savePermanentClick()">Save Permanent</button>
                         </div>
                     </div>
                 </div>
@@ -160,6 +180,7 @@
                                 <li>Time Daily: You can switch the relay on at a selected time daily and adjust the on duration.</li>
                                 <li>Interval: You can switch the relay to on by interval and adjust the on duration.</li>
                                 <li>Environmental Condition: You can use the environmental data as a parameter to adjust when to turn on the switch and for how long it stays on.</li>
+                                <li>Multiple-time Daily: You can switch the relay on more than one daily and adjust the on duration.</li>
                                 <li><strong>Use the panic button to disable the device in emergency.</strong></li>
                                 <li>Use the reboot button to restart the device.</li>
                             </ol>
@@ -188,11 +209,11 @@
                                         <a href="http://{{cfg['name']}}.local">http://{{cfg['name']}}.local</a> or <a href="http://{{attr['ipad']}}">http://{{attr['ipad']}}</a>
                                     </p>
                                     <div class="form-floating input-group mb-3">
-                                        <input type="text" class="form-control" id="udawa-cfg-httpUname" [(ngModel)]="cfg['httpUname']" (change)="changeConfig()">
+                                        <input type="text" class="form-control" id="udawa-cfg-httpUname" [(ngModel)]="cfg['httpUname']" (change)="changeAttr()">
                                         <label for="udawa-cfg-httpUser">Built-in Interface Username</label>
                                     </div>
                                     <div class="form-floating input-group mb-3">
-                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['httpPass']" (change)="changeConfig()">
+                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['httpPass']" (change)="changeAttr()">
                                         <label for="udawa-cfg-httpPass">Built-in Interface Password</label>
                                     </div>
                                 </div>
@@ -202,16 +223,41 @@
                                 <div class="card-body">
                                     <p>Currently connected to {{cfg['ap']}}, IP Address {{attr['ipad']}}</p>
                                     <div class="form-floating input-group mb-3">
-                                        <input type="text" class="form-control" id="udawa-cfg-wssid" [(ngModel)]="cfg['wssid']" (change)="changeConfig()">
+                                        <input type="text" class="form-control" id="udawa-cfg-wssid" [(ngModel)]="cfg['wssid']" (change)="changeAttr()">
                                         <label for="udawa-cfg-httpUser">Network SSID</label>
                                     </div>
                                     <div class="form-floating input-group mb-3">
-                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['wpass']" (change)="changeConfig()">
+                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['wpass']" (change)="changeAttr()">
                                         <label for="udawa-cfg-httpPass">Network Password</label>
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-primary btn-lg btn-block" (click)="saveConfigClick()">Save Config</button>
+                            <button type="button" class="btn btn-primary btn-sm btn-block" (click)="saveConfigClick()">Save</button>
+                            <hr>
+
+                            <div id="udawa-card-label" class="card mb-3">
+                                <div class="card-body">
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="text" class="form-control" id="udawa-cfg-labelCh1" [(ngModel)]="label['labelCh1']" (change)="changeAttr()">
+                                        <label for="udawa-cfg-labelCh1">Label Ch1</label>
+                                    </div>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="text" class="form-control" id="udawa-cfg-labelCh2" [(ngModel)]="label['labelCh2']" (change)="changeAttr()">
+                                        <label for="udawa-cfg-labelCh2">Label Ch2</label>
+                                    </div>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="text" class="form-control" id="udawa-cfg-labelCh3" [(ngModel)]="label['labelCh3']" (change)="changeAttr()">
+                                        <label for="udawa-cfg-labelCh3">Label Ch3</label>
+                                    </div>
+                                    <div class="form-floating input-group mb-3">
+                                        <input type="text" class="form-control" id="udawa-cfg-labelCh4" [(ngModel)]="label['labelCh4']" (change)="changeAttr()">
+                                        <label for="udawa-cfg-labelCh4">Label Ch4</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm btn-block" (click)="savePermanentClick()">Save</button>
+                            <hr>
+
                         </div>
                     </div>
                 </div>

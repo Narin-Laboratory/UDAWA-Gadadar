@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 const UDAWA_WS = "ws://" + window.location.hostname + "/ws";
-//const UDAWA_WS = "ws://" + "UDAWA8C2B31C4F5FC.local" + "/ws";
+//const UDAWA_WS = "ws://" + "tester.local" + "/ws";
 
 export interface Message {}
 

@@ -25,7 +25,7 @@ upload_port = /dev/ttyCOM4
 build_flags =
 	${env.build_flags}
 	-D=${PIOENV}
-	-DCORE_DEBUG_LEVEL=3
+	-DCORE_DEBUG_LEVEL=0
 lib_deps =
 	arduino-libraries/NTPClient@^3.1.0
 	bblanchon/ArduinoJson@^6.18.4
@@ -38,3 +38,4 @@ lib_deps =
 	https://github.com/adafruit/Adafruit_BME280_Library.git
 	https://github.com/me-no-dev/AsyncTCP.git
 	https://github.com/me-no-dev/ESPAsyncWebServer.git
+	https://github.com/akkoyun/Statistical.git

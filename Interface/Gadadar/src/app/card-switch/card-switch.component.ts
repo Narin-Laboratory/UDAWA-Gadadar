@@ -10,4 +10,5 @@ export class CardSwitchComponent {
   @Input() switch: string;
   @Input() rlyCtrlMd: string;
   @Input() opMode: object;
+  @Input() label: object;
 }

@@ -32,6 +32,8 @@ export class AppComponent {
   rlyActIT = {"rlyActITCh1":0,"rlyActITCh2":0,"rlyActITCh3":0,"rlyActITCh4":0};
   rlyActITOn = {"rlyActITOnCh1":0,"rlyActITOnCh2":0,"rlyActITOnCh3":0,"rlyActITOnCh4":0};
   rlyCtrlMd = {"rlyCtrlMdCh1":0,"rlyCtrlMdCh2":0,"rlyCtrlMdCh3":0,"rlyCtrlMdCh4":0};
+  dtCyMT = {"dtCyMTCh1": "0:0:0-0","dtCyMTCh2": "0:0:0-0","dtCyMTCh3": "0:0:0-0","dtCyMTCh4": "0:0:0-0" };
+  label = {"labelCh1": "unnamed", "labelCh2": "unnamed", "labelCh3": "unnamed", "labelCh4": "unnamed"};
 
   constructor(private WebsocketService: WebsocketService) {
     WebsocketService.messages.subscribe(msg => {
@@ -86,12 +88,32 @@ export class AppComponent {
       if(msg['rlyCtrlMd'] != null){
         this.rlyCtrlMd = msg['rlyCtrlMd'];
       }
+      if(msg['label'] != null){
+        this.label = msg['label'];
+      }
+      if(msg['dtCyMT'] != null){
+        let temp = msg['dtCyMT'];
+        for(let k in temp){
+          let item = JSON.parse(temp[k]);
+          let param: string = '';
+          for(let t in item){
+            let c: string = `${item[t]['h']}:${item[t]['i']}:${item[t]['s']}-${item[t]['d']}`;
+            if(param == ''){
+              param += c;
+            }
+            else{
+              param += ",";
+              param += c;
+            }
+          }
+          this.dtCyMT[k] = param;
+        }
+      }
       for(let i = 1; i <= 4; i++){
         if(msg['ch'+i] != null){
           this.state['ch'+i] = msg['ch'+i];
         }
       }
-
     });
   };
 
@@ -102,6 +124,24 @@ export class AppComponent {
     data['ch'] = 'ch' + this.selectedCh;
     data['state'] = Number(this.state['ch' + this.selectedCh]);
 
+    this.WebsocketService.messages.next(data);
+  }
+
+  attrChange(){
+    var data = {
+      'cmd': 'attr'
+    };
+    for(let key in this.label){
+      data[key] = this.label[key];
+    }
+    this.WebsocketService.messages.next(data);
+    data = {
+      'cmd': 'attr'
+    };
+    data['wssid'] = this.cfg['wssid'];
+    data['wpass'] = this.cfg['wpass'];
+    data['httpUname'] = this.cfg['httpUname'];
+    data['httpPass'] = this.cfg['httpPass'];
     this.WebsocketService.messages.next(data);
   }
 
@@ -117,6 +157,18 @@ export class AppComponent {
     data['rlyActITCh'+this.selectedCh] = this.rlyActIT['rlyActITCh'+this.selectedCh];
     data['rlyACTITOnCh'+this.selectedCh] = this.rlyActITOn['rlyActITOnCh'+this.selectedCh];
     data['rlyCtrlMdCh'+this.selectedCh] = this.rlyCtrlMd['rlyCtrlMdCh'+this.selectedCh];
+    let dtCyMT = [];
+    let _dtCyMT: object = this.dtCyMT['dtCyMTCh'+this.selectedCh].split(',',24);
+    for(let k in _dtCyMT){
+      let z ={'h': 0, 'i': 0, 's': 0, 'd': 0};
+      let a = _dtCyMT[k].split('-',2);
+      z['d'] = a[1];
+      let b: object = a[0].split(':',3);
+      z['h'] = b[0]; z['i'] = b[1]; z['s'] = b[2];
+      dtCyMT.push(z);
+    }
+
+    data['dtCyMTCh'+this.selectedCh] = JSON.stringify(dtCyMT);
     this.WebsocketService.messages.next(data);
   }
 
