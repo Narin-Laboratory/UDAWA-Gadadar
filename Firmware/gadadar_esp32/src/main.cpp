@@ -16,6 +16,17 @@ HardwareSerial PZEMSerial(1);
 PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 AsyncWebServer web(80);
 AsyncWebSocket ws("/ws");
+Stream_Stats<float> _volt;
+Stream_Stats<float> _amp;
+Stream_Stats<float> _watt;
+Stream_Stats<float> _ener;
+Stream_Stats<float> _freq;
+Stream_Stats<float> _pf;
+
+Stream_Stats<float> _celc;
+Stream_Stats<float> _rh;
+Stream_Stats<float> _hpa;
+Stream_Stats<float> _alt;
 
 const size_t cbSize = 1;
 GCB cb[cbSize] = {
@@ -89,12 +100,18 @@ void setup()
   }
 
   if(mySettings.intvRecPwrUsg != 0){
+    taskid_t taskCalcPowerUsage = taskManager.scheduleFixedRate(1000, [] {
+      calcPowerUsage();
+    });
     taskid_t taskRecPowerUsage = taskManager.scheduleFixedRate(mySettings.intvRecPwrUsg * 1000, [] {
       recPowerUsage();
     });
   }
 
   if(mySettings.intvRecWthr != 0){
+    taskid_t taskCalcWeatherData = taskManager.scheduleFixedRate(1000, [] {
+      calcWeatherData();
+    });
     taskid_t taskRecWeather = taskManager.scheduleFixedRate(mySettings.intvRecWthr * 1000, [] {
       recWeatherData();
     });
@@ -285,83 +302,82 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
   }
 }
 
+void calcPowerUsage(){
+  float volt = PZEM.voltage();
+  if(!isnan(volt)){
+    _volt.Add(volt);
+  }
+
+  float amp = PZEM.current();
+  if(!isnan(amp)){
+    _amp.Add(amp);
+  }
+
+  float watt = PZEM.power();
+  if(!isnan(watt)){
+    _watt.Add(watt);
+  }
+
+  float freq = PZEM.frequency();
+  if(!isnan(freq)){
+    _freq.Add(freq);
+  }
+
+  float pf = PZEM.pf();
+  if(!isnan(pf)){
+    _pf.Add(pf);
+  }
+}
+
 void recPowerUsage(){
   if(tb.connected()){
-    if(!isnan(PZEM.voltage())){
-      StaticJsonDocument<DOCSIZE_MIN> doc;
-      float volt = PZEM.voltage();
-      if(volt != mySettings._volt){
-        doc["volt"] = volt;
-        mySettings._volt = volt;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    mySettings._volt = _volt.Get_Average();
+    mySettings._amp = _amp.Get_Average();
+    mySettings._watt = _watt.Get_Average();
+    mySettings._ener = mySettings._watt / (float)(3600 / mySettings.intvRecPwrUsg);
+    mySettings._freq = _freq.Get_Average();
+    mySettings._pf = _pf.Get_Average();
+    doc["volt"] = mySettings._volt;
+    doc["amp"] = mySettings._amp;
+    doc["watt"] = mySettings._watt;
+    doc["ener"] = mySettings._ener;
+    doc["freq"] = mySettings._freq;
+    doc["pf"] = mySettings._pf;
 
-      float amp = PZEM.current();
-      if(amp != mySettings._amp){
-        doc["amp"] = amp;
-        mySettings._amp = amp;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
+    tb.sendAttributeDoc(doc);
+    _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
+  }
+}
 
-      float watt = PZEM.power();
-      if(watt != mySettings._watt){
-        doc["watt"] = watt;
-        mySettings._watt = watt;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
+void calcWeatherData(){
+  if(mySettings.flag_bme280){
+    mySettings._celc = bme.readTemperature();
+    mySettings._rh = bme.readHumidity();
+    mySettings._hpa = bme.readPressure() / 100.0F;
+    mySettings._alt = bme.readAltitude(mySettings.seaHpa);
 
-      float ener = PZEM.energy();
-      if(mySettings._ener == -1){
-        bool resetPZEM = PZEM.resetEnergy();
-        log_manager->warn(PSTR(__func__), PSTR("Resetting PZEM Energy Counter: %d\n"), (int)resetPZEM);
-        ener = PZEM.energy();
-        doc["ener"] = ener;
-        mySettings._ener = ener;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
-      else if(ener - mySettings._ener > 0){
-        doc["ener"] = ener - mySettings._ener;
-        mySettings._ener = ener;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
-
-      float freq = PZEM.frequency();
-      if(freq != mySettings._freq){
-        doc["freq"] = freq;
-        mySettings._freq = freq;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
-
-      float pf = PZEM.pf();
-      if(pf != mySettings._pf){
-        doc["pf"] = pf;
-        mySettings._pf = pf;
-        tb.sendTelemetryDoc(doc);
-        doc.clear();
-      }
-    }
+    _celc.Add(mySettings._celc);
+    _rh.Add(mySettings._rh);
+    _hpa.Add(mySettings._hpa);
+    _alt.Add(mySettings._alt);
   }
 }
 
 void recWeatherData(){
-  if(tb.connected() && mySettings.flag_bme280){
-    float celc = bme.readTemperature();
-    float rh = bme.readHumidity();
-    float hpa = bme.readPressure() / 100.0F;
-    float alt = bme.readAltitude(mySettings.seaHpa);
+  if(tb.connected()){
+    float celc = _celc.Get_Average();
+    float rh = _rh.Get_Average();
+    float hpa = _hpa.Get_Average();
+    float alt = _alt.Get_Average();
+
     StaticJsonDocument<DOCSIZE_MIN> doc;
     doc["celc"] = celc;
     doc["rh"] = rh;
     doc["hpa"] = hpa;
     doc["alt"] = alt;
     tb.sendTelemetryDoc(doc);
-
+    _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear();
   }
 }
 
@@ -585,7 +601,24 @@ if(doc["rlyActIT"] != nullptr)
   {
     for(uint8_t i = 0; i < countof(mySettings.dtCyMT); i++)
     {
-        mySettings.dtCyMT[i] = "{[]}";
+        mySettings.dtCyMT[i] = "[{}]";
+    }
+  }
+
+  if(doc["label"] != nullptr)
+  {
+    uint8_t index = 0;
+    for(JsonVariant v : doc["label"].as<JsonArray>())
+    {
+        strlcpy(mySettings.label[index], v.as<const char*>(), sizeof(mySettings.label[index]));
+        index++;
+    }
+  }
+  else
+  {
+    for(uint8_t i = 0; i < countof(mySettings.label); i++)
+    {
+        strlcpy(mySettings.label[i], "unnamed", sizeof(mySettings.label[i]));
     }
   }
 
@@ -656,6 +689,12 @@ void saveSettings()
   for(uint8_t i=0; i<countof(mySettings.dtCyMT); i++)
   {
     dtCyMT.add(mySettings.dtCyMT[i]);
+  }
+
+  JsonArray label = doc.createNestedArray("label");
+  for(uint8_t i=0; i<countof(mySettings.label); i++)
+  {
+    label.add(mySettings.label[i]);
   }
 
   doc["ON"] = mySettings.ON;
@@ -1155,6 +1194,11 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["rlyCtrlMdCh3"] != nullptr){mySettings.rlyCtrlMd[2] = data["rlyCtrlMdCh3"].as<uint8_t>();}
   if(data["rlyCtrlMdCh4"] != nullptr){mySettings.rlyCtrlMd[3] = data["rlyCtrlMdCh4"].as<uint8_t>();}
 
+  if(data["labelCh1"] != nullptr){strlcpy(mySettings.label[0], data["labelCh1"].as<const char*>(), sizeof(mySettings.label[0]));}
+  if(data["labelCh2"] != nullptr){strlcpy(mySettings.label[1], data["labelCh2"].as<const char*>(), sizeof(mySettings.label[1]));}
+  if(data["labelCh3"] != nullptr){strlcpy(mySettings.label[2], data["labelCh3"].as<const char*>(), sizeof(mySettings.label[2]));}
+  if(data["labelCh4"] != nullptr){strlcpy(mySettings.label[3], data["labelCh4"].as<const char*>(), sizeof(mySettings.label[3]));}
+
   if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
 
   if(data["httpUname"] != nullptr){mySettings.httpUname = data["httpUname"].as<String>();}
@@ -1280,6 +1324,12 @@ void syncClientAttributes()
   doc["dtCyMTCh4"] = mySettings.dtCyMT[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
+  doc["labelCh1"] = mySettings.label[0];
+  doc["labelCh2"] = mySettings.label[1];
+  doc["labelCh3"] = mySettings.label[2];
+  doc["labelCh4"] = mySettings.label[3];
+  tb.sendAttributeDoc(doc);
+  doc.clear();
   doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   doc["intvRecWthr"] = mySettings.intvRecWthr;
   doc["intvDevTel"] = mySettings.intvDevTel;
@@ -1369,11 +1419,12 @@ void wsSendSensors(){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     if(!isnan(PZEM.voltage())){
       JsonObject pzem = doc.createNestedObject("pzem");
-      pzem["volt"] = round2(PZEM.voltage());
-      pzem["amp"] = round2(PZEM.current());
-      pzem["watt"] = round2(PZEM.power());
-      pzem["freq"] = round2(PZEM.frequency());
-      pzem["pf"] = round2(PZEM.pf());
+      pzem["volt"] = round2(mySettings._volt);
+      pzem["amp"] = round2(mySettings._amp);
+      pzem["watt"] = round2(mySettings._watt);
+      pzem["ener"] = round2(mySettings._ener);
+      pzem["freq"] = round2(mySettings._freq);
+      pzem["pf"] = round2(mySettings._pf);
       wsSend(doc);
       doc.clear();
     }
@@ -1498,6 +1549,12 @@ void wsSendAttributes(){
   doc["ch2"] = mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
   doc["ch3"] = mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
   doc["ch4"] = mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
+  wsSend(doc);
+  doc.clear();
+  doc["labelCh1"] = mySettings.label[0];
+  doc["labelCh2"] = mySettings.label[1];
+  doc["labelCh3"] = mySettings.label[2];
+  doc["labelCh4"] = mySettings.label[3];
   wsSend(doc);
   doc.clear();
 }

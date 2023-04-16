@@ -60,10 +60,11 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
+#include <Statistical.h>
 
 
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.1"
+#define CURRENT_FIRMWARE_VERSION "0.0.2"
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -98,12 +99,19 @@ struct Settings
     float _volt = 0.0;
     float _amp = 0.0;
     float _watt = 0.0;
-    float _ener = -1;
+    float _ener = 0.0;
     float _freq = 0.0;
     float _pf = 0.0;
 
+    float _celc = 0.0;
+    float _rh = 0.0;
+    float _hpa = 0.0;
+    float _alt = 0.0;
+
     String httpUname;
     String httpPass;
+
+    char label[4][16];
 };
 
 callbackResponse processSaveConfig(const callbackData &data);
@@ -147,5 +155,7 @@ void selfDiagnosticShort();
 void selfDiagnosticLong();
 double round2(double value);
 void relayControlByMultiTime();
+void calcPowerUsage();
+void calcWeatherData();
 
 #endif
