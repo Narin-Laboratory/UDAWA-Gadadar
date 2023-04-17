@@ -41,9 +41,7 @@ export class WebsocketService {
             ws.onerror = obs.error.bind(obs);
             ws.onclose = obs.complete.bind(obs);
             ws.onclose = () => {
-                console.log("trying to reconnect");
-                this.subject = null;
-                this.connect(url);
+                location.reload();
             }
             return ws.close.bind(ws);
         });
