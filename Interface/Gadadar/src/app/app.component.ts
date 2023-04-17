@@ -125,6 +125,7 @@ export class AppComponent {
     data['state'] = Number(this.state['ch' + this.selectedCh]);
 
     this.WebsocketService.messages.next(data);
+
   }
 
   attrChange(){
@@ -142,6 +143,7 @@ export class AppComponent {
     data['wpass'] = this.cfg['wpass'];
     data['httpUname'] = this.cfg['httpUname'];
     data['httpPass'] = this.cfg['httpPass'];
+    data['useCloud'] = this.cfg['useCloud'];
     this.WebsocketService.messages.next(data);
   }
 

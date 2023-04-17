@@ -81,7 +81,7 @@ void setup()
   log_manager->info(PSTR(__func__),PSTR("Started MDNS on %s\n"), hostname.c_str());
 
   networkInit();
-  tb.setBufferSize(DOCSIZE);
+  tb.setBufferSize(DOCSIZE_MIN);
 
   web.begin();
   web.serveStatic("/", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
@@ -144,7 +144,7 @@ void loop()
   publishSwitch();
   ws.cleanupClients();
 
-  if(tb.connected() && mySettings.flag_syncClientAttr == 1){
+  if(tb.connected() && mySettings.flag_syncClientAttr == 1 && config.useCloud){
     syncClientAttributes();
     mySettings.publishSwitch[0] = true;
     mySettings.publishSwitch[1] = true;
@@ -155,7 +155,13 @@ void loop()
 
   if(tb.connected() && FLAG_IOT_SUBSCRIBE)
   {
-    tb.server_rpc_call("sharedAttributesUpdate", "sharedAttributesUpdate");
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    doc["method"] = "sharedAttributesUpdate";
+    JsonObject params = doc.createNestedObject("params");
+    params["name"] = config.name;
+    JsonObject payload = doc.template as<JsonObject>();
+    tb.server_rpc_call(payload);
+
     if(tb.callbackSubscribe(callbacks, callbacksSize))
     {
       log_manager->info(PSTR(__func__),PSTR("Callbacks subscribed successfuly!\n"));
@@ -1084,6 +1090,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["provisionDeviceSecret"] != nullptr){strlcpy(config.provisionDeviceSecret, data["provisionDeviceSecret"].as<const char*>(), sizeof(config.provisionDeviceSecret));}
   if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>(); log_manager->set_log_level(PSTR("*"), (LogLevel) config.logLev);;}
   if(data["gmtOffset"] != nullptr){config.gmtOffset = data["gmtOffset"].as<int>();}
+  if(data["useCloud"] != nullptr){config.useCloud = data["useCloud"].as<int>();}
 
 
   if(data["dtCycCh1"] != nullptr)
@@ -1263,6 +1270,7 @@ void syncClientAttributes()
   doc["gmtOffset"] = config.gmtOffset;
   tb.sendAttributeDoc(doc);
   doc.clear();
+  doc["useCloud"] = config.useCloud;
   doc["dtCycCh1"] = mySettings.dtCyc[0];
   doc["dtCycCh2"] = mySettings.dtCyc[1];
   doc["dtCycCh3"] = mySettings.dtCyc[2];
@@ -1474,6 +1482,7 @@ void wsSendAttributes(){
   cfg["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   cfg["intvRecWthr"] = mySettings.intvRecWthr;
   cfg["intvDevTel"] = mySettings.intvDevTel;
+  cfg["useCloud"] = config.useCloud;
   wsSend(doc);
   doc.clear();
   JsonObject dtCyc = doc.createNestedObject("dtCyc");

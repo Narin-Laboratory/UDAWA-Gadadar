@@ -73,7 +73,7 @@
 
                             <div [ngSwitch]="rlyCtrlMd['rlyCtrlMdCh'+selectedCh]">
                                 <div *ngSwitchCase=0>
-                                    <div id="udawa-card-dutycycle" class="card mb-3">
+                                    <div id="udawa-card-manual" class="card mb-3">
                                         <div class="card-body">
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDefault" ng-true-value="1" ng-false-value="0" [(ngModel)]="state['ch'+selectedCh]" (change)="changeState()">
@@ -227,8 +227,17 @@
                                         <label for="udawa-cfg-httpUser">Network SSID</label>
                                     </div>
                                     <div class="form-floating input-group mb-3">
-                                        <input type="password" class="form-control" id="udawa-cfg-httpPass" [(ngModel)]="cfg['wpass']" (change)="changeAttr()">
-                                        <label for="udawa-cfg-httpPass">Network Password</label>
+                                        <input type="password" class="form-control" id="udawa-cfg-wpass" [(ngModel)]="cfg['wpass']" (change)="changeAttr()">
+                                        <label for="udawa-cfg-wpass">Network Password</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="udawa-card-usecloud" class="card mb-3">
+                                <div class="card-body">
+                                    <p>Use MADAVA Cloud Plus (requres an active subscription).</p>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="udawa-cfg-usecloud" ng-true-value="1" ng-false-value="0" [(ngModel)]="cfg['useCloud']" (change)="changeAttr()">
+                                        <label class="form-check-label" for="udawa-cfg-usecloud">{{cfg['useCloud'] ? 'ON' : 'OFF'}}</label>
                                     </div>
                                 </div>
                             </div>
@@ -271,6 +280,7 @@
                                 <li>The device is supposed to be connected to the Internet for the timing function to work properly. Please provide your WiFi SSID and password correctly. If you mistakenly input the wrong WiFi credential, the device will fail to connect, and you will lose access. The solution is that you can turn on WiFi tethering on your phone with UDAWA and defaultkey as the SSID and password. The device will auto-reconnect to that emergency network, and you can reset the access from there.</li>
                                 <li>If your network connection is unreliable, please avoid using any feature that requires a timing function, such as the Datetime and Time Daily channel control modes.</li>
                                 <li>Some changes need reboot to take effect. Use the reboot button on the control tab.</li>
+                                <li>The MADAVA Cloud Plus feature requires an active subscription. Please contact your assembler or retailer to set up your cloud account. MADAVA Cloud Plus enables you to access the system anywhere and anytime via the Internet and provides you with mobile notification and extensive data logging and reporting.</li>
                             </ol>
                         </div>
                     </div>

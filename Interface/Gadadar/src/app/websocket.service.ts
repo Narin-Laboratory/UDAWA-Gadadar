@@ -3,9 +3,10 @@ import { Observable, Observer } from 'rxjs';
 import { AnonymousSubject } from 'rxjs/internal/Subject';
 import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
+import ReconnectingWebSocket from 'reconnecting-websocket';
 
 const UDAWA_WS = "ws://" + window.location.hostname + "/ws";
-//const UDAWA_WS = "ws://" + "tester.local" + "/ws";
+//const UDAWA_WS = "ws://" + "domain.local" + "/ws";
 
 export interface Message {}
 
@@ -35,20 +36,29 @@ export class WebsocketService {
     }
 
     private create(url): AnonymousSubject<MessageEvent> {
-        let ws = new WebSocket(url);
+        const options = {
+            connectionTimeout: 1000,
+            maxRetries: 1000000
+        };
+        let ws = new ReconnectingWebSocket(url, [], options);
         let observable = new Observable((obs: Observer<MessageEvent>) => {
             ws.onmessage = obs.next.bind(obs);
             ws.onerror = obs.error.bind(obs);
             ws.onclose = obs.complete.bind(obs);
+            ws.onclose = () => {
+                console.log("trying to reconnect");
+                this.subject = null;
+                this.connect(url);
+            }
             return ws.close.bind(ws);
         });
         let observer = {
             error: null,
             complete: null,
             next: (data: Object) => {
-                console.log('Message sent to websocket: ', data);
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify(data));
+                    console.log('Message sent to websocket: ', data);
                 }
             }
         };
