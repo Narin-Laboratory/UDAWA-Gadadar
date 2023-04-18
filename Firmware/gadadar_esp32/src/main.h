@@ -103,10 +103,22 @@ struct Settings
     float _freq = 0.0;
     float _pf = 0.0;
 
+    float volt = 0.0;
+    float amp = 0.0;
+    float watt = 0.0;
+    float ener = 0.0;
+    float freq = 0.0;
+    float pf = 0.0;
+
     float _celc = 0.0;
     float _rh = 0.0;
     float _hpa = 0.0;
     float _alt = 0.0;
+
+    float celc = 0.0;
+    float rh = 0.0;
+    float hpa = 0.0;
+    float alt = 0.0;
 
     String httpUname;
     String httpPass;

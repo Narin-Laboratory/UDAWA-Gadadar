@@ -209,13 +209,13 @@ void selfDiagnosticShort(){
 
 
   if(!mySettings.flag_bme280){
-    setAlarm(111, 1, -1, 1000);
+    setAlarm(111, 1, 5, 1000);
   }
   if(isnan(PZEM.voltage()) || PZEM.voltage() <= 0){
-    setAlarm(121, 1, -1, 1000);
+    setAlarm(121, 1, 5, 1000);
   }
   if(rtc.getYear() < 2023){
-    setAlarm(131, 1, -1, 1000);
+    setAlarm(131, 1, 5, 1000);
   }
 
   uint8_t ACTIVE_CH_COUNTER;
@@ -226,21 +226,21 @@ void selfDiagnosticShort(){
 
     if(mySettings.stateOnTs[i] > 0){
       if(millis() - mySettings.stateOnTs[i] > 3000000){
-        if(i = 0){setAlarm(211, 1, -1, 250);}
-        else if(i = 0){setAlarm(212, 1, -1, 250);}
-        else if(i = 0){setAlarm(213, 1, -1, 250);}
-        else if(i = 0){setAlarm(214, 1, -1, 250);}
+        if(i = 0){setAlarm(211, 1, 10, 1000);}
+        else if(i = 0){setAlarm(212, 1, 10, 1000);}
+        else if(i = 0){setAlarm(213, 1, 10, 1000);}
+        else if(i = 0){setAlarm(214, 1, 10, 1000);}
       }
     }
 
   }
 
-  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER > 0 && (int)PZEM.power() < 6){
-    setAlarm(221, 1, -1, 3000);
+  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER > 0 && (int)PZEM.power() < 5){
+    setAlarm(221, 1, 10, 1000);
   }
 
-  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 6){
-    setAlarm(222, 1, -1, 3000);
+  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 5){
+    setAlarm(222, 1, 10, 1000);
   }
 
 }
@@ -309,30 +309,38 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 }
 
 void calcPowerUsage(){
-  float volt = PZEM.voltage();
-  if(!isnan(volt)){
-    _volt.Add(volt);
+  mySettings.volt = PZEM.voltage();
+  if(!isnan(mySettings.volt)){
+    _volt.Add(mySettings.volt);
   }
 
-  float amp = PZEM.current();
-  if(!isnan(amp)){
-    _amp.Add(amp);
+  mySettings.amp = PZEM.current();
+  if(!isnan(mySettings.amp)){
+    _amp.Add(mySettings.amp);
   }
 
-  float watt = PZEM.power();
-  if(!isnan(watt)){
-    _watt.Add(watt);
+  mySettings.watt = PZEM.power();
+  if(!isnan(mySettings.watt)){
+    _watt.Add(mySettings.watt);
   }
 
-  float freq = PZEM.frequency();
-  if(!isnan(freq)){
-    _freq.Add(freq);
+  mySettings.ener = PZEM.energy();
+  if(!isnan(mySettings.ener)){
+    _watt.Add(mySettings.ener);
   }
 
-  float pf = PZEM.pf();
-  if(!isnan(pf)){
-    _pf.Add(pf);
+  mySettings.freq = PZEM.frequency();
+  if(!isnan(mySettings.freq)){
+    _freq.Add(mySettings.freq);
   }
+
+  mySettings.pf = PZEM.pf();
+  if(!isnan(mySettings.pf)){
+    _pf.Add(mySettings.pf);
+  }
+
+  //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f Amp: %.2f Watt %.2f Ener: %.2f Freq. %.2f PF %.2f\n"),
+  //  mySettings.volt, mySettings.amp, mySettings.watt, mySettings.ener, mySettings.freq, mySettings.pf);
 }
 
 void recPowerUsage(){
@@ -351,37 +359,40 @@ void recPowerUsage(){
     doc["freq"] = mySettings._freq;
     doc["pf"] = mySettings._pf;
 
-    tb.sendAttributeDoc(doc);
+    tb.sendTelemetryDoc(doc);
     _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
+
+    //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f Amp: %.2f Watt %.2f Ener: %.2f Freq. %.2f PF %.2f\n"),
+    //mySettings.volt, mySettings._amp, mySettings._watt, mySettings._ener, mySettings._freq, mySettings._pf);
   }
 }
 
 void calcWeatherData(){
   if(mySettings.flag_bme280){
-    mySettings._celc = bme.readTemperature();
-    mySettings._rh = bme.readHumidity();
-    mySettings._hpa = bme.readPressure() / 100.0F;
-    mySettings._alt = bme.readAltitude(mySettings.seaHpa);
+    mySettings.celc = bme.readTemperature();
+    mySettings.rh = bme.readHumidity();
+    mySettings.hpa = bme.readPressure() / 100.0F;
+    mySettings.alt = bme.readAltitude(mySettings.seaHpa);
 
-    _celc.Add(mySettings._celc);
-    _rh.Add(mySettings._rh);
-    _hpa.Add(mySettings._hpa);
-    _alt.Add(mySettings._alt);
+    _celc.Add(mySettings.celc);
+    _rh.Add(mySettings.rh);
+    _hpa.Add(mySettings.hpa);
+    _alt.Add(mySettings.alt);
   }
 }
 
 void recWeatherData(){
   if(tb.connected()){
-    float celc = _celc.Get_Average();
-    float rh = _rh.Get_Average();
-    float hpa = _hpa.Get_Average();
-    float alt = _alt.Get_Average();
+    mySettings._celc = _celc.Get_Average();
+    mySettings._rh = _rh.Get_Average();
+    mySettings._hpa = _hpa.Get_Average();
+    mySettings._alt = _alt.Get_Average();
 
     StaticJsonDocument<DOCSIZE_MIN> doc;
-    doc["celc"] = celc;
-    doc["rh"] = rh;
-    doc["hpa"] = hpa;
-    doc["alt"] = alt;
+    doc["celc"] = mySettings._celc;
+    doc["rh"] = mySettings._rh;
+    doc["hpa"] = mySettings._hpa;
+    doc["alt"] = mySettings._alt;
     tb.sendTelemetryDoc(doc);
     _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear();
   }
@@ -873,20 +884,20 @@ void setSwitch(String ch, String state)
   uint8_t pin = 0;
   uint8_t id = 0;
 
-  if(ch == String("ch1")){id = 1; pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
-  else if(ch == String("ch2")){id = 2; pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
-  else if(ch == String("ch3")){id = 3; pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
-  else if(ch == String("ch4")){id = 4; pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
+  if(ch == String("ch1")){id = 0; pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
+  else if(ch == String("ch2")){id = 1; pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
+  else if(ch == String("ch3")){id = 2; pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
+  else if(ch == String("ch4")){id = 3; pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
 
   if(state == String("ON"))
   {
     fState = mySettings.ON;
-    mySettings.stateOnTs[id-1] = millis();
+    mySettings.stateOnTs[id] = millis();
   }
   else
   {
     fState = 1 - mySettings.ON;
-    mySettings.stateOnTs[id-1] = 0;
+    mySettings.stateOnTs[id] = 0;
   }
 
   setCoMCUPin(pin, 1, OUTPUT, 0, fState);
@@ -1425,26 +1436,22 @@ void wsSendTelemetry(){
 void wsSendSensors(){
   if(ws.count() > 0){
     StaticJsonDocument<DOCSIZE_MIN> doc;
-    if(!isnan(PZEM.voltage())){
-      JsonObject pzem = doc.createNestedObject("pzem");
-      pzem["volt"] = round2(PZEM.voltage());
-      pzem["amp"] = round2(PZEM.current());
-      pzem["watt"] = round2(PZEM.power());
-      pzem["ener"] = round2(PZEM.energy());
-      pzem["freq"] = round2(PZEM.frequency());
-      pzem["pf"] = round2(PZEM.pf());
-      wsSend(doc);
-      doc.clear();
-    }
-    if(mySettings.flag_bme280){
-      JsonObject bme280 = doc.createNestedObject("bme280");
-      bme280["celc"] = round2(bme.readTemperature());
-      bme280["rh"] = round2(bme.readHumidity());
-      bme280["hpa"] = round2(bme.readPressure() / 100.0F);
-      bme280["alt"] = round2(bme.readAltitude(mySettings.seaHpa));
-      wsSend(doc);
-      doc.clear();
-    }
+    JsonObject pzem = doc.createNestedObject("pzem");
+    pzem["volt"] = round2(mySettings.volt);
+    pzem["amp"] = round2(mySettings.amp);
+    pzem["watt"] = round2(mySettings.watt);
+    pzem["ener"] = round2(mySettings.ener);
+    pzem["freq"] = round2(mySettings.freq);
+    pzem["pf"] = round2(mySettings.pf);
+    wsSend(doc);
+    doc.clear();
+    JsonObject bme280 = doc.createNestedObject("bme280");
+    bme280["celc"] = round2(mySettings.celc);
+    bme280["rh"] = round2(mySettings.rh);
+    bme280["hpa"] = round2(mySettings.hpa);
+    bme280["alt"] = round2(mySettings.alt);
+    wsSend(doc);
+    doc.clear();
   }
 }
 
