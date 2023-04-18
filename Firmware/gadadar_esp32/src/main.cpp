@@ -365,7 +365,7 @@ void calcPowerUsage(){
 
   mySettings.ener = PZEM.energy();
   if(!isnan(mySettings.ener)){
-    _watt.Add(mySettings.ener);
+    _ener.Add(mySettings.ener);
   }
 
   mySettings.freq = PZEM.frequency();
