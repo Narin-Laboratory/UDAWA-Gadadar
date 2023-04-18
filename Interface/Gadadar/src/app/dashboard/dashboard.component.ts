@@ -41,8 +41,8 @@ export class DashboardComponent {
   @Output() rlyActITOnChange = new EventEmitter<any>();
   @Input() rlyActITOn: object;
 
-  @Output() dtCyMTChange = new EventEmitter<any>();
-  @Input() dtCyMT: object;
+  @Output() rlyActMTChange = new EventEmitter<any>();
+  @Input() rlyActMT: object;
 
   @Output() labelChange = new EventEmitter<any>();
   @Input() label: object;
@@ -88,7 +88,7 @@ export class DashboardComponent {
     this.rlyActDrChange.emit(this.rlyActDr);
     this.rlyActITChange.emit(this.rlyActIT);
     this.rlyActITOnChange.emit(this.rlyActITOn);
-    this.dtCyMTChange.emit(this.dtCyMT);
+    this.rlyActMTChange.emit(this.rlyActMT);
     this.chParamsChange.emit();
   }
 

@@ -605,20 +605,20 @@ if(doc["rlyActIT"] != nullptr)
   if(doc["httpPass"] != nullptr){mySettings.httpPass = doc["httpPass"].as<String>();}
   else{mySettings.httpPass = "defaultkey";}
 
-  if(doc["dtCyMT"] != nullptr)
+  if(doc["rlyActMT"] != nullptr)
   {
     uint8_t index = 0;
-    for(JsonVariant v : doc["dtCyMT"].as<JsonArray>())
+    for(JsonVariant v : doc["rlyActMT"].as<JsonArray>())
     {
-        mySettings.dtCyMT[index] = v.as<String>();
+        mySettings.rlyActMT[index] = v.as<String>();
         index++;
     }
   }
   else
   {
-    for(uint8_t i = 0; i < countof(mySettings.dtCyMT); i++)
+    for(uint8_t i = 0; i < countof(mySettings.rlyActMT); i++)
     {
-        mySettings.dtCyMT[i] = "[{}]";
+        mySettings.rlyActMT[i] = "[{}]";
     }
   }
 
@@ -702,10 +702,10 @@ void saveSettings()
     pin.add(mySettings.pin[i]);
   }
 
-  JsonArray dtCyMT = doc.createNestedArray("dtCyMT");
-  for(uint8_t i=0; i<countof(mySettings.dtCyMT); i++)
+  JsonArray rlyActMT = doc.createNestedArray("rlyActMT");
+  for(uint8_t i=0; i<countof(mySettings.rlyActMT); i++)
   {
-    dtCyMT.add(mySettings.dtCyMT[i]);
+    rlyActMT.add(mySettings.rlyActMT[i]);
   }
 
   JsonArray label = doc.createNestedArray("label");
@@ -1030,9 +1030,9 @@ void relayControlByMultiTime(){
   for(uint8_t i = 0; i < countof(mySettings.pin); i++){
     if(mySettings.rlyCtrlMd[i] == 6){
       StaticJsonDocument<DOCSIZE_MIN> doc;
-      DeserializationError error = deserializeJson(doc, mySettings.dtCyMT[i]);
+      DeserializationError error = deserializeJson(doc, mySettings.rlyActMT[i]);
       if(error != DeserializationError::Ok){
-        log_manager->warn(PSTR(__func__),PSTR("Failed to parse JSON for CH%d: %s\n"),i+1, mySettings.dtCyMT[i].c_str());
+        log_manager->warn(PSTR(__func__),PSTR("Failed to parse JSON for CH%d: %s\n"),i+1, mySettings.rlyActMT[i].c_str());
         delay(1000);
         break;
       }
@@ -1152,10 +1152,10 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["dtRngFSCh3"] != nullptr){mySettings.dtRngFS[2] = data["dtRngFSCh3"].as<unsigned long>();}
   if(data["dtRngFSCh4"] != nullptr){mySettings.dtRngFS[3] = data["dtRngFSCh4"].as<unsigned long>();}
 
-  if(data["dtCyMTCh1"] != nullptr){mySettings.dtCyMT[0] = data["dtCyMTCh1"].as<String>();}
-  if(data["dtCyMTCh2"] != nullptr){mySettings.dtCyMT[1] = data["dtCyMTCh2"].as<String>();}
-  if(data["dtCyMTCh3"] != nullptr){mySettings.dtCyMT[2] = data["dtCyMTCh3"].as<String>();}
-  if(data["dtCyMTCh4"] != nullptr){mySettings.dtCyMT[3] = data["dtCyMTCh4"].as<String>();}
+  if(data["rlyActMTCh1"] != nullptr){mySettings.rlyActMT[0] = data["rlyActMTCh1"].as<String>();}
+  if(data["rlyActMTCh2"] != nullptr){mySettings.rlyActMT[1] = data["rlyActMTCh2"].as<String>();}
+  if(data["rlyActMTCh3"] != nullptr){mySettings.rlyActMT[2] = data["rlyActMTCh3"].as<String>();}
+  if(data["rlyActMTCh4"] != nullptr){mySettings.rlyActMT[3] = data["rlyActMTCh4"].as<String>();}
 
   if(data["rlyActDTCh1"] != nullptr){
     uint64_t micro = data["rlyActDTCh1"].as<uint64_t>();
@@ -1337,10 +1337,10 @@ void syncClientAttributes()
   doc["ON"] = mySettings.ON;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["dtCyMTCh1"] = mySettings.dtCyMT[0];
-  doc["dtCyMTCh2"] = mySettings.dtCyMT[1];
-  doc["dtCyMTCh3"] = mySettings.dtCyMT[2];
-  doc["dtCyMTCh4"] = mySettings.dtCyMT[3];
+  doc["rlyActMTCh1"] = mySettings.rlyActMT[0];
+  doc["rlyActMTCh2"] = mySettings.rlyActMT[1];
+  doc["rlyActMTCh3"] = mySettings.rlyActMT[2];
+  doc["rlyActMTCh4"] = mySettings.rlyActMT[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
   doc["labelCh1"] = mySettings.label[0];
@@ -1557,11 +1557,11 @@ void wsSendAttributes(){
   rlyCtrlMd["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
   wsSend(doc);
   doc.clear();
-  JsonObject dtCyMT = doc.createNestedObject("dtCyMT");
-  dtCyMT["dtCyMTCh1"] = mySettings.dtCyMT[0];
-  dtCyMT["dtCyMTCh2"] = mySettings.dtCyMT[1];
-  dtCyMT["dtCyMTCh3"] = mySettings.dtCyMT[2];
-  dtCyMT["dtCyMTCh4"] = mySettings.dtCyMT[3];
+  JsonObject rlyActMT = doc.createNestedObject("rlyActMT");
+  rlyActMT["rlyActMTCh1"] = mySettings.rlyActMT[0];
+  rlyActMT["rlyActMTCh2"] = mySettings.rlyActMT[1];
+  rlyActMT["rlyActMTCh3"] = mySettings.rlyActMT[2];
+  rlyActMT["rlyActMTCh4"] = mySettings.rlyActMT[3];
   wsSend(doc);
   doc.clear();
   doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;

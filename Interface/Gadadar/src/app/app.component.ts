@@ -32,7 +32,7 @@ export class AppComponent {
   rlyActIT = {"rlyActITCh1":0,"rlyActITCh2":0,"rlyActITCh3":0,"rlyActITCh4":0};
   rlyActITOn = {"rlyActITOnCh1":0,"rlyActITOnCh2":0,"rlyActITOnCh3":0,"rlyActITOnCh4":0};
   rlyCtrlMd = {"rlyCtrlMdCh1":0,"rlyCtrlMdCh2":0,"rlyCtrlMdCh3":0,"rlyCtrlMdCh4":0};
-  dtCyMT = {"dtCyMTCh1": "0:0:0-0","dtCyMTCh2": "0:0:0-0","dtCyMTCh3": "0:0:0-0","dtCyMTCh4": "0:0:0-0" };
+  rlyActMT = {"rlyActMTCh1": "0:0:0-0","rlyActMTCh2": "0:0:0-0","rlyActMTCh3": "0:0:0-0","rlyActMTCh4": "0:0:0-0" };
   label = {"labelCh1": "unnamed", "labelCh2": "unnamed", "labelCh3": "unnamed", "labelCh4": "unnamed"};
 
   constructor(private WebsocketService: WebsocketService) {
@@ -91,8 +91,8 @@ export class AppComponent {
       if(msg['label'] != null){
         this.label = msg['label'];
       }
-      if(msg['dtCyMT'] != null){
-        let temp = msg['dtCyMT'];
+      if(msg['rlyActMT'] != null){
+        let temp = msg['rlyActMT'];
         for(let k in temp){
           let item = JSON.parse(temp[k]);
           let param: string = '';
@@ -106,7 +106,7 @@ export class AppComponent {
               param += c;
             }
           }
-          this.dtCyMT[k] = param;
+          this.rlyActMT[k] = param;
         }
       }
       for(let i = 1; i <= 4; i++){
@@ -159,18 +159,18 @@ export class AppComponent {
     data['rlyActITCh'+this.selectedCh] = this.rlyActIT['rlyActITCh'+this.selectedCh];
     data['rlyACTITOnCh'+this.selectedCh] = this.rlyActITOn['rlyActITOnCh'+this.selectedCh];
     data['rlyCtrlMdCh'+this.selectedCh] = this.rlyCtrlMd['rlyCtrlMdCh'+this.selectedCh];
-    let dtCyMT = [];
-    let _dtCyMT: object = this.dtCyMT['dtCyMTCh'+this.selectedCh].split(',',24);
-    for(let k in _dtCyMT){
+    let rlyActMT = [];
+    let _rlyActMT: object = this.rlyActMT['rlyActMTCh'+this.selectedCh].split(',',24);
+    for(let k in _rlyActMT){
       let z ={'h': 0, 'i': 0, 's': 0, 'd': 0};
-      let a = _dtCyMT[k].split('-',2);
+      let a = _rlyActMT[k].split('-',2);
       z['d'] = a[1];
       let b: object = a[0].split(':',3);
       z['h'] = b[0]; z['i'] = b[1]; z['s'] = b[2];
-      dtCyMT.push(z);
+      rlyActMT.push(z);
     }
 
-    data['dtCyMTCh'+this.selectedCh] = JSON.stringify(dtCyMT);
+    data['rlyActMTCh'+this.selectedCh] = JSON.stringify(rlyActMT);
     this.WebsocketService.messages.next(data);
   }
 

@@ -153,7 +153,7 @@
                                     <div id="udawa-card-timedaily-multiple" class="card mb-3">
                                         <div class="card-body">
                                         <div class="form-floating input-group mb-3">
-                                            <input type="text" class="form-control" id="udawa-rlch-timedaily-multiple" [(ngModel)]="dtCyMT['dtCyMTCh'+selectedCh]" (change)="changeChParams()">
+                                            <input type="text" class="form-control" id="udawa-rlch-timedaily-multiple" [(ngModel)]="rlyActMT['rlyActMTCh'+selectedCh]" (change)="changeChParams()">
                                             <label for="udawa-rlch-timedaily-multiple">Comma separated value: 8:0:0-3600,18:0:0-7200</label>
                                             <span class="input-group-text">H:I:S-D</span>
                                             <p><small>H = hour in 0-24 format. I = minute in 0-60 format. S = second in 0-60 format. D = ON Duration in second. <strong>E.g: 8:0:0-3600,18:0:0-7200</strong> will turns ON at 8 AM for 1 hour and 6 PM for 2 hours.</small></p>
