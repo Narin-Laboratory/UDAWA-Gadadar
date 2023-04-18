@@ -363,7 +363,7 @@ void calcPowerUsage(){
     _watt.Add(mySettings.watt);
   }
 
-  mySettings.ener = PZEM.energy();
+  mySettings.ener = mySettings.watt / 3600 / 1;
   if(!isnan(mySettings.ener)){
     _ener.Add(mySettings.ener);
   }
@@ -1480,7 +1480,7 @@ void wsSendSensors(){
       pzem["volt"] = round2(mySettings.volt);
       pzem["amp"] = round2(mySettings.amp);
       pzem["watt"] = round2(mySettings.watt);
-      pzem["ener"] = round2(mySettings.ener);
+      pzem["ener"] = round2(PZEM.energy());
       pzem["freq"] = round2(mySettings.freq);
       pzem["pf"] = round2(mySettings.pf);
       wsSend(doc);
