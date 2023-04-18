@@ -12,8 +12,6 @@
 using namespace libudawa;
 Settings mySettings;
 Adafruit_BME280 bme;
-HardwareSerial PZEMSerial(1);
-PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 AsyncWebServer web(80);
 AsyncWebSocket ws("/ws");
 Stream_Stats<float> _volt;
@@ -247,6 +245,9 @@ void updateSpiffs(){
 }
 
 void selfDiagnosticShort(){
+  HardwareSerial PZEMSerial(1);
+  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
   if(!mySettings.flag_bme280){
     setAlarm(111, 1, 5, 1000);
   }
@@ -348,6 +349,9 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 }
 
 void calcPowerUsage(){
+  HardwareSerial PZEMSerial(1);
+  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
   mySettings.volt = PZEM.voltage();
   if(!isnan(mySettings.volt)){
     _volt.Add(mySettings.volt);
@@ -1474,18 +1478,20 @@ void wsSendTelemetry(){
 
 void wsSendSensors(){
   if(ws.count() > 0){
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
     StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject pzem = doc.createNestedObject("pzem");
-    if(mySettings.volt > 0){
-      pzem["volt"] = round2(mySettings.volt);
-      pzem["amp"] = round2(mySettings.amp);
-      pzem["watt"] = round2(mySettings.watt);
-      pzem["ener"] = round2(PZEM.energy());
-      pzem["freq"] = round2(mySettings.freq);
-      pzem["pf"] = round2(mySettings.pf);
-      wsSend(doc);
-      doc.clear();
-    }
+    pzem["volt"] = round2(mySettings.volt);
+    pzem["amp"] = round2(mySettings.amp);
+    pzem["watt"] = round2(mySettings.watt);
+    pzem["ener"] = round2(PZEM.energy());
+    pzem["freq"] = round2(mySettings.freq);
+    pzem["pf"] = round2(mySettings.pf)*100;
+    wsSend(doc);
+    doc.clear();
+
     JsonObject bme280 = doc.createNestedObject("bme280");
     bme280["celc"] = round2(mySettings.celc);
     bme280["rh"] = round2(mySettings.rh);
