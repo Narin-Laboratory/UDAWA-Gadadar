@@ -1437,14 +1437,16 @@ void wsSendSensors(){
   if(ws.count() > 0){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject pzem = doc.createNestedObject("pzem");
-    pzem["volt"] = round2(mySettings.volt);
-    pzem["amp"] = round2(mySettings.amp);
-    pzem["watt"] = round2(mySettings.watt);
-    pzem["ener"] = round2(mySettings.ener);
-    pzem["freq"] = round2(mySettings.freq);
-    pzem["pf"] = round2(mySettings.pf);
-    wsSend(doc);
-    doc.clear();
+    if(mySettings.volt > 0){
+      pzem["volt"] = round2(mySettings.volt);
+      pzem["amp"] = round2(mySettings.amp);
+      pzem["watt"] = round2(mySettings.watt);
+      pzem["ener"] = round2(mySettings.ener);
+      pzem["freq"] = round2(mySettings.freq);
+      pzem["pf"] = round2(mySettings.pf);
+      wsSend(doc);
+      doc.clear();
+    }
     JsonObject bme280 = doc.createNestedObject("bme280");
     bme280["celc"] = round2(mySettings.celc);
     bme280["rh"] = round2(mySettings.rh);
