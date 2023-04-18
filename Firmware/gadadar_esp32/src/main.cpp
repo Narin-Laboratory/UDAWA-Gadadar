@@ -12,8 +12,6 @@
 using namespace libudawa;
 Settings mySettings;
 Adafruit_BME280 bme;
-HardwareSerial PZEMSerial(1);
-PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 AsyncWebServer web(80);
 AsyncWebSocket ws("/ws");
 Stream_Stats<float> _volt;
@@ -247,6 +245,9 @@ void updateSpiffs(){
 }
 
 void selfDiagnosticShort(){
+  HardwareSerial PZEMSerial(1);
+  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
   if(!mySettings.flag_bme280){
     setAlarm(111, 1, 5, 1000);
   }
@@ -348,34 +349,27 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 }
 
 void calcPowerUsage(){
-  mySettings.volt = PZEM.voltage();
-  if(!isnan(mySettings.volt)){
-    _volt.Add(mySettings.volt);
+  HardwareSerial PZEMSerial(1);
+  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+  if(!isnan(PZEM.voltage())){
+    _volt.Add(PZEM.voltage());
   }
 
-  mySettings.amp = PZEM.current();
-  if(!isnan(mySettings.amp)){
-    _amp.Add(mySettings.amp);
+  if(!isnan(PZEM.current())){
+    _amp.Add(PZEM.current());
   }
 
-  mySettings.watt = PZEM.power();
-  if(!isnan(mySettings.watt)){
-    _watt.Add(mySettings.watt);
+  if(!isnan(PZEM.power())){
+    _watt.Add(PZEM.power());
   }
 
-  mySettings.ener = PZEM.energy();
-  if(!isnan(mySettings.ener)){
-    _watt.Add(mySettings.ener);
+  if(!isnan(PZEM.frequency())){
+    _freq.Add(PZEM.frequency());
   }
 
-  mySettings.freq = PZEM.frequency();
-  if(!isnan(mySettings.freq)){
-    _freq.Add(mySettings.freq);
-  }
-
-  mySettings.pf = PZEM.pf();
-  if(!isnan(mySettings.pf)){
-    _pf.Add(mySettings.pf);
+  if(!isnan(PZEM.pf())){
+    _pf.Add(PZEM.pf());
   }
 
   //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f Amp: %.2f Watt %.2f Ener: %.2f Freq. %.2f PF %.2f\n"),
@@ -385,18 +379,22 @@ void calcPowerUsage(){
 void recPowerUsage(){
   if(tb.connected()){
     StaticJsonDocument<DOCSIZE_MIN> doc;
-    mySettings._volt = _volt.Get_Average();
-    mySettings._amp = _amp.Get_Average();
-    mySettings._watt = _watt.Get_Average();
-    mySettings._ener = mySettings._watt / (float)(3600 / mySettings.intvRecPwrUsg);
-    mySettings._freq = _freq.Get_Average();
-    mySettings._pf = _pf.Get_Average();
-    doc["volt"] = mySettings._volt;
-    doc["amp"] = mySettings._amp;
-    doc["watt"] = mySettings._watt;
-    doc["ener"] = mySettings._ener;
-    doc["freq"] = mySettings._freq;
-    doc["pf"] = mySettings._pf;
+    doc["volt"] = _volt.Get_Average();
+    doc["amp"] = _amp.Get_Average();
+    doc["watt"] = _watt.Get_Average();
+    doc["freq"] = _freq.Get_Average();
+    doc["pf"] = _pf.Get_Average();
+
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+    float ener = PZEM.energy();
+    if(mySettings.lastEner == -1){
+      mySettings.lastEner = ener;
+    }
+    else{
+      doc["ener"] = ener - mySettings.lastEner;
+      mySettings.lastEner = ener;
+    }
 
     tb.sendTelemetryDoc(doc);
     _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
@@ -892,7 +890,14 @@ callbackResponse processBridge(const callbackData &data)
     String result;
     serializeJson(doc, result);
     return callbackResponse("bridge", result.c_str());
-  }else{
+  }
+  else if(doc["method"] == "resetPZEM"){
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+    PZEM.resetEnergy();
+    return callbackResponse("resetPZEM", 1);
+  }
+  else{
     serialWriteToCoMcu(doc, 0);
     String result;
     serializeJson(doc, result);
@@ -1474,18 +1479,20 @@ void wsSendTelemetry(){
 
 void wsSendSensors(){
   if(ws.count() > 0){
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
     StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject pzem = doc.createNestedObject("pzem");
-    if(mySettings.volt > 0){
-      pzem["volt"] = round2(mySettings.volt);
-      pzem["amp"] = round2(mySettings.amp);
-      pzem["watt"] = round2(mySettings.watt);
-      pzem["ener"] = round2(mySettings.ener);
-      pzem["freq"] = round2(mySettings.freq);
-      pzem["pf"] = round2(mySettings.pf);
-      wsSend(doc);
-      doc.clear();
-    }
+    pzem["volt"] = round2(PZEM.voltage());
+    pzem["amp"] = round2(PZEM.current());
+    pzem["watt"] = round2(PZEM.power());
+    pzem["ener"] = round2(PZEM.energy());
+    pzem["freq"] = round2(PZEM.frequency());
+    pzem["pf"] = round2(PZEM.pf())*100;
+    wsSend(doc);
+    doc.clear();
+
     JsonObject bme280 = doc.createNestedObject("bme280");
     bme280["celc"] = round2(mySettings.celc);
     bme280["rh"] = round2(mySettings.rh);
