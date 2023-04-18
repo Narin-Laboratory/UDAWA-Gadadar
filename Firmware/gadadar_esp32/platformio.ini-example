@@ -39,3 +39,4 @@ lib_deps =
 	https://github.com/me-no-dev/AsyncTCP.git
 	https://github.com/me-no-dev/ESPAsyncWebServer.git
 	https://github.com/akkoyun/Statistical.git
+	https://github.com/Narin-Laboratory/esp32FOTA.git
