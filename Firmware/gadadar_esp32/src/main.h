@@ -61,10 +61,12 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <Statistical.h>
+#include <esp32FOTA.hpp>
 
 
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.4"
+#define CURRENT_FIRMWARE_VERSION "0.0.5"
+bool FLAG_UPDATE_SPIFFS = 0;
 
 const char* settingsPath = "/settings.json";
 struct Settings

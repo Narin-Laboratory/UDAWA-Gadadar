@@ -65,6 +65,12 @@ void setup()
   cbSubscribe(cb, cbSize);
   setAlarm(999, 1, 1, 3000);
 
+  esp32FOTA esp32FOTA(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
+  esp32FOTA.setProgressCb( [](size_t progress, size_t size) {
+      if( progress == size || progress == 0 ) Serial.println();
+      Serial.print(".");
+  });
+
   setSwitch("ch1", "OFF");
   setSwitch("ch2", "OFF");
   setSwitch("ch3", "OFF");
@@ -179,6 +185,11 @@ void loop()
 
     mySettings.flag_syncClientAttr = 1;
   }
+
+  if(FLAG_UPDATE_SPIFFS){
+    FLAG_UPDATE_SPIFFS = false;
+    updateSpiffs();
+  }
 }
 
 double round2(double value) {
@@ -202,12 +213,40 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
 }
 
 void updateSpiffs(){
+  esp32FOTA esp32FOTA(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
 
+  CryptoMemAsset  *MyRootCA = new CryptoMemAsset("Root CA", CA_CERT, strlen(CA_CERT)+1 );
+
+  esp32FOTA.setManifestURL("http://prita.undiknas.ac.id/cdn/firmware/udawa.json");
+  esp32FOTA.setRootCA(MyRootCA);
+  esp32FOTA.setCertFileSystem(nullptr);
+  esp32FOTA.setProgressCb( [](size_t progress, size_t size) {
+      if( progress == size || progress == 0 ) Serial.println();
+      Serial.print(".");
+  });
+  esp32FOTA.setUpdateCheckFailCb( [](int partition, int error_code) {
+    Serial.printf("Update could validate %s partition (error %d)\n", partition==U_SPIFFS ? "spiffs" : "firmware", error_code );
+    // error codes:
+    //  -1 : partition not found
+    //  -2 : validation (signature check) failed
+  });
+  esp32FOTA.setUpdateBeginFailCb( [](int partition) {
+
+  });
+  esp32FOTA.setUpdateEndCb( [](int partition) {
+
+  });
+  esp32FOTA.setUpdateFinishedCb( [](int partition, bool restart_after) {
+    saveSettings();
+    configSave();
+    configCoMCUSave();
+  });
+
+  Serial.println(esp32FOTA.execHTTPcheck());
+  esp32FOTA.execOTASPIFFS();
 }
 
 void selfDiagnosticShort(){
-
-
   if(!mySettings.flag_bme280){
     setAlarm(111, 1, 5, 1000);
   }
@@ -744,7 +783,7 @@ JsonObject processEmitAlarmWs(const JsonObject &data){
 }
 
 callbackResponse processUpdateSpiffs(const callbackData &data){
-  updateSpiffs();
+  FLAG_UPDATE_SPIFFS = 1;
   return callbackResponse("updateSpiffs", 1);
 }
 
