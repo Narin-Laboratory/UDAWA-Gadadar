@@ -98,19 +98,7 @@ struct Settings
 
     bool flag_syncClientAttr = 0;
 
-    float _volt = 0.0;
-    float _amp = 0.0;
-    float _watt = 0.0;
-    float _ener = 0.0;
-    float _freq = 0.0;
-    float _pf = 0.0;
-
-    float volt = 0.0;
-    float amp = 0.0;
-    float watt = 0.0;
-    float ener = 0.0;
-    float freq = 0.0;
-    float pf = 0.0;
+    float lastEner = -1;
 
     float _celc = 0.0;
     float _rh = 0.0;
