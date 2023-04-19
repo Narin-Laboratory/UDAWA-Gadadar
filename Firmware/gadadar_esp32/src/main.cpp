@@ -12,8 +12,6 @@
 using namespace libudawa;
 Settings mySettings;
 Adafruit_BME280 bme;
-AsyncWebServer web(80);
-AsyncWebSocket ws("/ws");
 Stream_Stats<float> _volt;
 Stream_Stats<float> _amp;
 Stream_Stats<float> _watt;
@@ -26,12 +24,16 @@ Stream_Stats<float> _rh;
 Stream_Stats<float> _hpa;
 Stream_Stats<float> _alt;
 
-const size_t cbSize = 1;
+Task syncClientAttr(1 * TASK_SECOND, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
+
+const size_t cbSize = 3;
 GCB cb[cbSize] = {
-  { "emitAlarmWs", processEmitAlarmWs }
+  { "emitAlarmWs", processEmitAlarmWs },
+  { "wsEventData", processWsEventData },
+  { "onTbConnected", processOnTbConnected }
 };
 
-const size_t callbacksSize = 17;
+const size_t callbacksSize = 16;
 GenericCallback callbacks[callbacksSize] = {
   { "sharedAttributesUpdate", processSharedAttributesUpdate },
   { "provisionResponse", processProvisionResponse },
@@ -63,12 +65,6 @@ void setup()
   cbSubscribe(cb, cbSize);
   setAlarm(999, 1, 1, 3000);
 
-  esp32FOTA esp32FOTA(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
-  esp32FOTA.setProgressCb( [](size_t progress, size_t size) {
-      if( progress == size || progress == 0 ) Serial.println();
-      Serial.print(".");
-  });
-
   setSwitch("ch1", "OFF");
   setSwitch("ch2", "OFF");
   setSwitch("ch3", "OFF");
@@ -78,116 +74,11 @@ void setup()
   if(!mySettings.flag_bme280){
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }
-
-  String hostname = String(config.name) + String(".local");
-  MDNS.begin(hostname.c_str());
-  MDNS.addService("http", "tcp", 80);
-  log_manager->info(PSTR(__func__),PSTR("Started MDNS on %s\n"), hostname.c_str());
-
-  networkInit();
-  tb.setBufferSize(DOCSIZE_MIN);
-
-  web.begin();
-  web.serveStatic("/", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
-  web.serveStatic("/about", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
-  web.serveStatic("/dashboard", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
-  web.serveStatic("/configuration", SPIFFS, "/www/").setDefaultFile("index.html").setAuthentication(mySettings.httpUname.c_str(),mySettings.httpPass.c_str());
-
-  ws.onEvent(onWsEvent);
-  ws.setAuthentication(mySettings.httpUname.c_str(), mySettings.httpPass.c_str());
-  web.addHandler(&ws);
-
-  if(mySettings.intvDevTel != 0){
-    taskid_t taskPublishDeviceTelemetry = taskManager.scheduleFixedRate(mySettings.intvDevTel * 1000, [] {
-      publishDeviceTelemetry();
-    });
-  }
-
-  if(mySettings.intvRecPwrUsg != 0){
-    taskid_t taskCalcPowerUsage = taskManager.scheduleFixedRate(1000, [] {
-      calcPowerUsage();
-    });
-    taskid_t taskRecPowerUsage = taskManager.scheduleFixedRate(mySettings.intvRecPwrUsg * 1000, [] {
-      recPowerUsage();
-    });
-  }
-
-  if(mySettings.intvRecWthr != 0){
-    taskid_t taskCalcWeatherData = taskManager.scheduleFixedRate(1000, [] {
-      calcWeatherData();
-    });
-    taskid_t taskRecWeather = taskManager.scheduleFixedRate(mySettings.intvRecWthr * 1000, [] {
-      recWeatherData();
-    });
-  }
-
-  taskid_t taskWsSendTelemetry = taskManager.scheduleFixedRate(1000, [] {
-    wsSendTelemetry();
-  });
-
-  taskid_t taskWsSendSensors = taskManager.scheduleFixedRate(1000, [] {
-    wsSendSensors();
-  });
-
-  taskid_t taskSelfDiagnosticShort = taskManager.scheduleFixedRate(120000, [] {
-    selfDiagnosticShort();
-  });
-
-  taskid_t taskSelfDiagnosticLong = taskManager.scheduleFixedRate(3600000, [] {
-    selfDiagnosticLong();
-  });
 }
 
 void loop()
 {
   udawa();
-  relayControlByDateTime();
-  relayControlBydtCyc();
-  relayControlByIntrvl();
-  relayControlByMultiTime();
-  publishSwitch();
-  ws.cleanupClients();
-
-  if(tb.connected() && mySettings.flag_syncClientAttr == 1 && config.useCloud){
-    syncClientAttributes();
-    mySettings.publishSwitch[0] = true;
-    mySettings.publishSwitch[1] = true;
-    mySettings.publishSwitch[2] = true;
-    mySettings.publishSwitch[3] = true;
-    mySettings.flag_syncClientAttr = 0;
-  }
-
-  if(tb.connected() && FLAG_IOT_SUBSCRIBE)
-  {
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    doc["method"] = "sharedAttributesUpdate";
-    JsonObject params = doc.createNestedObject("params");
-    params["name"] = config.name;
-    JsonObject payload = doc.template as<JsonObject>();
-    tb.server_rpc_call(payload);
-
-    if(tb.callbackSubscribe(callbacks, callbacksSize))
-    {
-      log_manager->info(PSTR(__func__),PSTR("Callbacks subscribed successfuly!\n"));
-      FLAG_IOT_SUBSCRIBE = false;
-    }
-    if (tb.Firmware_Update(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION))
-    {
-      log_manager->info(PSTR(__func__),PSTR("OTA Update finished, rebooting...\n"));
-      reboot();
-    }
-    else
-    {
-      log_manager->info(PSTR(__func__),PSTR("Firmware up-to-date.\n"));
-    }
-
-    mySettings.flag_syncClientAttr = 1;
-  }
-
-  if(FLAG_UPDATE_SPIFFS){
-    FLAG_UPDATE_SPIFFS = false;
-    updateSpiffs();
-  }
 }
 
 double round2(double value) {
@@ -208,6 +99,14 @@ uint32_t micro2milli(uint32_t hi, uint32_t lo)
   ans = (ans << 16) + r / 1000;
 
   return ans;
+}
+
+void syncClientAttrCb(){
+  syncClientAttributes();
+  mySettings.publishSwitch[0] = true;
+  mySettings.publishSwitch[1] = true;
+  mySettings.publishSwitch[2] = true;
+  mySettings.publishSwitch[3] = true;
 }
 
 void updateSpiffs(){
@@ -287,65 +186,6 @@ void selfDiagnosticShort(){
 
 void selfDiagnosticLong(){
 
-}
-
-void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
-  if(type == WS_EVT_CONNECT){
-    log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] connect\n"), server->url(), client->id());
-    wsSendAttributes();
-  } else if(type == WS_EVT_DISCONNECT){
-    log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] disconnect\n"), server->url(), client->id());
-  } else if(type == WS_EVT_ERROR){
-    log_manager->warn(PSTR(__func__), PSTR("ws[%s][%u] error(%u): %s\n"), server->url(), client->id(), *((uint16_t*)arg), (char*)data);
-  } else if(type == WS_EVT_PONG){
-    log_manager->info(PSTR(__func__), PSTR("ws[%s][%u] pong[%u]: %s\n"), server->url(), client->id(), len, (len)?(char*)data:"");
-  } else if(type == WS_EVT_DATA){
-
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    DeserializationError err = deserializeJson(doc, data);
-    if (err == DeserializationError::Ok)
-    {
-      // Print the values
-      // (we must use as<T>() to resolve the ambiguity)
-      log_manager->warn(PSTR(__func__), PSTR("WS message parsing %s\n"), err.c_str());
-      serializeJsonPretty(doc, Serial);
-
-      if(doc["cmd"] == nullptr){return;}
-
-      const char* cmd = doc["cmd"].as<const char*>();
-      if(strcmp(cmd, (const char*) "attr") == 0){
-        JsonObject root = doc.template as<JsonObject>();
-        processSharedAttributesUpdate(root);
-        if(tb.connected()){
-          root.remove("cmd");
-          tb.sendAttributeDoc(doc);
-        }
-      }
-      else if(strcmp(cmd, (const char*) "saveSettings") == 0){
-        saveSettings();
-      }
-      else if(strcmp(cmd, (const char*) "saveConfig") == 0){
-        configSave();
-      }
-      else if(strcmp(cmd, (const char*) "setPanic") == 0){
-        StaticJsonDocument<DOCSIZE_MIN> doc;
-        JsonObject params = doc.createNestedObject("params");
-        params["state"]= "ON";
-        JsonObject root = doc.template as<JsonObject>();
-        processSetPanic(root);
-      }
-      else if(strcmp(cmd, (const char*) "reboot") == 0){
-        reboot();
-      }
-      else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
-      }
-    }
-    else
-    {
-      log_manager->warn(PSTR(__func__), PSTR("WS message parsing error: %s\n"), err.c_str());
-    }
-  }
 }
 
 void calcPowerUsage(){
@@ -773,6 +613,69 @@ void saveSettings()
   log_manager->debug(PSTR(__func__), "Written settings:\n %s \n", tmp.c_str());
 }
 
+JsonObject processWsEventData(const JsonObject &doc){
+  if(doc["cmd"] == nullptr){
+    log_manager->debug(PSTR(__func__), "Command not found.\n");
+    return doc;
+  }
+
+  const char* cmd = doc["cmd"].as<const char*>();
+  if(strcmp(cmd, (const char*) "attr") == 0){
+    processSharedAttributesUpdate(doc);
+    if(tb.connected()){
+      doc.remove("cmd");
+      StaticJsonDocument<DOCSIZE_MIN> tele;
+      tele = doc;
+      tb.sendAttributeDoc(tele);
+    }
+  }
+  else if(strcmp(cmd, (const char*) "saveSettings") == 0){
+    saveSettings();
+  }
+  else if(strcmp(cmd, (const char*) "saveConfig") == 0){
+    configSave();
+  }
+  else if(strcmp(cmd, (const char*) "setPanic") == 0){
+    JsonObject params = doc.createNestedObject("params");
+    params["state"]= "ON";
+    processSetPanic(doc);
+  }
+  else if(strcmp(cmd, (const char*) "reboot") == 0){
+    reboot();
+  }
+  else if(strcmp(cmd, (const char*) "setSwitch") == 0){
+    setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+  }
+
+  return doc;
+}
+
+JsonObject processOnTbConnected(const JsonObject &data){
+  StaticJsonDocument<DOCSIZE_MIN> doc;
+  doc["method"] = "sharedAttributesUpdate";
+  JsonObject params = doc.createNestedObject("params");
+  params["name"] = config.name;
+  JsonObject payload = doc.template as<JsonObject>();
+  tb.server_rpc_call(payload);
+
+  if(tb.callbackSubscribe(callbacks, callbacksSize))
+  {
+    log_manager->info(PSTR(__func__),PSTR("Callbacks subscribed successfuly!\n"));
+  }
+  if (tb.Firmware_Update(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION))
+  {
+    log_manager->info(PSTR(__func__),PSTR("OTA Update finished, rebooting...\n"));
+    reboot();
+  }
+  else
+  {
+    log_manager->info(PSTR(__func__),PSTR("Firmware up-to-date.\n"));
+  }
+
+  syncClientAttr.enable();
+  return data;
+}
+
 JsonObject processEmitAlarmWs(const JsonObject &data){
   StaticJsonDocument<DOCSIZE_MIN> doc;
   doc = data;
@@ -816,7 +719,7 @@ callbackResponse processReboot(const callbackData &data)
 
 callbackResponse processSyncClientAttributes(const callbackData &data)
 {
-  mySettings.flag_syncClientAttr = 1;
+  syncClientAttr.enable();
   return callbackResponse("syncClientAttributes", 1);
 }
 
@@ -876,7 +779,7 @@ callbackResponse processSetPanic(const callbackData &data)
     configcomcu.fPanic = 0;
   }
   serialWriteToCoMcu(doc, 0);
-  mySettings.flag_syncClientAttr = 1;
+  syncClientAttr.enable();
   return callbackResponse("setPanic", data["params"]["state"].as<int>());
 }
 

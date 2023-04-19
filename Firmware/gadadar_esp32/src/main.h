@@ -57,9 +57,6 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <ESPmDNS.h>
 #include <Statistical.h>
 #include <esp32FOTA.hpp>
 
@@ -96,8 +93,6 @@ struct Settings
     bool flag_bme280 = false;
     float seaHpa = 1019.00;
 
-    bool flag_syncClientAttr = 0;
-
     float lastEner = -1;
 
     float _celc = 0.0;
@@ -132,6 +127,8 @@ callbackResponse processBridge(const callbackData &data);
 callbackResponse processResetConfig(const callbackData &data);
 callbackResponse processUpdateSpiffs(const callbackData &data);
 JsonObject processEmitAlarmWs(const JsonObject &data);
+JsonObject processWsEventData(const JsonObject &data);
+JsonObject processOnTbConnected(const JsonObject &data);
 
 void loadSettings();
 void saveSettings();
@@ -146,7 +143,6 @@ void publishSwitch();
 void recPowerUsage();
 void recWeatherData();
 uint32_t micro2milli(uint32_t hi, uint32_t lo);
-void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len);
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc);
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client);
 void wsSendTelemetry();
@@ -159,5 +155,6 @@ double round2(double value);
 void relayControlByMultiTime();
 void calcPowerUsage();
 void calcWeatherData();
+void syncClientAttrCb();
 
 #endif
