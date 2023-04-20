@@ -21,19 +21,17 @@ export class AppComponent {
   bme280 = {};
   pzem = {};
 
-  selectedCh = 1;
+  selected = 1;
   state = {'ch1': 0, 'ch2': 0, 'ch3': 0, 'ch4': 0};
-  dtCyc = {"dtCycCh1":0,"dtCycCh2":0,"dtCycCh3":0,"dtCycCh4":0};
-  dtRng = {"dtRngCh1":2,"dtRngCh2":2,"dtRngCh3":2,"dtRngCh4":2};
-  dtCycFS = {"dtCycFSCh1":0,"dtCycFSCh2":0,"dtCycFSCh3":0,"dtCycFSCh4":0};
-  dtRngFS = {"dtRngFSCh1":0,"dtRngFSCh2":0,"dtRngFSCh3":0,"dtRngFSCh4":0};
-  rlyActDT = {"rlyActDTCh1":0,"rlyActDTCh2":0,"rlyActDTCh3":0,"rlyActDTCh4":0};
-  rlyActDr = {"rlyActDrCh1":0,"rlyActDrCh2":0,"rlyActDrCh3":0,"rlyActDrCh4":0};
-  rlyActIT = {"rlyActITCh1":0,"rlyActITCh2":0,"rlyActITCh3":0,"rlyActITCh4":0};
-  rlyActITOn = {"rlyActITOnCh1":0,"rlyActITOnCh2":0,"rlyActITOnCh3":0,"rlyActITOnCh4":0};
-  rlyCtrlMd = {"rlyCtrlMdCh1":0,"rlyCtrlMdCh2":0,"rlyCtrlMdCh3":0,"rlyCtrlMdCh4":0};
-  rlyActMT = {"rlyActMTCh1": "0:0:0-0","rlyActMTCh2": "0:0:0-0","rlyActMTCh3": "0:0:0-0","rlyActMTCh4": "0:0:0-0" };
-  label = {"labelCh1": "unnamed", "labelCh2": "unnamed", "labelCh3": "unnamed", "labelCh4": "unnamed"};
+  cpM = {"cpM1":0,"cpM2":0,"cpM3":0,"cpM4":0};
+  cp1A = {"cp1A1":0,"cp1A2":0,"cp1A3":0,"cp1A4":0};
+  cp1B = {"cp1B1":2,"cp1B2":2,"cp1B3":2,"cp1B4":2};
+  cp2A = {"cp2A1":0,"cp2A2":0,"cp2A3":0,"cp2A4":0};
+  cp2B = {"cp2B1":0,"cp2B2":0,"cp2B3":0,"cp2B4":0};
+  cp3A = {"cp3A1": "0:0:0-0","cp3A2": "0:0:0-0","cp3A3": "0:0:0-0","cp3A4": "0:0:0-0" };
+  cp4A = {"cp4A1":0,"cp4A2":0,"cp4A3":0,"cp4A4":0};
+  cp4B = {"cp4B1":0,"cp4B2":0,"cp4B3":0,"cp4B4":0};
+  lbl = {"lbl1": "unnamed", "lbl2": "unnamed", "lbl3": "unnamed", "lbl4": "unnamed"};
 
   constructor(private WebsocketService: WebsocketService) {
     WebsocketService.messages.subscribe(msg => {
@@ -55,44 +53,38 @@ export class AppComponent {
       if(msg['pzem'] != null){
         this.pzem = msg['pzem'];
       }
-      if(msg['dtCyc'] != null){
-        this.dtCyc = msg['dtCyc'];
+      if(msg['cp1A'] != null){
+        this.cp1A = msg['cp1A'];
       }
-      if(msg['dtRng'] != null){
-        this.dtRng = msg['dtRng'];
+      if(msg['cp1B'] != null){
+        this.cp1B = msg['cp1B'];
       }
-      if(msg['dtCycFS'] != null){
-        this.dtCycFS = msg['dtCycFS'];
-      }
-      if(msg['dtRngFS'] != null){
-        this.dtRngFS = msg['dtRngFS'];
-      }
-      if(msg['rlyActDT'] != null){
-        let temp = msg['rlyActDT'];
+      if(msg['cp2A'] != null){
+        let temp = msg['cp2A'];
         for(let i = 1; i <= 4; i++){
           const datepipe: DatePipe = new DatePipe('en-US')
-          let formattedDate = datepipe.transform(temp["rlyActDTCh"+i], 'YYYY-MM-dd HH:mm:ss');
-          temp["rlyActDTCh"+i] = formattedDate;
+          let formattedDate = datepipe.transform(temp["cp2A"+i], 'YYYY-MM-dd HH:mm:ss');
+          temp["cp2A"+i] = formattedDate;
         }
-        this.rlyActDT = temp;
+        this.cp2A = temp;
       }
-      if(msg['rlyActDr'] != null){
-        this.rlyActDr = msg['rlyActDr'];
+      if(msg['cp2B'] != null){
+        this.cp2B = msg['cp2B'];
       }
-      if(msg['rlyActIT'] != null){
-        this.rlyActIT = msg['rlyActIT'];
+      if(msg['cp4A'] != null){
+        this.cp4A = msg['cp4A'];
       }
-      if(msg['rlyActITOn'] != null){
-        this.rlyActITOn = msg['rlyActITOn'];
+      if(msg['cp4B'] != null){
+        this.cp4B = msg['cp4B'];
       }
-      if(msg['rlyCtrlMd'] != null){
-        this.rlyCtrlMd = msg['rlyCtrlMd'];
+      if(msg['cpM'] != null){
+        this.cpM = msg['cpM'];
       }
-      if(msg['label'] != null){
-        this.label = msg['label'];
+      if(msg['lbl'] != null){
+        this.lbl = msg['lbl'];
       }
-      if(msg['rlyActMT'] != null){
-        let temp = msg['rlyActMT'];
+      if(msg['cp3A'] != null){
+        let temp = msg['cp3A'];
         for(let k in temp){
           let item = JSON.parse(temp[k]);
           let param: string = '';
@@ -106,7 +98,7 @@ export class AppComponent {
               param += c;
             }
           }
-          this.rlyActMT[k] = param;
+          this.cp3A[k] = param;
         }
       }
       for(let i = 1; i <= 4; i++){
@@ -121,8 +113,8 @@ export class AppComponent {
     var data = {
       'cmd': 'setSwitch'
     };
-    data['ch'] = 'ch' + this.selectedCh;
-    data['state'] = Number(this.state['ch' + this.selectedCh]);
+    data['ch'] = 'ch' + this.selected;
+    data['state'] = Number(this.state['ch' + this.selected]);
 
     this.WebsocketService.messages.next(data);
 
@@ -132,8 +124,8 @@ export class AppComponent {
     var data = {
       'cmd': 'attr'
     };
-    for(let key in this.label){
-      data[key] = this.label[key];
+    for(let key in this.lbl){
+      data[key] = this.lbl[key];
     }
     this.WebsocketService.messages.next(data);
     data = {
@@ -141,9 +133,10 @@ export class AppComponent {
     };
     data['wssid'] = this.cfg['wssid'];
     data['wpass'] = this.cfg['wpass'];
-    data['httpUname'] = this.cfg['httpUname'];
-    data['httpPass'] = this.cfg['httpPass'];
-    data['useCloud'] = this.cfg['useCloud'];
+    data['htU'] = this.cfg['htU'];
+    data['htP'] = this.cfg['htP'];
+    data['fIoT'] = this.cfg['fIoT'];
+    data['hname'] = this.cfg['hname'];
     this.WebsocketService.messages.next(data);
   }
 
@@ -151,26 +144,31 @@ export class AppComponent {
     var data = {
       'cmd': 'attr',
     };
-    data['dtCycCh'+this.selectedCh] = this.dtCyc['dtCycCh'+this.selectedCh];
-    data['dtRngCh'+this.selectedCh] = this.dtRng['dtRngCh'+this.selectedCh];
-    let ts = new Date(this.rlyActDT['rlyActDTCh'+this.selectedCh]);
-    data['rlyActDTCh'+this.selectedCh] = ts.getTime();
-    data['rlyActDrCh'+this.selectedCh] = this.rlyActDr['rlyActDrCh'+this.selectedCh];
-    data['rlyActITCh'+this.selectedCh] = this.rlyActIT['rlyActITCh'+this.selectedCh];
-    data['rlyACTITOnCh'+this.selectedCh] = this.rlyActITOn['rlyActITOnCh'+this.selectedCh];
-    data['rlyCtrlMdCh'+this.selectedCh] = this.rlyCtrlMd['rlyCtrlMdCh'+this.selectedCh];
-    let rlyActMT = [];
-    let _rlyActMT: object = this.rlyActMT['rlyActMTCh'+this.selectedCh].split(',',24);
-    for(let k in _rlyActMT){
+
+    data['cpM'+this.selected] = this.cpM['cpM'+this.selected];
+    
+    data['cp1A'+this.selected] = this.cp1A['cp1A'+this.selected];
+    data['cp1B'+this.selected] = this.cp1B['cp1B'+this.selected];
+    let ts = new Date(this.cp2A['cp2A'+this.selected]);
+    data['cp2A'+this.selected] = ts.getTime();
+    data['cp2B'+this.selected] = this.cp2B['cp2B'+this.selected];
+
+    let cp3A = [];
+    let _cp3A: object = this.cp3A['cp3A'+this.selected].split(',',24);
+    for(let k in _cp3A){
       let z ={'h': 0, 'i': 0, 's': 0, 'd': 0};
-      let a = _rlyActMT[k].split('-',2);
+      let a = _cp3A[k].split('-',2);
       z['d'] = a[1];
       let b: object = a[0].split(':',3);
       z['h'] = b[0]; z['i'] = b[1]; z['s'] = b[2];
-      rlyActMT.push(z);
+      cp3A.push(z);
     }
 
-    data['rlyActMTCh'+this.selectedCh] = JSON.stringify(rlyActMT);
+    data['cp3A'+this.selected] = JSON.stringify(cp3A);
+
+    data['cp4A'+this.selected] = this.cp4A['cp4A'+this.selected];
+    data['cp4B'+this.selected] = this.cp4B['cp4B'+this.selected];
+
     this.WebsocketService.messages.next(data);
   }
 

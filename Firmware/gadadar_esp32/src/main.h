@@ -63,26 +63,24 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 const char* settingsPath = "/settings.json";
 struct Settings
 {
-    uint8_t rlyCtrlMd[4];
-    uint8_t dtCyc[4];
-    unsigned long dtRng[4];
-    uint8_t dtCycFS[4];
-    unsigned long dtRngFS[4];
-    uint8_t pin[4];
-    String rlyActMT[4];
+    uint8_t cpM[4];
+    uint8_t cp1A[4];
+    unsigned long cp1B[4];
+    uint8_t pR[4];
+    String cp3A[4];
     uint32_t lastUpdated;
     uint8_t ON;
     bool dutyState[4];
     unsigned long stateOnTs[4];
     unsigned long dutyCounter[4];
-    uint16_t intvRecPwrUsg = 900;
-    uint16_t intvRecWthr = 300;
-    uint16_t intvDevTel = 60;
-    uint32_t rlyActDT[4];
-    uint32_t rlyActIT[4];
-    unsigned long rlyActDr[4];
-    unsigned long rlyActITOn[4];
-    unsigned long rlyActITOnTs[4];
+    uint16_t itP = 900;
+    uint16_t itW = 300;
+    uint16_t itD = 60;
+    uint32_t cp2A[4];
+    uint32_t cp4A[4];
+    unsigned long cp2B[4];
+    unsigned long cp4B[4];
+    unsigned long cp4BTs[4];
     bool publishSwitch[4] = {true, true, true, true};
 
     bool flag_bme280 = false;
@@ -100,7 +98,7 @@ struct Settings
     float hpa = 0.0;
     float alt = 0.0;
 
-    char label[4][16];
+    char lbl[4][16];
 };
 
 callbackResponse processSaveConfig(const callbackData &data);
@@ -126,7 +124,7 @@ JsonObject processOnUpdateFinished(const JsonObject &data);
 
 void loadSettings();
 void saveSettings();
-void relayControlBydtCycCb();
+void relayControlBycp1ACb();
 void relayControlByDateTimeCb();
 void relayControlByIntrvlCb();
 void relayControlByMultiTimeCb();

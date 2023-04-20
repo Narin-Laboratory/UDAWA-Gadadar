@@ -3,7 +3,7 @@
  * Firmware for Actuator 4Ch UDAWA Board (Gadadar)
  * Licensed under aGPLv3
  * Researched and developed by PRITA Research Group & Narin Laboratory
- * prita.undiknas.ac.id | narin.co.id
+ * prita.undiknas.ac.itD | narin.co.itD
 **/
 #include "main.h"
 #define S1_TX 32
@@ -26,14 +26,14 @@ Stream_Stats<float> _alt;
 
 Task syncClientAttr(TASK_IMMEDIATE, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
 Task publishSwitchLoop(1 * TASK_SECOND, TASK_FOREVER, &publishSwitchCb, &r, 0, NULL, NULL, 0);
-Task publishDeviceTelemetryLoop(mySettings.intvDevTel * TASK_SECOND, TASK_FOREVER, &publishDeviceTelemetryCb, &r, 0, NULL, NULL, 0);
+Task publishDeviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &publishDeviceTelemetryCb, &r, 0, NULL, NULL, 0);
 Task calcWeatherDataLoop(30 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 0, NULL, NULL, 0);
-Task recWeatherDataLoop(mySettings.intvRecWthr * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL, 0);
+Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL, 0);
 Task calcPowerUsageLoop(1 * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
-Task recPowerUsageLoop(mySettings.intvRecPwrUsg * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
+Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
 Task wsSendTelemetryLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, &wsSendEnable, NULL, 0);
 Task wsSendSensorsLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, &wsSendEnable, NULL, 0);
-Task relayControlBydtCycLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlBydtCycCb, &r, 0, NULL, NULL, 0);
+Task relayControlBycp1ALoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlBycp1ACb, &r, 0, NULL, NULL, 0);
 Task relayControlByDateTimeLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByDateTimeCb, &r, 0, NULL, NULL, 0);
 Task relayControlByIntrvlLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByIntrvlCb, &r, 0, NULL, NULL, 0);
 Task relayControlByMultiTimeLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByMultiTimeCb, &r, 0, NULL, NULL, 0);
@@ -59,12 +59,12 @@ GenericCallback callbacks[callbacksSize] = {
   { "syncClientAttributes", processSyncClientAttributes },
   { "reboot", processReboot },
   { "setSwitch", processSetSwitch },
-  { "getSwitchCh1", processGetSwitchCh1},
-  { "getSwitchCh2", processGetSwitchCh2},
-  { "getSwitchCh3", processGetSwitchCh3},
-  { "getSwitchCh4", processGetSwitchCh4},
+  { "getCh1", processGetSwitchCh1},
+  { "getCh2", processGetSwitchCh2},
+  { "getCh3", processGetSwitchCh3},
+  { "getCh4", processGetSwitchCh4},
   { "setPanic", processSetPanic},
-  { "bridge", processBridge},
+  { "britDge", processBridge},
   { "resetConfig",  processResetConfig},
   { "updateSpiffs", processUpdateSpiffs}
 };
@@ -93,7 +93,7 @@ void setup()
   calcPowerUsageLoop.enable();
   calcWeatherDataLoop.enable();
 
-  relayControlBydtCycLoop.enable();
+  relayControlBycp1ALoop.enable();
   relayControlByDateTimeLoop.enable();
   relayControlByIntrvlLoop.enable();
   relayControlByMultiTimeLoop.enable();
@@ -185,9 +185,6 @@ void calcPowerUsageCb(){
   if(!isnan(PZEM.pf())){
     _pf.Add(PZEM.pf());
   }
-
-  //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f Amp: %.2f Watt %.2f Ener: %.2f Freq. %.2f PF %.2f\n"),
-  //  mySettings.volt, mySettings.amp, mySettings.watt, mySettings.ener, mySettings.freq, mySettings.pf);
 }
 
 void recPowerUsageCb(){
@@ -212,9 +209,6 @@ void recPowerUsageCb(){
 
     tb.sendTelemetryDoc(doc);
     _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
-
-    //log_manager->debug(PSTR(__func__), PSTR("Volt: %.2f Amp: %.2f Watt %.2f Ener: %.2f Freq. %.2f PF %.2f\n"),
-    //mySettings.volt, mySettings._amp, mySettings._watt, mySettings._ener, mySettings._freq, mySettings._pf);
   }
 }
 
@@ -254,235 +248,52 @@ void loadSettings()
   StaticJsonDocument<DOCSIZE> doc;
   readSettings(doc, settingsPath);
 
-  if(doc["dtCyc"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["dtCyc"].as<JsonArray>())
-    {
-        mySettings.dtCyc[index] = v.as<uint8_t>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.dtCyc); i++)
-    {
-        mySettings.dtCyc[i] = 0;
-    }
-  }
+  if(doc["cpM"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cpM"].as<JsonArray>()) { mySettings.cpM[index] = v.as<uint8_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cpM); i++) { mySettings.cpM[i] = 0; } }
 
-  if(doc["dtRng"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["dtRng"].as<JsonArray>())
-    {
-        mySettings.dtRng[index] = v.as<unsigned long>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.dtRng); i++)
-    {
-        mySettings.dtRng[i] = 0;
-    }
-  }
+  if(doc["cp1A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp1A"].as<JsonArray>()) { mySettings.cp1A[index] = v.as<uint8_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp1A); i++) { mySettings.cp1A[i] = 0; } }
 
-  if(doc["dtCycFS"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["dtCycFS"].as<JsonArray>())
-    {
-        mySettings.dtCycFS[index] = v.as<uint8_t>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.dtCycFS); i++)
-    {
-        mySettings.dtCycFS[i] = 0;
-    }
-  }
+  if(doc["cp1B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp1B"].as<JsonArray>()) { mySettings.cp1B[index] = v.as<unsigned long>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp1B); i++) { mySettings.cp1B[i] = 0; } }  
 
-  if(doc["dtRngFS"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["dtRngFS"].as<JsonArray>())
-    {
-        mySettings.dtRngFS[index] = v.as<unsigned long>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.dtRngFS); i++)
-    {
-        mySettings.dtRngFS[i] = 0;
-    }
-  }
+  if(doc["cp2A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp2A"].as<JsonArray>()) { mySettings.cp2A[index] = v.as<unsigned long>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp2A); i++) { mySettings.cp2A[i] = 0; } }
 
-  if(doc["rlyActDT"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["rlyActDT"].as<JsonArray>())
-    {
-        mySettings.rlyActDT[index] = v.as<unsigned long>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.rlyActDT); i++)
-    {
-        mySettings.rlyActDT[i] = 0;
-    }
-  }
+  if(doc["cp2B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp2B"].as<JsonArray>()) { mySettings.cp2B[index] = v.as<unsigned long>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp2B); i++) { mySettings.cp2B[i] = 0; } }
 
-  if(doc["rlyActDr"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["rlyActDr"].as<JsonArray>())
-    {
-        mySettings.rlyActDr[index] = v.as<unsigned long>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.rlyActDr); i++)
-    {
-        mySettings.rlyActDr[i] = 0;
-    }
-  }
+  if(doc["cp3A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp3A"].as<JsonArray>()) { mySettings.cp3A[index] = v.as<String>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp3A); i++) { mySettings.cp3A[i] = "[{}]"; } }
 
-if(doc["rlyActIT"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["rlyActIT"].as<JsonArray>())
-    {
-        mySettings.rlyActIT[index] = v.as<unsigned long>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.rlyActIT); i++)
-    {
-        mySettings.rlyActIT[i] = 0;
-    }
-  }
 
-  if(doc["rlyActITOn"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["rlyActITOn"].as<JsonArray>())
-    {
-        mySettings.rlyActITOn[index] = v.as<unsigned long>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.rlyActITOn); i++)
-    {
-        mySettings.rlyActITOn[i] = 0;
-    }
-  }
+  if(doc["cp4A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp4A"].as<JsonArray>()) { mySettings.cp4A[index] = v.as<unsigned long>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp4A); i++) { mySettings.cp4A[i] = 0; } }
 
-  if(doc["pin"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["pin"].as<JsonArray>())
-    {
-        mySettings.pin[index] = v.as<uint8_t>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.pin); i++)
-    {
-        mySettings.pin[i] = 0;
-    }
-  }
+  if(doc["cp4B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp4B"].as<JsonArray>()) { mySettings.cp4B[index] = v.as<unsigned long>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp4B); i++) { mySettings.cp4B[i] = 0; } }
 
-  if(doc["ON"] != nullptr)
-  {
-    mySettings.ON = doc["ON"].as<uint8_t>();
-  }
-  else
-  {
-    mySettings.ON = 1;
-  }
+  if(doc["pR"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["pR"].as<JsonArray>()) { mySettings.pR[index] = v.as<uint8_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.pR); i++) { mySettings.pR[i] = 0; } }
 
-  if(doc["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = doc["intvRecPwrUsg"].as<uint16_t>();}
-  else{mySettings.intvRecPwrUsg = 900;}
+  if(doc["ON"] != nullptr) { mySettings.ON = doc["ON"].as<uint8_t>(); } else { mySettings.ON = 1; }
 
-  if(doc["intvRecWthr"] != nullptr){mySettings.intvRecWthr = doc["intvRecWthr"].as<uint16_t>();}
-  else{mySettings.intvRecWthr = 300;}
+  if(doc["itP"] != nullptr){mySettings.itP = doc["itP"].as<uint16_t>();}
+  else{mySettings.itP = 900;}
 
-  if(doc["intvDevTel"] != nullptr){mySettings.intvDevTel = doc["intvDevTel"].as<uint16_t>();}
-  else{mySettings.intvDevTel = 60;}
+  if(doc["itW"] != nullptr){mySettings.itW = doc["itW"].as<uint16_t>();}
+  else{mySettings.itW = 300;}
 
-  if(doc["rlyCtrlMd"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["rlyCtrlMd"].as<JsonArray>())
-    {
-        mySettings.rlyCtrlMd[index] = v.as<uint8_t>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.rlyCtrlMd); i++)
-    {
-        mySettings.rlyCtrlMd[i] = 0;
-    }
-  }
+  if(doc["itD"] != nullptr){mySettings.itD = doc["itD"].as<uint16_t>();}
+  else{mySettings.itD = 60;}
 
-  for(uint8_t i = 0; i < countof(mySettings.dutyCounter); i++)
-  {
-    mySettings.dutyCounter[i] = 86400;
-  }
+  for(uint8_t i = 0; i < countof(mySettings.dutyCounter); i++) { mySettings.dutyCounter[i] = 86400; }
 
   if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
   else{mySettings.seaHpa = 1019.00;}
 
-  if(doc["rlyActMT"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["rlyActMT"].as<JsonArray>())
-    {
-        mySettings.rlyActMT[index] = v.as<String>();
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.rlyActMT); i++)
-    {
-        mySettings.rlyActMT[i] = "[{}]";
-    }
-  }
-
-  if(doc["label"] != nullptr)
-  {
-    uint8_t index = 0;
-    for(JsonVariant v : doc["label"].as<JsonArray>())
-    {
-        strlcpy(mySettings.label[index], v.as<const char*>(), sizeof(mySettings.label[index]));
-        index++;
-    }
-  }
-  else
-  {
-    for(uint8_t i = 0; i < countof(mySettings.label); i++)
-    {
-        strlcpy(mySettings.label[i], "unnamed", sizeof(mySettings.label[i]));
-    }
-  }
+  if(doc["lbll"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbll"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.lbl); i++) { strlcpy(mySettings.lbl[i], "unnamed", sizeof(mySettings.lbl[i])); } }
 
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
@@ -493,81 +304,69 @@ void saveSettings()
 {
   StaticJsonDocument<DOCSIZE> doc;
 
-  JsonArray dtCyc = doc.createNestedArray("dtCyc");
-  for(uint8_t i=0; i<countof(mySettings.dtCyc); i++)
+  JsonArray cp1A = doc.createNestedArray("cp1A");
+  for(uint8_t i=0; i<countof(mySettings.cp1A); i++)
   {
-    dtCyc.add(mySettings.dtCyc[i]);
+    cp1A.add(mySettings.cp1A[i]);
   }
 
-  JsonArray dtRng = doc.createNestedArray("dtRng");
-  for(uint8_t i=0; i<countof(mySettings.dtRng); i++)
+  JsonArray cp1B = doc.createNestedArray("cp1B");
+  for(uint8_t i=0; i<countof(mySettings.cp1B); i++)
   {
-    dtRng.add(mySettings.dtRng[i]);
+    cp1B.add(mySettings.cp1B[i]);
   }
 
-  JsonArray dtCycFS = doc.createNestedArray("dtCycFS");
-  for(uint8_t i=0; i<countof(mySettings.dtCycFS); i++)
+  JsonArray cp2A = doc.createNestedArray("cp2A");
+  for(uint8_t i=0; i<countof(mySettings.cp2A); i++)
   {
-    dtCycFS.add(mySettings.dtCycFS[i]);
+    cp2A.add(mySettings.cp2A[i]);
   }
 
-  JsonArray dtRngFS = doc.createNestedArray("dtRngFS");
-  for(uint8_t i=0; i<countof(mySettings.dtRngFS); i++)
+  JsonArray cp2B = doc.createNestedArray("cp2B");
+  for(uint8_t i=0; i<countof(mySettings.cp2B); i++)
   {
-    dtRngFS.add(mySettings.dtRngFS[i]);
+    cp2B.add(mySettings.cp2B[i]);
   }
 
-  JsonArray rlyActDT = doc.createNestedArray("rlyActDT");
-  for(uint8_t i=0; i<countof(mySettings.rlyActDT); i++)
+  JsonArray cp3A = doc.createNestedArray("cp3A");
+  for(uint8_t i=0; i<countof(mySettings.cp3A); i++)
   {
-    rlyActDT.add(mySettings.rlyActDT[i]);
+    cp3A.add(mySettings.cp3A[i]);
   }
 
-  JsonArray rlyActDr = doc.createNestedArray("rlyActDr");
-  for(uint8_t i=0; i<countof(mySettings.rlyActDr); i++)
+  JsonArray cp4A = doc.createNestedArray("cp4A");
+  for(uint8_t i=0; i<countof(mySettings.cp4A); i++)
   {
-    rlyActDr.add(mySettings.rlyActDr[i]);
+    cp4A.add(mySettings.cp4A[i]);
   }
 
-  JsonArray rlyActIT = doc.createNestedArray("rlyActIT");
-  for(uint8_t i=0; i<countof(mySettings.rlyActIT); i++)
+  JsonArray cp4B = doc.createNestedArray("cp4B");
+  for(uint8_t i=0; i<countof(mySettings.cp4B); i++)
   {
-    rlyActIT.add(mySettings.rlyActIT[i]);
+    cp4B.add(mySettings.cp4B[i]);
   }
 
-  JsonArray rlyActITOn = doc.createNestedArray("rlyActITOn");
-  for(uint8_t i=0; i<countof(mySettings.rlyActITOn); i++)
+  JsonArray pR = doc.createNestedArray("pR");
+  for(uint8_t i=0; i<countof(mySettings.pR); i++)
   {
-    rlyActITOn.add(mySettings.rlyActITOn[i]);
+    pR.add(mySettings.pR[i]);
   }
 
-  JsonArray pin = doc.createNestedArray("pin");
-  for(uint8_t i=0; i<countof(mySettings.pin); i++)
+  JsonArray lbl = doc.createNestedArray("lbll");
+  for(uint8_t i=0; i<countof(mySettings.lbl); i++)
   {
-    pin.add(mySettings.pin[i]);
-  }
-
-  JsonArray rlyActMT = doc.createNestedArray("rlyActMT");
-  for(uint8_t i=0; i<countof(mySettings.rlyActMT); i++)
-  {
-    rlyActMT.add(mySettings.rlyActMT[i]);
-  }
-
-  JsonArray label = doc.createNestedArray("label");
-  for(uint8_t i=0; i<countof(mySettings.label); i++)
-  {
-    label.add(mySettings.label[i]);
+    lbl.add(mySettings.lbl[i]);
   }
 
   doc["ON"] = mySettings.ON;
-  doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
-  doc["intvRecWthr"] = mySettings.intvRecWthr;
-  doc["intvDevTel"] = mySettings.intvDevTel;
+  doc["itP"] = mySettings.itP;
+  doc["itW"] = mySettings.itW;
+  doc["itD"] = mySettings.itD;
 
-  JsonArray rlyCtrlMd = doc.createNestedArray("rlyCtrlMd");
-  for(uint8_t i=0; i<countof(mySettings.rlyCtrlMd); i++)
+  JsonArray cpM = doc.createNestedArray("cpM");
+  for(uint8_t i=0; i<countof(mySettings.cpM); i++)
   {
-    rlyCtrlMd.add(mySettings.rlyCtrlMd[i]);
+    cpM.add(mySettings.cpM[i]);
   }
 
   doc["seaHpa"] = mySettings.seaHpa;
@@ -615,13 +414,9 @@ JsonObject processWsEvent(const JsonObject &doc){
     const char* cmd = doc["cmd"].as<const char*>();
     if(strcmp(cmd, (const char*) "attr") == 0){
       processSharedAttributesUpdate(doc);
-      if(tb.connected()){
-        doc.remove("cmd");
-        doc.remove("evType");
-        StaticJsonDocument<DOCSIZE_MIN> tele;
-        tele = doc;
-        tb.sendAttributeDoc(tele);
-      }
+      syncClientAttr.setInterval(TASK_IMMEDIATE);
+      syncClientAttr.setIterations(TASK_ONCE);
+      syncClientAttr.enable();
     }
     else if(strcmp(cmd, (const char*) "saveSettings") == 0){
       saveSettings();
@@ -770,21 +565,21 @@ callbackResponse processSetPanic(const callbackData &data)
   doc["method"] = "sCfg";
   String state = data["params"]["state"].as<String>();
   if(state == String("ON")){
-    doc["fPanic"] = 1;
-    configcomcu.fPanic = 1;
+    doc["fP"] = 1;
+    configcomcu.fP = 1;
 
-    mySettings.rlyCtrlMd[0] = 0;
-    mySettings.rlyCtrlMd[1] = 0;
-    mySettings.rlyCtrlMd[2] = 0;
-    mySettings.rlyCtrlMd[3] = 0;
+    mySettings.cpM[0] = 0;
+    mySettings.cpM[1] = 0;
+    mySettings.cpM[2] = 0;
+    mySettings.cpM[3] = 0;
     setSwitch("ch1", "OFF");
     setSwitch("ch2", "OFF");
     setSwitch("ch3", "OFF");
     setSwitch("ch4", "OFF");
   }
   else{
-    doc["fPanic"] = 0;
-    configcomcu.fPanic = 0;
+    doc["fP"] = 0;
+    configcomcu.fP = 0;
   }
   serialWriteToCoMcu(doc, 0);
   syncClientAttr.setInterval(TASK_IMMEDIATE);
@@ -802,7 +597,7 @@ callbackResponse processBridge(const callbackData &data)
     serialWriteToCoMcu(doc, 1);
     String result;
     serializeJson(doc, result);
-    return callbackResponse("bridge", result.c_str());
+    return callbackResponse("britDge", result.c_str());
   }
   else if(doc["method"] == "resetPZEM"){
     HardwareSerial PZEMSerial(1);
@@ -814,7 +609,7 @@ callbackResponse processBridge(const callbackData &data)
     serialWriteToCoMcu(doc, 0);
     String result;
     serializeJson(doc, result);
-    return callbackResponse("bridge", result.c_str());
+    return callbackResponse("britDge", result.c_str());
   }
 }
 
@@ -838,119 +633,74 @@ callbackResponse processResetConfig(const callbackData &data){
 void setSwitch(String ch, String state)
 {
   bool fState = 0;
-  uint8_t pin = 0;
-  uint8_t id = 0;
+  uint8_t pR = 0;
+  uint8_t itD = 0;
 
-  if(ch == String("ch1")){id = 0; pin = mySettings.pin[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
-  else if(ch == String("ch2")){id = 1; pin = mySettings.pin[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
-  else if(ch == String("ch3")){id = 2; pin = mySettings.pin[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
-  else if(ch == String("ch4")){id = 3; pin = mySettings.pin[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
+  if(ch == String("ch1")){itD = 0; pR = mySettings.pR[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
+  else if(ch == String("ch2")){itD = 1; pR = mySettings.pR[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
+  else if(ch == String("ch3")){itD = 2; pR = mySettings.pR[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
+  else if(ch == String("ch4")){itD = 3; pR = mySettings.pR[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
 
   if(state == String("ON"))
   {
     fState = mySettings.ON;
-    mySettings.stateOnTs[id] = millis();
+    mySettings.stateOnTs[itD] = millis();
   }
   else
   {
     fState = 1 - mySettings.ON;
-    mySettings.stateOnTs[id] = 0;
+    mySettings.stateOnTs[itD] = 0;
   }
 
-  setCoMCUPin(pin, 1, OUTPUT, 0, fState);
+  setCoMCUPin(pR, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
 }
 
 void relayControlByDateTimeCb(){
-  for(uint8_t i = 0; i < countof(mySettings.pin); i++)
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
-    if(mySettings.rlyActDr[i] > 0 && mySettings.rlyCtrlMd[i] == 2){
-      if(mySettings.rlyActDT[i] <= (rtc.getEpoch()) && (mySettings.rlyActDr[i]) >=
-        (rtc.getEpoch() - mySettings.rlyActDT[i]) && mySettings.dutyState[i] != mySettings.ON){
+    if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
+      if(mySettings.cp2A[i] <= (rtc.getEpoch()) && (mySettings.cp2B[i]) >=
+        (rtc.getEpoch() - mySettings.cp2A[i]) && mySettings.dutyState[i] != mySettings.ON){
           mySettings.dutyState[i] = mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "ON");
-          log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d changed to %d - ts:%d - tr:%d - exp:%d\n"), i+1,
-            mySettings.dutyState[i], mySettings.rlyActDT[i], mySettings.rlyActDr[i],
-            mySettings.rlyActDr[i] - (rtc.getEpoch() - mySettings.rlyActDT[i]));
       }
-      else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.rlyActDr[i]) <=
-        (rtc.getEpoch() - mySettings.rlyActDT[i])){
+      else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.cp2B[i]) <=
+        (rtc.getEpoch() - mySettings.cp2A[i])){
           mySettings.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
-          log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d changed to %d - ts:%d - tr:%d - exp:%d\n"), i+1,
-            mySettings.dutyState[i], mySettings.rlyActDT[i], mySettings.rlyActDr[i],
-            mySettings.rlyActDr[i] - (rtc.getEpoch() - mySettings.rlyActDT[i]));
-      }
-    }
-    else if(mySettings.rlyActDr[i] > 0 && mySettings.rlyCtrlMd[i] == 3){
-      int currHour = rtc.getHour(true);
-      int currMinute = rtc.getMinute();
-      int currSecond = rtc.getSecond();
-      String currDT = rtc.getDateTime();
-      int currentTimeInSec = (currHour * 60 * 60) + (currMinute * 60) + currSecond;
-
-      long rlyActDT = mySettings.rlyActDT[i] + config.gmtOffset;
-      int targetHour = hour(rlyActDT);
-      int targetMinute = minute(rlyActDT);
-      int targetSecond = second(rlyActDT);
-      char targetDT[32];
-      sprintf(targetDT, "%02d.%02d.%02d %02d:%02d:%02d", day(rlyActDT), month(rlyActDT),
-        year(rlyActDT), hour(rlyActDT), minute(rlyActDT), second(rlyActDT));
-      int targetTimeInSec = (targetHour * 60 * 60) + (targetMinute * 60) + targetSecond;
-
-      if(targetTimeInSec <= currentTimeInSec && (mySettings.rlyActDr[i]) >=
-        (currentTimeInSec - targetTimeInSec) && mySettings.dutyState[i] != mySettings.ON){
-          mySettings.dutyState[i] = mySettings.ON;
-          String ch = "ch" + String(i+1);
-          setSwitch(ch, "ON");
-          log_manager->debug(PSTR(__func__),PSTR("currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
-            mySettings.dutyState[i], currentTimeInSec, currHour, currMinute, currSecond, currDT.c_str(), rtc.getEpoch(),
-            targetTimeInSec, targetHour, targetMinute, targetSecond, targetDT, rlyActDT,
-            mySettings.rlyActDr[i], mySettings.rlyActDr[i] - (currentTimeInSec - targetTimeInSec));
-      }
-      else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.rlyActDr[i]) <=
-        (currentTimeInSec - targetTimeInSec)){
-          mySettings.dutyState[i] = 1 - mySettings.ON;
-          String ch = "ch" + String(i+1);
-          setSwitch(ch, "OFF");
-          log_manager->debug(PSTR(__func__),PSTR("currentTimeInSec:%d (%d:%d:%d - %s - %d) targetTimeInSec:%d (%d:%d:%d - %s - %d) - rlyActDr:%d - exp:%d\n"), i+1,
-            mySettings.dutyState[i], currentTimeInSec, currHour, currMinute, currSecond, currDT.c_str(), rtc.getEpoch(),
-            targetTimeInSec, targetHour, targetMinute, targetSecond, targetDT, rlyActDT,
-            mySettings.rlyActDr[i], mySettings.rlyActDr[i] - (currentTimeInSec - targetTimeInSec));
       }
     }
   }
 }
 
-void relayControlBydtCycCb()
+void relayControlBycp1ACb()
 {
-  for(uint8_t i = 0; i < countof(mySettings.pin); i++)
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
-    if (mySettings.dtRng[i] < 2){mySettings.dtRng[i] = 2;} //safenet
-    if(mySettings.dtCyc[i] != 0 && mySettings.rlyCtrlMd[i] == 1)
+    if (mySettings.cp1B[i] < 2){mySettings.cp1B[i] = 2;} //safenet
+    if(mySettings.cp1A[i] != 0 && mySettings.cpM[i] == 1)
     {
       if( mySettings.dutyState[i] == mySettings.ON )
       {
-        if( mySettings.dtCyc[i] != 100 && (millis() - mySettings.dutyCounter[i] ) >= (float)(( ((float)mySettings.dtCyc[i] / 100) * (float)mySettings.dtRng[i]) * 1000))
+        if( mySettings.cp1A[i] != 100 && (millis() - mySettings.dutyCounter[i] ) >= (float)(( ((float)mySettings.cp1A[i] / 100) * (float)mySettings.cp1B[i]) * 1000))
         {
           mySettings.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
           mySettings.dutyCounter[i] = millis();
-          log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d has changed to %d - dtCyc:%d - dtRng:%ld\n"), i+1, mySettings.dutyState[i], mySettings.dtCyc[i], mySettings.dtRng[i]);
         }
       }
       else
       {
-        if( mySettings.dtCyc[i] != 0 && (millis() - mySettings.dutyCounter[i] ) >= (float) ( ((100 - (float) mySettings.dtCyc[i]) / 100) * (float) mySettings.dtRng[i]) * 1000)
+        if( mySettings.cp1A[i] != 0 && (millis() - mySettings.dutyCounter[i] ) >= (float) ( ((100 - (float) mySettings.cp1A[i]) / 100) * (float) mySettings.cp1B[i]) * 1000)
         {
           mySettings.dutyState[i] = mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "ON");
           mySettings.dutyCounter[i] = millis();
-          log_manager->debug(PSTR(__func__),PSTR("Relay Ch%d has changed to %d - dtCyc:%d - dtRng:%ld\n"), i+1, mySettings.dutyState[i], mySettings.dtCyc[i], mySettings.dtRng[i]);
         }
       }
     }
@@ -958,36 +708,32 @@ void relayControlBydtCycCb()
 }
 
 void relayControlByIntrvlCb(){
-  for(uint8_t i = 0; i < countof(mySettings.pin); i++)
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
-    if(mySettings.rlyActIT[i] != 0 && mySettings.rlyActITOn[i] != 0 && mySettings.rlyCtrlMd[i] == 4)
+    if(mySettings.cp4A[i] != 0 && mySettings.cp4B[i] != 0 && mySettings.cpM[i] == 4)
     {
-      if( mySettings.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.rlyActITOnTs[i]) > (mySettings.rlyActIT[i] * 1000) ){
+      if( mySettings.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4A[i] * 1000) ){
         mySettings.dutyState[i] = mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "ON");
-        mySettings.rlyActITOnTs[i] = millis();
-        log_manager->debug(PSTR(__func__), PSTR("Relay Ch%d has changed to %d - rlyActIT:%d - rlyActITOn:%d\n"), i+1, mySettings.dutyState[i],
-          mySettings.rlyActIT[i], mySettings.rlyActITOn[i]);
+        mySettings.cp4BTs[i] = millis();
       }
-      if( mySettings.dutyState[i] == mySettings.ON && (millis() - mySettings.rlyActITOnTs[i]) > (mySettings.rlyActITOn[i] * 1000) ){
+      if( mySettings.dutyState[i] == mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4B[i] * 1000) ){
         mySettings.dutyState[i] = 1 - mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "OFF");
-        log_manager->debug(PSTR(__func__), PSTR("Relay Ch%d has changed to %d - rlyActIT:%d - rlyActITOn:%d\n"), i+1, mySettings.dutyState[i],
-          mySettings.rlyActIT[i], mySettings.rlyActITOn[i]);
       }
     }
   }
 }
 
 void relayControlByMultiTimeCb(){
-  for(uint8_t i = 0; i < countof(mySettings.pin); i++){
-    if(mySettings.rlyCtrlMd[i] == 6){
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++){
+    if(mySettings.cpM[i] == 3){
       StaticJsonDocument<DOCSIZE_MIN> doc;
-      DeserializationError error = deserializeJson(doc, mySettings.rlyActMT[i]);
+      DeserializationError error = deserializeJson(doc, mySettings.cp3A[i]);
       if(error != DeserializationError::Ok){
-        log_manager->warn(PSTR(__func__),PSTR("Failed to parse JSON for CH%d: %s\n"),i+1, mySettings.rlyActMT[i].c_str());
+        log_manager->warn(PSTR(__func__),PSTR("Failed to parse JSON for CH%d: %s\n"),i+1, mySettings.cp3A[i].c_str());
         delay(1000);
         break;
       }
@@ -1003,7 +749,7 @@ void relayControlByMultiTimeCb(){
         String currDT = rtc.getDateTime();
         int currentTimeInSec = currHourToSec + currMinuteToSec + currSecond;
 
-        int rlyActDT = v["d"].as<int>();
+        int d = v["d"].as<int>();
         int targetHour = v["h"].as<int>();
         int targetHourToSec = targetHour * 3600;
         int targetMinute = v["i"].as<int>();
@@ -1012,7 +758,7 @@ void relayControlByMultiTimeCb(){
         int targetTimeInSec = targetHourToSec + targetMinuteToSec + targetSecond;
 
         int activationOffset = targetTimeInSec - currentTimeInSec;
-        int deactivationOffset = activationOffset + rlyActDT;
+        int deactivationOffset = activationOffset + d;
         int activeTimeWindow = deactivationOffset - activationOffset;
         flag_isInTimeWindow = ( activationOffset <= 0 && deactivationOffset >= 0 ) ? true : false;
         const char * isInTimeWindow = flag_isInTimeWindow ? "TRUE" : "FALSE";
@@ -1025,12 +771,10 @@ void relayControlByMultiTimeCb(){
         mySettings.dutyState[i] = mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "ON");
-        log_manager->info(PSTR(__func__), PSTR("%d ActiveTimeWindow found, turning ON switch: %s\n"), activeTimeWindowCounter, ch.c_str());
       }else if(mySettings.dutyState[i] == mySettings.ON && activeTimeWindowCounter < 1) {
         mySettings.dutyState[i] = 1 - mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "OFF");
-        log_manager->info(PSTR(__func__), PSTR("No ActiveTimeWindow found, turning OFF switch: %s\n"), ch.c_str());
       }
     }
   }
@@ -1051,142 +795,132 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["dssid"] != nullptr){strlcpy(config.dssid, data["dssid"].as<const char*>(), sizeof(config.dssid));}
   if(data["dpass"] != nullptr){strlcpy(config.dpass, data["dpass"].as<const char*>(), sizeof(config.dpass));}
   if(data["upass"] != nullptr){strlcpy(config.upass, data["upass"].as<const char*>(), sizeof(config.upass));}
-  if(data["accessToken"] != nullptr){strlcpy(config.accessToken, data["accessToken"].as<const char*>(), sizeof(config.accessToken));}
-  if(data["provisionDeviceKey"] != nullptr){strlcpy(config.provisionDeviceKey, data["provisionDeviceKey"].as<const char*>(), sizeof(config.provisionDeviceKey));}
-  if(data["provisionDeviceSecret"] != nullptr){strlcpy(config.provisionDeviceSecret, data["provisionDeviceSecret"].as<const char*>(), sizeof(config.provisionDeviceSecret));}
+  if(data["accTkn"] != nullptr){strlcpy(config.accTkn, data["accTkn"].as<const char*>(), sizeof(config.accTkn));}
+  if(data["provDK"] != nullptr){strlcpy(config.provDK, data["provDK"].as<const char*>(), sizeof(config.provDK));}
+  if(data["provDS"] != nullptr){strlcpy(config.provDS, data["provDS"].as<const char*>(), sizeof(config.provDS));}
   if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>(); log_manager->set_log_level(PSTR("*"), (LogLevel) config.logLev);;}
-  if(data["gmtOffset"] != nullptr){config.gmtOffset = data["gmtOffset"].as<int>();}
-  if(data["useCloud"] != nullptr){config.useCloud = data["useCloud"].as<int>();}
-  if(data["httpUname"] != nullptr){strlcpy(config.httpUname, data["httpUname"].as<const char*>(), sizeof(config.httpUname));}
-  if(data["httpPass"] != nullptr){strlcpy(config.httpPass, data["httpPass"].as<const char*>(), sizeof(config.httpPass));}
-  if(data["useWiFiOta"] != nullptr){config.useWiFiOta = data["useWiFiOta"].as<bool>();}
-  if(data["useWebIface"] != nullptr){config.useWebIface = data["useWebIface"].as<bool>();}
-  if(data["hostname"] != nullptr){strlcpy(config.hostname, data["hostname"].as<const char*>(), sizeof(config.hostname));}
+  if(data["gmtOff"] != nullptr){config.gmtOff = data["gmtOff"].as<int>();}
+  if(data["fIot"] != nullptr){config.fIot = data["fIot"].as<int>();}
+  if(data["htU"] != nullptr){strlcpy(config.htU, data["htU"].as<const char*>(), sizeof(config.htU));}
+  if(data["htP"] != nullptr){strlcpy(config.htP, data["htP"].as<const char*>(), sizeof(config.htP));}
+  if(data["fWOTA"] != nullptr){config.fWOTA = data["fWOTA"].as<bool>();}
+  if(data["fIface"] != nullptr){config.fIface = data["fIface"].as<bool>();}
+  if(data["hname"] != nullptr){strlcpy(config.hname, data["hname"].as<const char*>(), sizeof(config.hname));}
 
 
-  if(data["dtCycCh1"] != nullptr)
+  if(data["cp1A1"] != nullptr)
   {
-    mySettings.dtCyc[0] = data["dtCycCh1"].as<uint8_t>();
-    if(data["dtCycCh1"].as<uint8_t>() == 0)
+    mySettings.cp1A[0] = data["cp1A1"].as<uint8_t>();
+    if(data["cp1A1"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch1"), String("OFF"));
     }
   }
-  if(data["dtCycCh2"] != nullptr)
+  if(data["cp1A2"] != nullptr)
   {
-    mySettings.dtCyc[1] = data["dtCycCh2"].as<uint8_t>();
-    if(data["dtCycCh2"].as<uint8_t>() == 0)
+    mySettings.cp1A[1] = data["cp1A2"].as<uint8_t>();
+    if(data["cp1A2"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch2"), String("OFF"));
     }
   }
-  if(data["dtCycCh3"] != nullptr)
+  if(data["cp1A3"] != nullptr)
   {
-    mySettings.dtCyc[2] = data["dtCycCh3"].as<uint8_t>();
-    if(data["dtCycCh3"].as<uint8_t>() == 0)
+    mySettings.cp1A[2] = data["cp1A3"].as<uint8_t>();
+    if(data["cp1A3"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch3"), String("OFF"));
     }
   }
-  if(data["dtCycCh4"] != nullptr)
+  if(data["cp1A4"] != nullptr)
   {
-    mySettings.dtCyc[3] = data["dtCycCh4"].as<uint8_t>();
-    if(data["dtCycCh4"].as<uint8_t>() == 0)
+    mySettings.cp1A[3] = data["cp1A4"].as<uint8_t>();
+    if(data["cp1A4"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch4"), String("OFF"));
     }
   }
 
-  if(data["dtRngCh1"] != nullptr){mySettings.dtRng[0] = data["dtRngCh1"].as<unsigned long>();}
-  if(data["dtRngCh2"] != nullptr){mySettings.dtRng[1] = data["dtRngCh2"].as<unsigned long>();}
-  if(data["dtRngCh3"] != nullptr){mySettings.dtRng[2] = data["dtRngCh3"].as<unsigned long>();}
-  if(data["dtRngCh4"] != nullptr){mySettings.dtRng[3] = data["dtRngCh4"].as<unsigned long>();}
+  if(data["cp1B1"] != nullptr){mySettings.cp1B[0] = data["cp1B1"].as<unsigned long>();}
+  if(data["cp1B2"] != nullptr){mySettings.cp1B[1] = data["cp1B2"].as<unsigned long>();}
+  if(data["cp1B3"] != nullptr){mySettings.cp1B[2] = data["cp1B3"].as<unsigned long>();}
+  if(data["cp1B4"] != nullptr){mySettings.cp1B[3] = data["cp1B4"].as<unsigned long>();}
 
-  if(data["dtCycFSCh1"] != nullptr){mySettings.dtCycFS[0] = data["dtCycFSCh1"].as<uint8_t>();}
-  if(data["dtCycFSCh2"] != nullptr){mySettings.dtCycFS[1] = data["dtCycFSCh2"].as<uint8_t>();}
-  if(data["dtCycFSCh3"] != nullptr){mySettings.dtCycFS[2] = data["dtCycFSCh3"].as<uint8_t>();}
-  if(data["dtCycFSCh4"] != nullptr){mySettings.dtCycFS[3] = data["dtCycFSCh4"].as<uint8_t>();}
+  if(data["cp3A1"] != nullptr){mySettings.cp3A[0] = data["cp3A1"].as<String>();}
+  if(data["cp3A2"] != nullptr){mySettings.cp3A[1] = data["cp3A2"].as<String>();}
+  if(data["cp3A3"] != nullptr){mySettings.cp3A[2] = data["cp3A3"].as<String>();}
+  if(data["cp3A4"] != nullptr){mySettings.cp3A[3] = data["cp3A4"].as<String>();}
 
-  if(data["dtRngFSCh1"] != nullptr){mySettings.dtRngFS[0] = data["dtRngFSCh1"].as<unsigned long>();}
-  if(data["dtRngFSCh2"] != nullptr){mySettings.dtRngFS[1] = data["dtRngFSCh2"].as<unsigned long>();}
-  if(data["dtRngFSCh3"] != nullptr){mySettings.dtRngFS[2] = data["dtRngFSCh3"].as<unsigned long>();}
-  if(data["dtRngFSCh4"] != nullptr){mySettings.dtRngFS[3] = data["dtRngFSCh4"].as<unsigned long>();}
-
-  if(data["rlyActMTCh1"] != nullptr){mySettings.rlyActMT[0] = data["rlyActMTCh1"].as<String>();}
-  if(data["rlyActMTCh2"] != nullptr){mySettings.rlyActMT[1] = data["rlyActMTCh2"].as<String>();}
-  if(data["rlyActMTCh3"] != nullptr){mySettings.rlyActMT[2] = data["rlyActMTCh3"].as<String>();}
-  if(data["rlyActMTCh4"] != nullptr){mySettings.rlyActMT[3] = data["rlyActMTCh4"].as<String>();}
-
-  if(data["rlyActDTCh1"] != nullptr){
-    uint64_t micro = data["rlyActDTCh1"].as<uint64_t>();
+  if(data["cp2A1"] != nullptr){
+    uint64_t micro = data["cp2A1"].as<uint64_t>();
     uint32_t micro_high = micro >> 32;
     uint32_t micro_low = micro & MAX_INT;
-    mySettings.rlyActDT[0] = micro2milli(micro_high, micro_low);
+    mySettings.cp2A[0] = micro2milli(micro_high, micro_low);
   }
-  if(data["rlyActDTCh2"] != nullptr){
-    uint64_t micro = data["rlyActDTCh2"].as<uint64_t>();
+  if(data["cp2A2"] != nullptr){
+    uint64_t micro = data["cp2A2"].as<uint64_t>();
     uint32_t micro_high = micro >> 32;
     uint32_t micro_low = micro & MAX_INT;
-    mySettings.rlyActDT[1] = micro2milli(micro_high, micro_low);
+    mySettings.cp2A[1] = micro2milli(micro_high, micro_low);
   }
-  if(data["rlyActDTCh3"] != nullptr){
-    uint64_t micro = data["rlyActDTCh3"].as<uint64_t>();
+  if(data["cp2A3"] != nullptr){
+    uint64_t micro = data["cp2A3"].as<uint64_t>();
     uint32_t micro_high = micro >> 32;
     uint32_t micro_low = micro & MAX_INT;
-    mySettings.rlyActDT[2] = micro2milli(micro_high, micro_low);
+    mySettings.cp2A[2] = micro2milli(micro_high, micro_low);
   }
-  if(data["rlyActDTCh4"] != nullptr){
-    uint64_t micro = data["rlyActDTCh4"].as<uint64_t>();
+  if(data["cp2A4"] != nullptr){
+    uint64_t micro = data["cp2A4"].as<uint64_t>();
     uint32_t micro_high = micro >> 32;
     uint32_t micro_low = micro & MAX_INT;
-    mySettings.rlyActDT[3] = micro2milli(micro_high, micro_low);
+    mySettings.cp2A[3] = micro2milli(micro_high, micro_low);
   }
 
-  if(data["rlyActDrCh1"] != nullptr){mySettings.rlyActDr[0] = data["rlyActDrCh1"].as<unsigned long>();}
-  if(data["rlyActDrCh2"] != nullptr){mySettings.rlyActDr[1] = data["rlyActDrCh2"].as<unsigned long>();}
-  if(data["rlyActDrCh3"] != nullptr){mySettings.rlyActDr[2] = data["rlyActDrCh3"].as<unsigned long>();}
-  if(data["rlyActDrCh4"] != nullptr){mySettings.rlyActDr[3] = data["rlyActDrCh4"].as<unsigned long>();}
+  if(data["cp2B1"] != nullptr){mySettings.cp2B[0] = data["cp2B1"].as<unsigned long>();}
+  if(data["cp2B2"] != nullptr){mySettings.cp2B[1] = data["cp2B2"].as<unsigned long>();}
+  if(data["cp2B3"] != nullptr){mySettings.cp2B[2] = data["cp2B3"].as<unsigned long>();}
+  if(data["cp2B4"] != nullptr){mySettings.cp2B[3] = data["cp2B4"].as<unsigned long>();}
 
-  if(data["rlyActITCh1"] != nullptr){mySettings.rlyActIT[0] = data["rlyActITCh1"].as<unsigned long>();}
-  if(data["rlyActITCh2"] != nullptr){mySettings.rlyActIT[1] = data["rlyActITCh2"].as<unsigned long>();}
-  if(data["rlyActITCh3"] != nullptr){mySettings.rlyActIT[2] = data["rlyActITCh3"].as<unsigned long>();}
-  if(data["rlyActITCh4"] != nullptr){mySettings.rlyActIT[3] = data["rlyActITCh4"].as<unsigned long>();}
+  if(data["cp4A1"] != nullptr){mySettings.cp4A[0] = data["cp4A1"].as<unsigned long>();}
+  if(data["cp4A2"] != nullptr){mySettings.cp4A[1] = data["cp4A2"].as<unsigned long>();}
+  if(data["cp4A3"] != nullptr){mySettings.cp4A[2] = data["cp4A3"].as<unsigned long>();}
+  if(data["cp4A4"] != nullptr){mySettings.cp4A[3] = data["cp4A4"].as<unsigned long>();}
 
-  if(data["rlyActITOnCh1"] != nullptr){mySettings.rlyActITOn[0] = data["rlyActITOnCh1"].as<unsigned long>();}
-  if(data["rlyActITOnCh2"] != nullptr){mySettings.rlyActITOn[1] = data["rlyActITOnCh2"].as<unsigned long>();}
-  if(data["rlyActITOnCh3"] != nullptr){mySettings.rlyActITOn[2] = data["rlyActITOnCh3"].as<unsigned long>();}
-  if(data["rlyActITOnCh4"] != nullptr){mySettings.rlyActITOn[3] = data["rlyActITOnCh4"].as<unsigned long>();}
+  if(data["cp4B1"] != nullptr){mySettings.cp4B[0] = data["cp4B1"].as<unsigned long>();}
+  if(data["cp4B2"] != nullptr){mySettings.cp4B[1] = data["cp4B2"].as<unsigned long>();}
+  if(data["cp4B3"] != nullptr){mySettings.cp4B[2] = data["cp4B3"].as<unsigned long>();}
+  if(data["cp4B4"] != nullptr){mySettings.cp4B[3] = data["cp4B4"].as<unsigned long>();}
 
-  if(data["pinCh1"] != nullptr){mySettings.pin[0] = data["pinCh1"].as<uint8_t>();}
-  if(data["pinCh2"] != nullptr){mySettings.pin[1] = data["pinCh2"].as<uint8_t>();}
-  if(data["pinCh3"] != nullptr){mySettings.pin[2] = data["pinCh3"].as<uint8_t>();}
-  if(data["pinCh4"] != nullptr){mySettings.pin[3] = data["pinCh4"].as<uint8_t>();}
+  if(data["pR1"] != nullptr){mySettings.pR[0] = data["pR1"].as<uint8_t>();}
+  if(data["pR2"] != nullptr){mySettings.pR[1] = data["pR2"].as<uint8_t>();}
+  if(data["pR3"] != nullptr){mySettings.pR[2] = data["pR3"].as<uint8_t>();}
+  if(data["pR4"] != nullptr){mySettings.pR[3] = data["pR4"].as<uint8_t>();}
 
   if(data["ON"] != nullptr){mySettings.ON = data["ON"].as<bool>();}
-  if(data["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = data["intvRecPwrUsg"].as<uint16_t>();}
-  if(data["intvRecWthr"] != nullptr){mySettings.intvRecWthr = data["intvRecWthr"].as<uint16_t>();}
-  if(data["intvDevTel"] != nullptr){mySettings.intvDevTel = data["intvDevTel"].as<uint16_t>();}
+  if(data["itP"] != nullptr){mySettings.itP = data["itP"].as<uint16_t>();}
+  if(data["itW"] != nullptr){mySettings.itW = data["itW"].as<uint16_t>();}
+  if(data["itD"] != nullptr){mySettings.itD = data["itD"].as<uint16_t>();}
 
-  if(data["rlyCtrlMdCh1"] != nullptr){mySettings.rlyCtrlMd[0] = data["rlyCtrlMdCh1"].as<uint8_t>();}
-  if(data["rlyCtrlMdCh2"] != nullptr){mySettings.rlyCtrlMd[1] = data["rlyCtrlMdCh2"].as<uint8_t>();}
-  if(data["rlyCtrlMdCh3"] != nullptr){mySettings.rlyCtrlMd[2] = data["rlyCtrlMdCh3"].as<uint8_t>();}
-  if(data["rlyCtrlMdCh4"] != nullptr){mySettings.rlyCtrlMd[3] = data["rlyCtrlMdCh4"].as<uint8_t>();}
+  if(data["cpM1"] != nullptr){mySettings.cpM[0] = data["cpM1"].as<uint8_t>();}
+  if(data["cpM2"] != nullptr){mySettings.cpM[1] = data["cpM2"].as<uint8_t>();}
+  if(data["cpM3"] != nullptr){mySettings.cpM[2] = data["cpM3"].as<uint8_t>();}
+  if(data["cpM4"] != nullptr){mySettings.cpM[3] = data["cpM4"].as<uint8_t>();}
 
-  if(data["labelCh1"] != nullptr){strlcpy(mySettings.label[0], data["labelCh1"].as<const char*>(), sizeof(mySettings.label[0]));}
-  if(data["labelCh2"] != nullptr){strlcpy(mySettings.label[1], data["labelCh2"].as<const char*>(), sizeof(mySettings.label[1]));}
-  if(data["labelCh3"] != nullptr){strlcpy(mySettings.label[2], data["labelCh3"].as<const char*>(), sizeof(mySettings.label[2]));}
-  if(data["labelCh4"] != nullptr){strlcpy(mySettings.label[3], data["labelCh4"].as<const char*>(), sizeof(mySettings.label[3]));}
+  if(data["lbl1"] != nullptr){strlcpy(mySettings.lbl[0], data["lbl1"].as<const char*>(), sizeof(mySettings.lbl[0]));}
+  if(data["lbl2"] != nullptr){strlcpy(mySettings.lbl[1], data["lbl2"].as<const char*>(), sizeof(mySettings.lbl[1]));}
+  if(data["lbl3"] != nullptr){strlcpy(mySettings.lbl[2], data["lbl3"].as<const char*>(), sizeof(mySettings.lbl[2]));}
+  if(data["lbl4"] != nullptr){strlcpy(mySettings.lbl[3], data["lbl4"].as<const char*>(), sizeof(mySettings.lbl[3]));}
 
   if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
 
-  if(data["fPanic"] != nullptr){configcomcu.fPanic = data["fPanic"].as<bool>();}
-  if(data["bfreq"] != nullptr){configcomcu.bfreq = data["bfreq"].as<uint16_t>();}
-  if(data["fBuzz"] != nullptr){configcomcu.fBuzz = data["fBuzz"].as<bool>();}
-  if(data["pinBuzzer"] != nullptr){configcomcu.pinBuzzer = data["pinBuzzer"].as<uint8_t>();}
-  if(data["pinLedR"] != nullptr){configcomcu.pinLedR = data["pinLedR"].as<uint8_t>();}
-  if(data["pinLedG"] != nullptr){configcomcu.pinLedG = data["pinLedG"].as<uint8_t>();}
-  if(data["pinLedB"] != nullptr){configcomcu.pinLedB = data["pinLedB"].as<uint8_t>();}
-  if(data["ledON"] != nullptr){configcomcu.ledON = data["ledON"].as<uint8_t>();}
+  if(data["fP"] != nullptr){configcomcu.fP = data["fP"].as<bool>();}
+  if(data["bFr"] != nullptr){configcomcu.bFr = data["bFr"].as<uint16_t>();}
+  if(data["fB"] != nullptr){configcomcu.fB = data["fB"].as<bool>();}
+  if(data["pBz"] != nullptr){configcomcu.pBz = data["pBz"].as<uint8_t>();}
+  if(data["pLR"] != nullptr){configcomcu.pLR = data["pLR"].as<uint8_t>();}
+  if(data["pLG"] != nullptr){configcomcu.pLG = data["pLG"].as<uint8_t>();}
+  if(data["pLB"] != nullptr){configcomcu.pLB = data["pLB"].as<uint8_t>();}
+  if(data["lON"] != nullptr){configcomcu.lON = data["lON"].as<uint8_t>();}
 
 
   if(data["cmd"] == nullptr){
@@ -1211,9 +945,9 @@ void syncClientAttributes()
   tb.sendAttributeDoc(doc);
   doc.clear();
   doc["apmac"] = WiFi.softAPmacAddress();
-  doc["flashFree"] = ESP.getFreeSketchSpace();
-  doc["firmwareSize"] = ESP.getSketchSize();
-  doc["flashSize"] = ESP.getFlashChipSize();
+  doc["flFree"] = ESP.getFreeSketchSpace();
+  doc["fwSize"] = ESP.getSketchSize();
+  doc["flSize"] = ESP.getFlashChipSize();
   doc["sdkVer"] = ESP.getSdkVersion();
   tb.sendAttributeDoc(doc);
   doc.clear();
@@ -1229,113 +963,101 @@ void syncClientAttributes()
   doc["dssid"] = config.dssid;
   doc["dpass"] = config.dpass;
   doc["upass"] = config.upass;
-  doc["accessToken"] = config.accessToken;
+  doc["accTkn"] = config.accTkn;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["provisionDeviceKey"] = config.provisionDeviceKey;
-  doc["provisionDeviceSecret"] = config.provisionDeviceSecret;
+  doc["provDK"] = config.provDK;
+  doc["provDS"] = config.provDS;
   doc["logLev"] = config.logLev;
-  doc["gmtOffset"] = config.gmtOffset;
+  doc["gmtOff"] = config.gmtOff;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["useCloud"] = (int)config.useCloud;
-  doc["dtCycCh1"] = mySettings.dtCyc[0];
-  doc["dtCycCh2"] = mySettings.dtCyc[1];
-  doc["dtCycCh3"] = mySettings.dtCyc[2];
-  doc["dtCycCh4"] = mySettings.dtCyc[3];
+  doc["fIot"] = (int)config.fIot;
+  doc["cp1A1"] = mySettings.cp1A[0];
+  doc["cp1A2"] = mySettings.cp1A[1];
+  doc["cp1A3"] = mySettings.cp1A[2];
+  doc["cp1A4"] = mySettings.cp1A[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["dtRngCh1"] = mySettings.dtRng[0];
-  doc["dtRngCh2"] = mySettings.dtRng[1];
-  doc["dtRngCh3"] = mySettings.dtRng[2];
-  doc["dtRngCh4"] = mySettings.dtRng[3];
+  doc["cp1B1"] = mySettings.cp1B[0];
+  doc["cp1B2"] = mySettings.cp1B[1];
+  doc["cp1B3"] = mySettings.cp1B[2];
+  doc["cp1B4"] = mySettings.cp1B[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["dtCycFSCh1"] = mySettings.dtCycFS[0];
-  doc["dtCycFSCh2"] = mySettings.dtCycFS[1];
-  doc["dtCycFSCh3"] = mySettings.dtCycFS[2];
-  doc["dtCycFSCh4"] = mySettings.dtCycFS[3];
+  doc["cp2A1"] = (uint64_t)mySettings.cp2A[0] * 1000;
+  doc["cp2A2"] = (uint64_t)mySettings.cp2A[1] * 1000;
+  doc["cp2A3"] = (uint64_t)mySettings.cp2A[2] * 1000;
+  doc["cp2A4"] = (uint64_t)mySettings.cp2A[3] * 1000;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["dtRngFSCh1"] = mySettings.dtRngFS[0];
-  doc["dtRngFSCh2"] = mySettings.dtRngFS[1];
-  doc["dtRngFSCh3"] = mySettings.dtRngFS[2];
-  doc["dtRngFSCh4"] = mySettings.dtRngFS[3];
+  doc["cp2B1"] = mySettings.cp2B[0];
+  doc["cp2B2"] = mySettings.cp2B[1];
+  doc["cp2B3"] = mySettings.cp2B[2];
+  doc["cp2B4"] = mySettings.cp2B[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["rlyActDTCh1"] = (uint64_t)mySettings.rlyActDT[0] * 1000;
-  doc["rlyActDTCh2"] = (uint64_t)mySettings.rlyActDT[1] * 1000;
-  doc["rlyActDTCh3"] = (uint64_t)mySettings.rlyActDT[2] * 1000;
-  doc["rlyActDTCh4"] = (uint64_t)mySettings.rlyActDT[3] * 1000;
+  doc["cp4A1"] = mySettings.cp4A[0];
+  doc["cp4A2"] = mySettings.cp4A[1];
+  doc["cp4A3"] = mySettings.cp4A[2];
+  doc["cp4A4"] = mySettings.cp4A[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["rlyActDrCh1"] = mySettings.rlyActDr[0];
-  doc["rlyActDrCh2"] = mySettings.rlyActDr[1];
-  doc["rlyActDrCh3"] = mySettings.rlyActDr[2];
-  doc["rlyActDrCh4"] = mySettings.rlyActDr[3];
+  doc["cp4B1"] = mySettings.cp4B[0];
+  doc["cp4B2"] = mySettings.cp4B[1];
+  doc["cp4B3"] = mySettings.cp4B[2];
+  doc["cp4B4"] = mySettings.cp4B[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["rlyActITCh1"] = mySettings.rlyActIT[0];
-  doc["rlyActITCh2"] = mySettings.rlyActIT[1];
-  doc["rlyActITCh3"] = mySettings.rlyActIT[2];
-  doc["rlyActITCh4"] = mySettings.rlyActIT[3];
-  tb.sendAttributeDoc(doc);
-  doc.clear();
-  doc["rlyActITOnCh1"] = mySettings.rlyActITOn[0];
-  doc["rlyActITOnCh2"] = mySettings.rlyActITOn[1];
-  doc["rlyActITOnCh3"] = mySettings.rlyActITOn[2];
-  doc["rlyActITOnCh4"] = mySettings.rlyActITOn[3];
-  tb.sendAttributeDoc(doc);
-  doc.clear();
-  doc["pinCh1"] = mySettings.pin[0];
-  doc["pinCh2"] = mySettings.pin[1];
-  doc["pinCh3"] = mySettings.pin[2];
-  doc["pinCh4"] = mySettings.pin[3];
+  doc["pR1"] = mySettings.pR[0];
+  doc["pR2"] = mySettings.pR[1];
+  doc["pR3"] = mySettings.pR[2];
+  doc["pR4"] = mySettings.pR[3];
   doc["ON"] = mySettings.ON;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["rlyActMTCh1"] = mySettings.rlyActMT[0];
-  doc["rlyActMTCh2"] = mySettings.rlyActMT[1];
-  doc["rlyActMTCh3"] = mySettings.rlyActMT[2];
-  doc["rlyActMTCh4"] = mySettings.rlyActMT[3];
+  doc["cp3A1"] = mySettings.cp3A[0];
+  doc["cp3A2"] = mySettings.cp3A[1];
+  doc["cp3A3"] = mySettings.cp3A[2];
+  doc["cp3A4"] = mySettings.cp3A[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["labelCh1"] = mySettings.label[0];
-  doc["labelCh2"] = mySettings.label[1];
-  doc["labelCh3"] = mySettings.label[2];
-  doc["labelCh4"] = mySettings.label[3];
+  doc["lbl1"] = mySettings.lbl[0];
+  doc["lbl2"] = mySettings.lbl[1];
+  doc["lbl3"] = mySettings.lbl[2];
+  doc["lbl4"] = mySettings.lbl[3];
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
-  doc["intvRecWthr"] = mySettings.intvRecWthr;
-  doc["intvDevTel"] = mySettings.intvDevTel;
+  doc["itP"] = mySettings.itP;
+  doc["itW"] = mySettings.itW;
+  doc["itD"] = mySettings.itD;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
-  doc["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
-  doc["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
-  doc["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
+  doc["cpM1"] = mySettings.cpM[0];
+  doc["cpM2"] = mySettings.cpM[1];
+  doc["cpM3"] = mySettings.cpM[2];
+  doc["cpM4"] = mySettings.cpM[3];
   doc["seaHpa"] = mySettings.seaHpa;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["pinBuzzer"] = configcomcu.pinBuzzer;
-  doc["pinLedR"] = configcomcu.pinLedR;
-  doc["pinLedG"] = configcomcu.pinLedG;
-  doc["pinLedB"] = configcomcu.pinLedB;
-  doc["httpUname"] = config.httpUname;
-  doc["httpPass"] = config.httpPass;
+  doc["pBz"] = configcomcu.pBz;
+  doc["pLR"] = configcomcu.pLR;
+  doc["pLG"] = configcomcu.pLG;
+  doc["pLB"] = configcomcu.pLB;
+  doc["htU"] = config.htU;
+  doc["htP"] = config.htP;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["ledON"] = configcomcu.ledON;
-  doc["bfreq"] = configcomcu.bfreq;
-  doc["fPanic"] = configcomcu.fPanic;
-  doc["fBuzz"] = configcomcu.fBuzz;
-  doc["bfreq"] = configcomcu.bfreq;
+  doc["lON"] = configcomcu.lON;
+  doc["bFr"] = configcomcu.bFr;
+  doc["fP"] = configcomcu.fP;
+  doc["fB"] = configcomcu.fB;
+  doc["bFr"] = configcomcu.bFr;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["useWiFiOta"] = (int)config.useWiFiOta;
-  doc["useWebIface"] = (int)config.useWebIface;
-  doc["hostname"] = config.hostname;
+  doc["fWOTA"] = (int)config.fWOTA;
+  doc["fIface"] = (int)config.fIface;
+  doc["hname"] = config.hname;
   tb.sendAttributeDoc(doc);
   doc.clear();
 }
@@ -1380,7 +1102,7 @@ void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client)
 }
 
 bool wsSendEnable(){
-  if(config.useWebIface && (ws.count() > 0)){
+  if(config.fIface && (ws.count() > 0)){
     return true;
   }
   else{
@@ -1442,9 +1164,9 @@ void wsSendAttributes(){
   attr["fmVersion"] = CURRENT_FIRMWARE_VERSION;
   attr["stamac"] = WiFi.macAddress();
   attr["apmac"] = WiFi.softAPmacAddress();
-  attr["flashFree"] = ESP.getFreeSketchSpace();
-  attr["firmwareSize"] = ESP.getSketchSize();
-  attr["flashSize"] = ESP.getFlashChipSize();
+  attr["flFree"] = ESP.getFreeSketchSpace();
+  attr["fwSize"] = ESP.getSketchSize();
+  attr["flSize"] = ESP.getFlashChipSize();
   attr["sdkVer"] = ESP.getSdkVersion();
   wsSend(doc);
   doc.clear();
@@ -1456,84 +1178,73 @@ void wsSendAttributes(){
   cfg["wssid"] = config.wssid;
   cfg["ap"] = WiFi.SSID();
   cfg["wpass"] = config.wpass;
-  cfg["gmtOffset"] = config.gmtOffset;
-  cfg["httpUname"] = config.httpUname;
-  cfg["httpPass"] = config.httpPass;
+  cfg["gmtOff"] = config.gmtOff;
+  cfg["htU"] = config.htU;
+  cfg["htP"] = config.htP;
   cfg["name"] = config.name;
-  cfg["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
-  cfg["intvRecWthr"] = mySettings.intvRecWthr;
-  cfg["intvDevTel"] = mySettings.intvDevTel;
-  cfg["useCloud"] = (int)config.useCloud;
+  cfg["itP"] = mySettings.itP;
+  cfg["itW"] = mySettings.itW;
+  cfg["itD"] = mySettings.itD;
+  cfg["fIot"] = (int)config.fIot;
+  doc["fWOTA"] = (int)config.fWOTA;
+  doc["fIface"] = (int)config.fIface;
+  doc["hname"] = config.hname;
   wsSend(doc);
   doc.clear();
-  JsonObject dtCyc = doc.createNestedObject("dtCyc");
-  dtCyc["dtCycCh1"] = mySettings.dtCyc[0];
-  dtCyc["dtCycCh2"] = mySettings.dtCyc[1];
-  dtCyc["dtCycCh3"] = mySettings.dtCyc[2];
-  dtCyc["dtCycCh4"] = mySettings.dtCyc[3];
+  JsonObject cp1A = doc.createNestedObject("cp1A");
+  cp1A["cp1A1"] = mySettings.cp1A[0];
+  cp1A["cp1A2"] = mySettings.cp1A[1];
+  cp1A["cp1A3"] = mySettings.cp1A[2];
+  cp1A["cp1A4"] = mySettings.cp1A[3];
   wsSend(doc);
   doc.clear();
-  JsonObject dtRng = doc.createNestedObject("dtRng");
-  dtRng["dtRngCh1"] = mySettings.dtRng[0];
-  dtRng["dtRngCh2"] = mySettings.dtRng[1];
-  dtRng["dtRngCh3"] = mySettings.dtRng[2];
-  dtRng["dtRngCh4"] = mySettings.dtRng[3];
+  JsonObject cp1B = doc.createNestedObject("cp1B");
+  cp1B["cp1B1"] = mySettings.cp1B[0];
+  cp1B["cp1B2"] = mySettings.cp1B[1];
+  cp1B["cp1B3"] = mySettings.cp1B[2];
+  cp1B["cp1B4"] = mySettings.cp1B[3];
   wsSend(doc);
   doc.clear();
-  JsonObject dtCycFS = doc.createNestedObject("dtCycFS");
-  dtCycFS["dtCycFSCh1"] = mySettings.dtCycFS[0];
-  dtCycFS["dtCycFSCh2"] = mySettings.dtCycFS[1];
-  dtCycFS["dtCycFSCh3"] = mySettings.dtCycFS[2];
-  dtCycFS["dtCycFSCh4"] = mySettings.dtCycFS[3];
+  JsonObject cp2A = doc.createNestedObject("cp2A");
+  cp2A["cp2A1"] = (uint64_t)mySettings.cp2A[0] * 1000;
+  cp2A["cp2A2"] = (uint64_t)mySettings.cp2A[1] * 1000;
+  cp2A["cp2A3"] = (uint64_t)mySettings.cp2A[2] * 1000;
+  cp2A["cp2A4"] = (uint64_t)mySettings.cp2A[3] * 1000;
   wsSend(doc);
   doc.clear();
-  JsonObject dtRngFS = doc.createNestedObject("dtRngFS");
-  dtRngFS["dtRngFSCh1"] = mySettings.dtRngFS[0];
-  dtRngFS["dtRngFSCh2"] = mySettings.dtRngFS[1];
-  dtRngFS["dtRngFSCh3"] = mySettings.dtRngFS[2];
-  dtRngFS["dtRngFSCh4"] = mySettings.dtRngFS[3];
+  JsonObject cp2B = doc.createNestedObject("cp2B");
+  cp2B["cp2B1"] = mySettings.cp2B[0];
+  cp2B["cp2B2"] = mySettings.cp2B[1];
+  cp2B["cp2B3"] = mySettings.cp2B[2];
+  cp2B["cp2B4"] = mySettings.cp2B[3];
   wsSend(doc);
   doc.clear();
-  JsonObject rlyActDT = doc.createNestedObject("rlyActDT");
-  rlyActDT["rlyActDTCh1"] = (uint64_t)mySettings.rlyActDT[0] * 1000;
-  rlyActDT["rlyActDTCh2"] = (uint64_t)mySettings.rlyActDT[1] * 1000;
-  rlyActDT["rlyActDTCh3"] = (uint64_t)mySettings.rlyActDT[2] * 1000;
-  rlyActDT["rlyActDTCh4"] = (uint64_t)mySettings.rlyActDT[3] * 1000;
+  JsonObject cp4A = doc.createNestedObject("cp4A");
+  cp4A["cp4A1"] = mySettings.cp4A[0];
+  cp4A["cp4A2"] = mySettings.cp4A[1];
+  cp4A["cp4A3"] = mySettings.cp4A[2];
+  cp4A["cp4A4"] = mySettings.cp4A[3];
   wsSend(doc);
   doc.clear();
-  JsonObject rlyActDr = doc.createNestedObject("rlyActDr");
-  rlyActDr["rlyActDrCh1"] = mySettings.rlyActDr[0];
-  rlyActDr["rlyActDrCh2"] = mySettings.rlyActDr[1];
-  rlyActDr["rlyActDrCh3"] = mySettings.rlyActDr[2];
-  rlyActDr["rlyActDrCh4"] = mySettings.rlyActDr[3];
+  JsonObject cp4B = doc.createNestedObject("cp4B");
+  cp4B["cp4B1"] = mySettings.cp4B[0];
+  cp4B["cp4B2"] = mySettings.cp4B[1];
+  cp4B["cp4B3"] = mySettings.cp4B[2];
+  cp4B["cp4B4"] = mySettings.cp4B[3];
   wsSend(doc);
   doc.clear();
-  JsonObject rlyActIT = doc.createNestedObject("rlyActIT");
-  rlyActIT["rlyActITCh1"] = mySettings.rlyActIT[0];
-  rlyActIT["rlyActITCh2"] = mySettings.rlyActIT[1];
-  rlyActIT["rlyActITCh3"] = mySettings.rlyActIT[2];
-  rlyActIT["rlyActITCh4"] = mySettings.rlyActIT[3];
+  JsonObject cpM = doc.createNestedObject("cpM");
+  cpM["cpM1"] = mySettings.cpM[0];
+  cpM["cpM2"] = mySettings.cpM[1];
+  cpM["cpM3"] = mySettings.cpM[2];
+  cpM["cpM4"] = mySettings.cpM[3];
   wsSend(doc);
   doc.clear();
-  JsonObject rlyActITOn = doc.createNestedObject("rlyActITOn");
-  rlyActITOn["rlyActITOnCh1"] = mySettings.rlyActITOn[0];
-  rlyActITOn["rlyActITOnCh2"] = mySettings.rlyActITOn[1];
-  rlyActITOn["rlyActITOnCh3"] = mySettings.rlyActITOn[2];
-  rlyActITOn["rlyActITOnCh4"] = mySettings.rlyActITOn[3];
-  wsSend(doc);
-  doc.clear();
-  JsonObject rlyCtrlMd = doc.createNestedObject("rlyCtrlMd");
-  rlyCtrlMd["rlyCtrlMdCh1"] = mySettings.rlyCtrlMd[0];
-  rlyCtrlMd["rlyCtrlMdCh2"] = mySettings.rlyCtrlMd[1];
-  rlyCtrlMd["rlyCtrlMdCh3"] = mySettings.rlyCtrlMd[2];
-  rlyCtrlMd["rlyCtrlMdCh4"] = mySettings.rlyCtrlMd[3];
-  wsSend(doc);
-  doc.clear();
-  JsonObject rlyActMT = doc.createNestedObject("rlyActMT");
-  rlyActMT["rlyActMTCh1"] = mySettings.rlyActMT[0];
-  rlyActMT["rlyActMTCh2"] = mySettings.rlyActMT[1];
-  rlyActMT["rlyActMTCh3"] = mySettings.rlyActMT[2];
-  rlyActMT["rlyActMTCh4"] = mySettings.rlyActMT[3];
+  JsonObject cp3A = doc.createNestedObject("cp3A");
+  cp3A["cp3A1"] = mySettings.cp3A[0];
+  cp3A["cp3A2"] = mySettings.cp3A[1];
+  cp3A["cp3A3"] = mySettings.cp3A[2];
+  cp3A["cp3A4"] = mySettings.cp3A[3];
   wsSend(doc);
   doc.clear();
   doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
@@ -1542,16 +1253,11 @@ void wsSendAttributes(){
   doc["ch4"] = mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
   wsSend(doc);
   doc.clear();
-  JsonObject label = doc.createNestedObject("label");
-  label["labelCh1"] = mySettings.label[0];
-  label["labelCh2"] = mySettings.label[1];
-  label["labelCh3"] = mySettings.label[2];
-  label["labelCh4"] = mySettings.label[3];
-  wsSend(doc);
-  doc.clear();
-  doc["useWiFiOta"] = (int)config.useWiFiOta;
-  doc["useWebIface"] = (int)config.useWebIface;
-  doc["hostname"] = config.hostname;
+  JsonObject lbl = doc.createNestedObject("lbll");
+  lbl["lbl1"] = mySettings.lbl[0];
+  lbl["lbl2"] = mySettings.lbl[1];
+  lbl["lbl3"] = mySettings.lbl[2];
+  lbl["lbl4"] = mySettings.lbl[3];
   wsSend(doc);
   doc.clear();
 }

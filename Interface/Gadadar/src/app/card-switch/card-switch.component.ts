@@ -8,7 +8,7 @@ import { Input, Component } from '@angular/core';
 export class CardSwitchComponent {
   @Input() state: number;
   @Input() switch: string;
-  @Input() rlyCtrlMd: string;
+  @Input() cpM: string;
   @Input() opMode: object;
-  @Input() label: object;
+  @Input() lbl: object;
 }

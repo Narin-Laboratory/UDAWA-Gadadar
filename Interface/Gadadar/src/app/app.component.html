@@ -16,10 +16,10 @@
     <div class="col-sm-12">
       <app-dashboard (panic)="panic()" (reboot)="reboot()" (saveConfig)="saveConfig()" (savePermanent)="savePermanent()"
         (chParamsChange)="chParamsChange()" (attrChange)="attrChange()"
-        (stateChange)="stateChange()" [(selectedCh)]="selectedCh"
-        [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(rlyCtrlMd)]="rlyCtrlMd"
-        [(dtCyc)]="dtCyc" [(dtRng)]="dtRng" [(rlyActDT)]="rlyActDT" [(rlyActDr)]="rlyActDr"
-        [(rlyActIT)]="rlyActIT" [(rlyActITOn)]="rlyActITOn" [(rlyActMT)]="rlyActMT" [(label)]="label" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
+        (stateChange)="stateChange()" [(selected)]="selected"
+        [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(cpM)]="cpM"
+        [(cp1A)]="cp1A" [(cp1B)]="cp1B" [(cp2A)]="cp2A" [(cp2B)]="cp2B"
+        [(cp4A)]="cp4A" [(cp4B)]="cp4B" [(cp3A)]="cp3A" [(lbl)]="lbl" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
     </div>
   </div>
 </div>

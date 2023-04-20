@@ -15,37 +15,37 @@ export class DashboardComponent {
   @Input() state: object;
   @Output() stateChange = new EventEmitter<any>();
 
-  @Input() selectedCh: number;
-  @Output() selectedChChange = new EventEmitter<number>();
+  @Input() selected: number;
+  @Output() selectedChange = new EventEmitter<number>();
 
   @Output() chParamsChange = new EventEmitter<any>();
 
-  @Output() rlyCtrlMdChange = new EventEmitter<any>();
-  @Input() rlyCtrlMd: object;
+  @Output() cpMChange = new EventEmitter<any>();
+  @Input() cpM: object;
 
-  @Output() dtCycChange = new EventEmitter<any>();
-  @Input() dtCyc: object;
+  @Output() cp1AChange = new EventEmitter<any>();
+  @Input() cp1A: object;
 
-  @Output() dtRngChange = new EventEmitter<any>();
-  @Input() dtRng: object;
+  @Output() cp1BChange = new EventEmitter<any>();
+  @Input() cp1B: object;
 
-  @Output() rlyActDTChange = new EventEmitter<any>();
-  @Input() rlyActDT: object;
+  @Output() cp2AChange = new EventEmitter<any>();
+  @Input() cp2A: object;
 
-  @Output() rlyActDrChange = new EventEmitter<any>();
-  @Input() rlyActDr: object;
+  @Output() cp2BChange = new EventEmitter<any>();
+  @Input() cp2B: object;
 
-  @Output() rlyActITChange = new EventEmitter<any>();
-  @Input() rlyActIT: object;
+  @Output() cp4AChange = new EventEmitter<any>();
+  @Input() cp4A: object;
 
-  @Output() rlyActITOnChange = new EventEmitter<any>();
-  @Input() rlyActITOn: object;
+  @Output() cp4BChange = new EventEmitter<any>();
+  @Input() cp4B: object;
 
-  @Output() rlyActMTChange = new EventEmitter<any>();
-  @Input() rlyActMT: object;
+  @Output() cp3AChange = new EventEmitter<any>();
+  @Input() cp3A: object;
 
-  @Output() labelChange = new EventEmitter<any>();
-  @Input() label: object;
+  @Output() lblChange = new EventEmitter<any>();
+  @Input() lbl: object;
 
   @Output() cfgChange = new EventEmitter<any>();
   @Input() cfg: object;
@@ -64,31 +64,30 @@ export class DashboardComponent {
     'Manual Switch',
     'Duty Cycle',
     'Datetime',
-    'Time Daily',
+    'Multiple Time Daily',
     'Interval',
-    'Environment Condition',
-    'Multiple Time Daily'
+    'Environment Condition'
   ];
 
   channel = [1, 2, 3, 4];
 
-  changeSelectedCh(){
-    this.selectedChChange.emit(Number(this.selectedCh));
+  changeSelected(){
+    this.selectedChange.emit(Number(this.selected));
   }
   changeState(){
-    this.state['ch'+this.selectedCh] = Number(this.state['ch'+this.selectedCh]);
+    this.state['ch'+this.selected] = Number(this.state['ch'+this.selected]);
     this.stateChange.emit(this.state);
   }
 
-  changeChParams(){
-    this.rlyCtrlMdChange.emit(this.rlyCtrlMd);
-    this.dtCycChange.emit(this.dtCyc);
-    this.dtRngChange.emit(this.dtRng);
-    this.rlyActDTChange.emit(this.rlyActDT);
-    this.rlyActDrChange.emit(this.rlyActDr);
-    this.rlyActITChange.emit(this.rlyActIT);
-    this.rlyActITOnChange.emit(this.rlyActITOn);
-    this.rlyActMTChange.emit(this.rlyActMT);
+  changeParams(){
+    this.cpMChange.emit(this.cpM);
+    this.cp1AChange.emit(this.cp1A);
+    this.cp1BChange.emit(this.cp1B);
+    this.cp2AChange.emit(this.cp2A);
+    this.cp2BChange.emit(this.cp2B);
+    this.cp4AChange.emit(this.cp4A);
+    this.cp4BChange.emit(this.cp4B);
+    this.cp3AChange.emit(this.cp3A);
     this.chParamsChange.emit();
   }
 
@@ -99,7 +98,7 @@ export class DashboardComponent {
   changeAttr(){
     this.cfgChange.emit(this.cfg);
     this.attrChange.emit(this.attr);
-    this.labelChange.emit(this.label);
+    this.lblChange.emit(this.lbl);
   }
 
   saveConfigClick(){
