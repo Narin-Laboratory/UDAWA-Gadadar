@@ -49,7 +49,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
 #define CURRENT_FIRMWARE_VERSION "0.0.5"
 #define DOCSIZE 2048
-#define DOCSIZE_MIN 384
+#define DOCSIZE_MIN 512
 #define USE_SERIAL2
 #include <libudawa.h>
 #include <TimeLib.h>
@@ -77,8 +77,8 @@ struct Settings
     uint16_t itW = 300;
     uint16_t itD = 60;
     uint32_t cp2A[4];
-    uint32_t cp4A[4];
     unsigned long cp2B[4];
+    uint32_t cp4A[4];
     unsigned long cp4B[4];
     unsigned long cp4BTs[4];
     bool publishSwitch[4] = {true, true, true, true};

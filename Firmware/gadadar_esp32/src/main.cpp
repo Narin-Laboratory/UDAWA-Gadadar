@@ -800,7 +800,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["provDS"] != nullptr){strlcpy(config.provDS, data["provDS"].as<const char*>(), sizeof(config.provDS));}
   if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>(); log_manager->set_log_level(PSTR("*"), (LogLevel) config.logLev);;}
   if(data["gmtOff"] != nullptr){config.gmtOff = data["gmtOff"].as<int>();}
-  if(data["fIot"] != nullptr){config.fIot = data["fIot"].as<int>();}
+  if(data["fIoT"] != nullptr){config.fIoT = data["fIoT"].as<int>();}
   if(data["htU"] != nullptr){strlcpy(config.htU, data["htU"].as<const char*>(), sizeof(config.htU));}
   if(data["htP"] != nullptr){strlcpy(config.htP, data["htP"].as<const char*>(), sizeof(config.htP));}
   if(data["fWOTA"] != nullptr){config.fWOTA = data["fWOTA"].as<bool>();}
@@ -972,7 +972,7 @@ void syncClientAttributes()
   doc["gmtOff"] = config.gmtOff;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["fIot"] = (int)config.fIot;
+  doc["fIoT"] = (int)config.fIoT;
   doc["cp1A1"] = mySettings.cp1A[0];
   doc["cp1A2"] = mySettings.cp1A[1];
   doc["cp1A3"] = mySettings.cp1A[2];
@@ -1185,10 +1185,10 @@ void wsSendAttributes(){
   cfg["itP"] = mySettings.itP;
   cfg["itW"] = mySettings.itW;
   cfg["itD"] = mySettings.itD;
-  cfg["fIot"] = (int)config.fIot;
-  doc["fWOTA"] = (int)config.fWOTA;
-  doc["fIface"] = (int)config.fIface;
-  doc["hname"] = config.hname;
+  cfg["fIoT"] = (int)config.fIoT;
+  cfg["fWOTA"] = (int)config.fWOTA;
+  cfg["fIface"] = (int)config.fIface;
+  cfg["hname"] = config.hname;
   wsSend(doc);
   doc.clear();
   JsonObject cp1A = doc.createNestedObject("cp1A");
