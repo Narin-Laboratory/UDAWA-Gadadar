@@ -46,7 +46,8 @@ vh+RH1AiwshFKw9rxdUXJBGGVgn5F0Ie4alDI8ehelOpmrZgFYMOCpcFSpJ5vbXM
 ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 -----END CERTIFICATE-----
 )EOF";
-
+#define CURRENT_FIRMWARE_TITLE "Gadadar"
+#define CURRENT_FIRMWARE_VERSION "0.0.5"
 #define DOCSIZE 2048
 #define DOCSIZE_MIN 384
 #define USE_SERIAL2
@@ -58,12 +59,6 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Statistical.h>
-#include <esp32FOTA.hpp>
-
-
-#define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.5"
-bool FLAG_UPDATE_SPIFFS = 0;
 
 const char* settingsPath = "/settings.json";
 struct Settings
@@ -80,9 +75,9 @@ struct Settings
     bool dutyState[4];
     unsigned long stateOnTs[4];
     unsigned long dutyCounter[4];
-    uint16_t intvRecPwrUsg = 1;
-    uint16_t intvRecWthr = 1;
-    uint16_t intvDevTel = 1;
+    uint16_t intvRecPwrUsg = 900;
+    uint16_t intvRecWthr = 300;
+    uint16_t intvDevTel = 60;
     uint32_t rlyActDT[4];
     uint32_t rlyActIT[4];
     unsigned long rlyActDr[4];
@@ -105,9 +100,6 @@ struct Settings
     float hpa = 0.0;
     float alt = 0.0;
 
-    String httpUname;
-    String httpPass;
-
     char label[4][16];
 };
 
@@ -127,34 +119,33 @@ callbackResponse processBridge(const callbackData &data);
 callbackResponse processResetConfig(const callbackData &data);
 callbackResponse processUpdateSpiffs(const callbackData &data);
 JsonObject processEmitAlarmWs(const JsonObject &data);
-JsonObject processWsEventData(const JsonObject &data);
+JsonObject processWsEvent(const JsonObject &data);
 JsonObject processOnTbConnected(const JsonObject &data);
+JsonObject processOnTbDisconnected(const JsonObject &data);
+JsonObject processOnUpdateFinished(const JsonObject &data);
 
 void loadSettings();
 void saveSettings();
-void relayControlBydtCyc();
-void relayControlByDateTime();
-void relayControlByIntrvl();
+void relayControlBydtCycCb();
+void relayControlByDateTimeCb();
+void relayControlByIntrvlCb();
+void relayControlByMultiTimeCb();
 void syncClientAttributes();
-void publishDeviceAttributes();
-void publishDeviceTelemetry();
+void publishDeviceTelemetryCb();
 void setSwitch(String  ch, String state);
-void publishSwitch();
-void recPowerUsage();
-void recWeatherData();
-uint32_t micro2milli(uint32_t hi, uint32_t lo);
+void publishSwitchCb();
+void recPowerUsageCb();
+void recWeatherDataCb();
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc);
 void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client);
-void wsSendTelemetry();
-void wsSendSensors();
+void wsSendTelemetryCb();
+void wsSendSensorsCb();
 void wsSendAttributes();
-void updateSpiffs();
-void selfDiagnosticShort();
-void selfDiagnosticLong();
-double round2(double value);
-void relayControlByMultiTime();
-void calcPowerUsage();
-void calcWeatherData();
+void selfDiagnosticShortCb();
+void selfDiagnosticLongCb();
+void calcPowerUsageCb();
+void calcWeatherDataCb();
 void syncClientAttrCb();
+bool wsSendEnable();
 
 #endif

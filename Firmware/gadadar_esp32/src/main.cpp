@@ -24,13 +24,29 @@ Stream_Stats<float> _rh;
 Stream_Stats<float> _hpa;
 Stream_Stats<float> _alt;
 
-Task syncClientAttr(1 * TASK_SECOND, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
+Task syncClientAttr(TASK_IMMEDIATE, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
+Task publishSwitchLoop(1 * TASK_SECOND, TASK_FOREVER, &publishSwitchCb, &r, 0, NULL, NULL, 0);
+Task publishDeviceTelemetryLoop(mySettings.intvDevTel * TASK_SECOND, TASK_FOREVER, &publishDeviceTelemetryCb, &r, 0, NULL, NULL, 0);
+Task calcWeatherDataLoop(30 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 0, NULL, NULL, 0);
+Task recWeatherDataLoop(mySettings.intvRecWthr * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL, 0);
+Task calcPowerUsageLoop(1 * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
+Task recPowerUsageLoop(mySettings.intvRecPwrUsg * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
+Task wsSendTelemetryLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, &wsSendEnable, NULL, 0);
+Task wsSendSensorsLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, &wsSendEnable, NULL, 0);
+Task relayControlBydtCycLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlBydtCycCb, &r, 0, NULL, NULL, 0);
+Task relayControlByDateTimeLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByDateTimeCb, &r, 0, NULL, NULL, 0);
+Task relayControlByIntrvlLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByIntrvlCb, &r, 0, NULL, NULL, 0);
+Task relayControlByMultiTimeLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByMultiTimeCb, &r, 0, NULL, NULL, 0);
+Task selfDiagnosticShortLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticShortCb, &r, 0, NULL, NULL, 0);
+Task selfDiagnosticLongLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticLongCb, &r, 0, NULL, NULL, 0);
 
-const size_t cbSize = 3;
+const size_t cbSize = 5;
 GCB cb[cbSize] = {
   { "emitAlarmWs", processEmitAlarmWs },
-  { "wsEventData", processWsEventData },
-  { "onTbConnected", processOnTbConnected }
+  { "wsEvent", processWsEvent },
+  { "onTbConnected", processOnTbConnected },
+  { "onTbDisconnected", processOnTbDisconnected },
+  { "onUpdateFinished", processOnUpdateFinished }
 };
 
 const size_t callbacksSize = 16;
@@ -57,7 +73,6 @@ void setup()
 {
   startup();
   loadSettings();
-  configCoMCULoad();
   syncConfigCoMCU();
   if(String(config.model) == String("Generic")){
     strlcpy(config.model, "Gadadar", sizeof(config.model));
@@ -74,6 +89,17 @@ void setup()
   if(!mySettings.flag_bme280){
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }
+
+  calcPowerUsageLoop.enable();
+  calcWeatherDataLoop.enable();
+
+  relayControlBydtCycLoop.enable();
+  relayControlByDateTimeLoop.enable();
+  relayControlByIntrvlLoop.enable();
+  relayControlByMultiTimeLoop.enable();
+  publishSwitchLoop.enable();
+  selfDiagnosticShortLoop.enable();
+  selfDiagnosticLongLoop.enable();
 }
 
 void loop()
@@ -81,69 +107,17 @@ void loop()
   udawa();
 }
 
-double round2(double value) {
-   return (int)(value * 100 + 0.5) / 100.0;
-}
-
-const uint32_t MAX_INT = 0xFFFFFFFF;
-uint32_t micro2milli(uint32_t hi, uint32_t lo)
-{
-  if (hi >= 1000)
-  {
-    log_manager->warn(PSTR(__func__), PSTR("Cannot store milliseconds in uint32!\n"));
-  }
-
-  uint32_t r = (lo >> 16) + (hi << 16);
-  uint32_t ans = r / 1000;
-  r = ((r % 1000) << 16) + (lo & 0xFFFF);
-  ans = (ans << 16) + r / 1000;
-
-  return ans;
-}
-
 void syncClientAttrCb(){
+  log_manager->debug(PSTR(__func__),PSTR("Executed.\n"));
   syncClientAttributes();
+  wsSendAttributes();
   mySettings.publishSwitch[0] = true;
   mySettings.publishSwitch[1] = true;
   mySettings.publishSwitch[2] = true;
   mySettings.publishSwitch[3] = true;
 }
 
-void updateSpiffs(){
-  esp32FOTA esp32FOTA(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
-
-  CryptoMemAsset  *MyRootCA = new CryptoMemAsset("Root CA", CA_CERT, strlen(CA_CERT)+1 );
-
-  esp32FOTA.setManifestURL("http://prita.undiknas.ac.id/cdn/firmware/udawa.json");
-  esp32FOTA.setRootCA(MyRootCA);
-  esp32FOTA.setCertFileSystem(nullptr);
-  esp32FOTA.setProgressCb( [](size_t progress, size_t size) {
-      if( progress == size || progress == 0 ) Serial.println();
-      Serial.print(".");
-  });
-  esp32FOTA.setUpdateCheckFailCb( [](int partition, int error_code) {
-    Serial.printf("Update could validate %s partition (error %d)\n", partition==U_SPIFFS ? "spiffs" : "firmware", error_code );
-    // error codes:
-    //  -1 : partition not found
-    //  -2 : validation (signature check) failed
-  });
-  esp32FOTA.setUpdateBeginFailCb( [](int partition) {
-
-  });
-  esp32FOTA.setUpdateEndCb( [](int partition) {
-
-  });
-  esp32FOTA.setUpdateFinishedCb( [](int partition, bool restart_after) {
-    saveSettings();
-    configSave();
-    configCoMCUSave();
-  });
-
-  Serial.println(esp32FOTA.execHTTPcheck());
-  esp32FOTA.execOTASPIFFS();
-}
-
-void selfDiagnosticShort(){
+void selfDiagnosticShortCb(){
   HardwareSerial PZEMSerial(1);
   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
@@ -184,11 +158,11 @@ void selfDiagnosticShort(){
 
 }
 
-void selfDiagnosticLong(){
+void selfDiagnosticLongCb(){
 
 }
 
-void calcPowerUsage(){
+void calcPowerUsageCb(){
   HardwareSerial PZEMSerial(1);
   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
@@ -216,7 +190,7 @@ void calcPowerUsage(){
   //  mySettings.volt, mySettings.amp, mySettings.watt, mySettings.ener, mySettings.freq, mySettings.pf);
 }
 
-void recPowerUsage(){
+void recPowerUsageCb(){
   if(tb.connected()){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     doc["volt"] = _volt.Get_Average();
@@ -244,7 +218,7 @@ void recPowerUsage(){
   }
 }
 
-void calcWeatherData(){
+void calcWeatherDataCb(){
   if(mySettings.flag_bme280){
     mySettings.celc = bme.readTemperature();
     mySettings.rh = bme.readHumidity();
@@ -258,7 +232,7 @@ void calcWeatherData(){
   }
 }
 
-void recWeatherData(){
+void recWeatherDataCb(){
   if(tb.connected()){
     mySettings._celc = _celc.Get_Average();
     mySettings._rh = _rh.Get_Average();
@@ -443,13 +417,13 @@ if(doc["rlyActIT"] != nullptr)
   }
 
   if(doc["intvRecPwrUsg"] != nullptr){mySettings.intvRecPwrUsg = doc["intvRecPwrUsg"].as<uint16_t>();}
-  else{mySettings.intvRecPwrUsg = 0;}
+  else{mySettings.intvRecPwrUsg = 900;}
 
   if(doc["intvRecWthr"] != nullptr){mySettings.intvRecWthr = doc["intvRecWthr"].as<uint16_t>();}
-  else{mySettings.intvRecWthr = 0;}
+  else{mySettings.intvRecWthr = 300;}
 
   if(doc["intvDevTel"] != nullptr){mySettings.intvDevTel = doc["intvDevTel"].as<uint16_t>();}
-  else{mySettings.intvDevTel = 0;}
+  else{mySettings.intvDevTel = 60;}
 
   if(doc["rlyCtrlMd"] != nullptr)
   {
@@ -475,12 +449,6 @@ if(doc["rlyActIT"] != nullptr)
 
   if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
   else{mySettings.seaHpa = 1019.00;}
-
-  if(doc["httpUname"] != nullptr){mySettings.httpUname = doc["httpUname"].as<String>();}
-  else{mySettings.httpUname = "UDAWA";}
-
-  if(doc["httpPass"] != nullptr){mySettings.httpPass = doc["httpPass"].as<String>();}
-  else{mySettings.httpPass = "defaultkey";}
 
   if(doc["rlyActMT"] != nullptr)
   {
@@ -604,47 +572,74 @@ void saveSettings()
 
   doc["seaHpa"] = mySettings.seaHpa;
 
-  doc["httpUname"] = mySettings.httpUname;
-  doc["httpPass"] = mySettings.httpPass;
-
   writeSettings(doc, settingsPath);
   String tmp;
   if(config.logLev >= 4){serializeJsonPretty(doc, tmp);}
   log_manager->debug(PSTR(__func__), "Written settings:\n %s \n", tmp.c_str());
 }
 
-JsonObject processWsEventData(const JsonObject &doc){
-  if(doc["cmd"] == nullptr){
-    log_manager->debug(PSTR(__func__), "Command not found.\n");
+JsonObject processOnUpdateFinished(const JsonObject &data){
+  saveSettings();
+  return data;
+}
+
+JsonObject processWsEvent(const JsonObject &doc){
+  if(doc["evType"] == nullptr){
+    log_manager->debug(PSTR(__func__), "Event type not found.\n");
     return doc;
   }
+  int evType = doc["evType"].as<int>();
 
-  const char* cmd = doc["cmd"].as<const char*>();
-  if(strcmp(cmd, (const char*) "attr") == 0){
-    processSharedAttributesUpdate(doc);
-    if(tb.connected()){
-      doc.remove("cmd");
-      StaticJsonDocument<DOCSIZE_MIN> tele;
-      tele = doc;
-      tb.sendAttributeDoc(tele);
+
+  if(evType == (int)WS_EVT_CONNECT){
+    syncClientAttr.setInterval(TASK_IMMEDIATE);
+    syncClientAttr.setIterations(TASK_ONCE);
+    syncClientAttr.enable();
+
+    wsSendTelemetryLoop.enableIfNot();
+    wsSendSensorsLoop.enableIfNot();
+
+  }
+  if(evType == (int)WS_EVT_DISCONNECT){
+    if(ws.count() < 1){
+      wsSendTelemetryLoop.disable();
+      wsSendSensorsLoop.disable();
+      log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
     }
   }
-  else if(strcmp(cmd, (const char*) "saveSettings") == 0){
-    saveSettings();
-  }
-  else if(strcmp(cmd, (const char*) "saveConfig") == 0){
-    configSave();
-  }
-  else if(strcmp(cmd, (const char*) "setPanic") == 0){
-    JsonObject params = doc.createNestedObject("params");
-    params["state"]= "ON";
-    processSetPanic(doc);
-  }
-  else if(strcmp(cmd, (const char*) "reboot") == 0){
-    reboot();
-  }
-  else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-    setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+  else if(evType == (int)WS_EVT_DATA){
+    if(doc["cmd"] == nullptr){
+      log_manager->debug(PSTR(__func__), "Command not found.\n");
+      return doc;
+    }
+    const char* cmd = doc["cmd"].as<const char*>();
+    if(strcmp(cmd, (const char*) "attr") == 0){
+      processSharedAttributesUpdate(doc);
+      if(tb.connected()){
+        doc.remove("cmd");
+        doc.remove("evType");
+        StaticJsonDocument<DOCSIZE_MIN> tele;
+        tele = doc;
+        tb.sendAttributeDoc(tele);
+      }
+    }
+    else if(strcmp(cmd, (const char*) "saveSettings") == 0){
+      saveSettings();
+    }
+    else if(strcmp(cmd, (const char*) "saveConfig") == 0){
+      configSave();
+    }
+    else if(strcmp(cmd, (const char*) "setPanic") == 0){
+      JsonObject params = doc.createNestedObject("params");
+      params["state"]= "ON";
+      processSetPanic(doc);
+    }
+    else if(strcmp(cmd, (const char*) "reboot") == 0){
+      reboot();
+    }
+    else if(strcmp(cmd, (const char*) "setSwitch") == 0){
+      setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+    }
   }
 
   return doc;
@@ -667,16 +662,27 @@ JsonObject processOnTbConnected(const JsonObject &data){
     log_manager->info(PSTR(__func__),PSTR("OTA Update finished, rebooting...\n"));
     reboot();
   }
-  else
-  {
-    log_manager->info(PSTR(__func__),PSTR("Firmware up-to-date.\n"));
-  }
 
+  syncClientAttr.setInterval(TASK_IMMEDIATE);
+  syncClientAttr.setIterations(TASK_ONCE);
   syncClientAttr.enable();
+  publishDeviceTelemetryLoop.enable();
+  recPowerUsageLoop.enable();
+  recWeatherDataLoop.enable();
+  return data;
+}
+
+JsonObject processOnTbDisconnected(const JsonObject &data){
+  publishDeviceTelemetryLoop.disable();
+  recPowerUsageLoop.disable();
+  recWeatherDataLoop.disable();
   return data;
 }
 
 JsonObject processEmitAlarmWs(const JsonObject &data){
+  if(ws.count() < 1){
+    return data;
+  }
   StaticJsonDocument<DOCSIZE_MIN> doc;
   doc = data;
   wsSend(doc);
@@ -684,7 +690,7 @@ JsonObject processEmitAlarmWs(const JsonObject &data){
 }
 
 callbackResponse processUpdateSpiffs(const callbackData &data){
-  FLAG_UPDATE_SPIFFS = 1;
+  updateSpiffs.enableDelayed(10);
   return callbackResponse("updateSpiffs", 1);
 }
 
@@ -719,6 +725,8 @@ callbackResponse processReboot(const callbackData &data)
 
 callbackResponse processSyncClientAttributes(const callbackData &data)
 {
+  syncClientAttr.setInterval(TASK_IMMEDIATE);
+  syncClientAttr.setIterations(TASK_ONCE);
   syncClientAttr.enable();
   return callbackResponse("syncClientAttributes", 1);
 }
@@ -779,6 +787,8 @@ callbackResponse processSetPanic(const callbackData &data)
     configcomcu.fPanic = 0;
   }
   serialWriteToCoMcu(doc, 0);
+  syncClientAttr.setInterval(TASK_IMMEDIATE);
+  syncClientAttr.setIterations(TASK_ONCE);
   syncClientAttr.enable();
   return callbackResponse("setPanic", data["params"]["state"].as<int>());
 }
@@ -851,7 +861,7 @@ void setSwitch(String ch, String state)
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
 }
 
-void relayControlByDateTime(){
+void relayControlByDateTimeCb(){
   for(uint8_t i = 0; i < countof(mySettings.pin); i++)
   {
     if(mySettings.rlyActDr[i] > 0 && mySettings.rlyCtrlMd[i] == 2){
@@ -914,7 +924,7 @@ void relayControlByDateTime(){
   }
 }
 
-void relayControlBydtCyc()
+void relayControlBydtCycCb()
 {
   for(uint8_t i = 0; i < countof(mySettings.pin); i++)
   {
@@ -947,7 +957,7 @@ void relayControlBydtCyc()
   }
 }
 
-void relayControlByIntrvl(){
+void relayControlByIntrvlCb(){
   for(uint8_t i = 0; i < countof(mySettings.pin); i++)
   {
     if(mySettings.rlyActIT[i] != 0 && mySettings.rlyActITOn[i] != 0 && mySettings.rlyCtrlMd[i] == 4)
@@ -971,9 +981,7 @@ void relayControlByIntrvl(){
   }
 }
 
-
-unsigned long relayControlByMultiTime_lastSwitch = 0;
-void relayControlByMultiTime(){
+void relayControlByMultiTimeCb(){
   for(uint8_t i = 0; i < countof(mySettings.pin); i++){
     if(mySettings.rlyCtrlMd[i] == 6){
       StaticJsonDocument<DOCSIZE_MIN> doc;
@@ -1049,6 +1057,11 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>(); log_manager->set_log_level(PSTR("*"), (LogLevel) config.logLev);;}
   if(data["gmtOffset"] != nullptr){config.gmtOffset = data["gmtOffset"].as<int>();}
   if(data["useCloud"] != nullptr){config.useCloud = data["useCloud"].as<int>();}
+  if(data["httpUname"] != nullptr){strlcpy(config.httpUname, data["httpUname"].as<const char*>(), sizeof(config.httpUname));}
+  if(data["httpPass"] != nullptr){strlcpy(config.httpPass, data["httpPass"].as<const char*>(), sizeof(config.httpPass));}
+  if(data["useWiFiOta"] != nullptr){config.useWiFiOta = data["useWiFiOta"].as<bool>();}
+  if(data["useWebIface"] != nullptr){config.useWebIface = data["useWebIface"].as<bool>();}
+  if(data["hostname"] != nullptr){strlcpy(config.hostname, data["hostname"].as<const char*>(), sizeof(config.hostname));}
 
 
   if(data["dtCycCh1"] != nullptr)
@@ -1166,9 +1179,6 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
 
   if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
 
-  if(data["httpUname"] != nullptr){mySettings.httpUname = data["httpUname"].as<String>();}
-  if(data["httpPass"] != nullptr){mySettings.httpPass = data["httpPass"].as<String>();}
-
   if(data["fPanic"] != nullptr){configcomcu.fPanic = data["fPanic"].as<bool>();}
   if(data["bfreq"] != nullptr){configcomcu.bfreq = data["bfreq"].as<uint16_t>();}
   if(data["fBuzz"] != nullptr){configcomcu.fBuzz = data["fBuzz"].as<bool>();}
@@ -1228,7 +1238,7 @@ void syncClientAttributes()
   doc["gmtOffset"] = config.gmtOffset;
   tb.sendAttributeDoc(doc);
   doc.clear();
-  doc["useCloud"] = config.useCloud;
+  doc["useCloud"] = (int)config.useCloud;
   doc["dtCycCh1"] = mySettings.dtCyc[0];
   doc["dtCycCh2"] = mySettings.dtCyc[1];
   doc["dtCycCh3"] = mySettings.dtCyc[2];
@@ -1312,8 +1322,8 @@ void syncClientAttributes()
   doc["pinLedR"] = configcomcu.pinLedR;
   doc["pinLedG"] = configcomcu.pinLedG;
   doc["pinLedB"] = configcomcu.pinLedB;
-  doc["httpUname"] = mySettings.httpUname;
-  doc["httpPass"] = mySettings.httpPass;
+  doc["httpUname"] = config.httpUname;
+  doc["httpPass"] = config.httpPass;
   tb.sendAttributeDoc(doc);
   doc.clear();
   doc["ledON"] = configcomcu.ledON;
@@ -1323,9 +1333,14 @@ void syncClientAttributes()
   doc["bfreq"] = configcomcu.bfreq;
   tb.sendAttributeDoc(doc);
   doc.clear();
+  doc["useWiFiOta"] = (int)config.useWiFiOta;
+  doc["useWebIface"] = (int)config.useWebIface;
+  doc["hostname"] = config.hostname;
+  tb.sendAttributeDoc(doc);
+  doc.clear();
 }
 
-void publishDeviceTelemetry()
+void publishDeviceTelemetryCb()
 {
   if(tb.connected()){
     StaticJsonDocument<DOCSIZE_MIN> doc;
@@ -1340,18 +1355,15 @@ void publishDeviceTelemetry()
   }
 }
 
-void publishSwitch(){
-  if(tb.connected()){
-    for (uint8_t i = 0; i < 4; i++){
-      if(mySettings.publishSwitch[i]){
-        StaticJsonDocument<DOCSIZE_MIN> doc;
-        String chName = "ch" + String(i+1);
-        doc[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
-        tb.sendTelemetryDoc(doc);
-        wsSend(doc);
-        doc.clear();
-        mySettings.publishSwitch[i] = false;
-      }
+void publishSwitchCb(){
+  for (uint8_t i = 0; i < 4; i++){
+    if(mySettings.publishSwitch[i]){
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      String chName = "ch" + String(i+1);
+      doc[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
+      if(tb.connected()){ tb.sendTelemetryDoc(doc); }
+      if(ws.count() > 0){ wsSend(doc); }
+      mySettings.publishSwitch[i] = false;
     }
   }
 }
@@ -1367,7 +1379,16 @@ void wsSend(StaticJsonDocument<DOCSIZE_MIN> &doc, AsyncWebSocketClient * client)
   ws.text(client->id(), buffer.c_str());
 }
 
-void wsSendTelemetry(){
+bool wsSendEnable(){
+  if(config.useWebIface && (ws.count() > 0)){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+
+void wsSendTelemetryCb(){
   if(ws.count() > 0){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject devTel = doc.createNestedObject("devTel");
@@ -1380,21 +1401,23 @@ void wsSendTelemetry(){
   }
 }
 
-void wsSendSensors(){
+void wsSendSensorsCb(){
   if(ws.count() > 0){
     HardwareSerial PZEMSerial(1);
     PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
     StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject pzem = doc.createNestedObject("pzem");
-    pzem["volt"] = round2(PZEM.voltage());
-    pzem["amp"] = round2(PZEM.current());
-    pzem["watt"] = round2(PZEM.power());
-    pzem["ener"] = round2(PZEM.energy());
-    pzem["freq"] = round2(PZEM.frequency());
-    pzem["pf"] = round2(PZEM.pf())*100;
-    wsSend(doc);
-    doc.clear();
+    if(!isnan(PZEM.voltage())){
+      pzem["volt"] = round2(PZEM.voltage());
+      pzem["amp"] = round2(PZEM.current());
+      pzem["watt"] = round2(PZEM.power());
+      pzem["ener"] = round2(PZEM.energy());
+      pzem["freq"] = round2(PZEM.frequency());
+      pzem["pf"] = round2(PZEM.pf())*100;
+      wsSend(doc);
+      doc.clear();
+    }
 
     JsonObject bme280 = doc.createNestedObject("bme280");
     bme280["celc"] = round2(mySettings.celc);
@@ -1434,13 +1457,13 @@ void wsSendAttributes(){
   cfg["ap"] = WiFi.SSID();
   cfg["wpass"] = config.wpass;
   cfg["gmtOffset"] = config.gmtOffset;
-  cfg["httpUname"] = mySettings.httpUname;
-  cfg["httpPass"] = mySettings.httpPass;
+  cfg["httpUname"] = config.httpUname;
+  cfg["httpPass"] = config.httpPass;
   cfg["name"] = config.name;
   cfg["intvRecPwrUsg"] = mySettings.intvRecPwrUsg;
   cfg["intvRecWthr"] = mySettings.intvRecWthr;
   cfg["intvDevTel"] = mySettings.intvDevTel;
-  cfg["useCloud"] = config.useCloud;
+  cfg["useCloud"] = (int)config.useCloud;
   wsSend(doc);
   doc.clear();
   JsonObject dtCyc = doc.createNestedObject("dtCyc");
@@ -1524,6 +1547,11 @@ void wsSendAttributes(){
   label["labelCh2"] = mySettings.label[1];
   label["labelCh3"] = mySettings.label[2];
   label["labelCh4"] = mySettings.label[3];
+  wsSend(doc);
+  doc.clear();
+  doc["useWiFiOta"] = (int)config.useWiFiOta;
+  doc["useWebIface"] = (int)config.useWebIface;
+  doc["hostname"] = config.hostname;
   wsSend(doc);
   doc.clear();
 }
