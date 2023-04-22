@@ -35,7 +35,7 @@ export class AppComponent {
 
   constructor(private WebsocketService: WebsocketService) {
     WebsocketService.messages.subscribe(msg => {
-      console.log(msg);
+      //console.log(msg);
       if(msg['attr'] != null){
         this.attr = msg['attr'];
       }

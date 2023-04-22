@@ -30,7 +30,7 @@ Task publishDeviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &pub
 Task calcWeatherDataLoop(30 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 0, NULL, NULL, 0);
 Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL, 0);
 Task calcPowerUsageLoop(1 * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
-Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
+Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL, 0);
 Task wsSendTelemetryLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, &wsSendEnable, NULL, 0);
 Task wsSendSensorsLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, &wsSendEnable, NULL, 0);
 Task relayControlBycp1ALoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlBycp1ACb, &r, 0, NULL, NULL, 0);
@@ -64,7 +64,7 @@ GenericCallback callbacks[callbacksSize] = {
   { "getCh3", processGetSwitchCh3},
   { "getCh4", processGetSwitchCh4},
   { "setPanic", processSetPanic},
-  { "britDge", processBridge},
+  { "bridge", processBridge},
   { "resetConfig",  processResetConfig},
   { "updateSpiffs", processUpdateSpiffs}
 };
@@ -274,7 +274,7 @@ void loadSettings()
   else { for(uint8_t i = 0; i < countof(mySettings.cp4B); i++) { mySettings.cp4B[i] = 0; } }
 
   if(doc["pR"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["pR"].as<JsonArray>()) { mySettings.pR[index] = v.as<uint8_t>(); index++; } } 
-  else { for(uint8_t i = 0; i < countof(mySettings.pR); i++) { mySettings.pR[i] = 0; } }
+  else { for(uint8_t i = 0; i < countof(mySettings.pR); i++) { mySettings.pR[i] = 6+i; } }
 
   if(doc["ON"] != nullptr) { mySettings.ON = doc["ON"].as<uint8_t>(); } else { mySettings.ON = 1; }
 
@@ -292,7 +292,7 @@ void loadSettings()
   if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
   else{mySettings.seaHpa = 1019.00;}
 
-  if(doc["lbll"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbll"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
+  if(doc["lbl"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbl"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.lbl); i++) { strlcpy(mySettings.lbl[i], "unnamed", sizeof(mySettings.lbl[i])); } }
 
   String tmp;
@@ -352,7 +352,7 @@ void saveSettings()
     pR.add(mySettings.pR[i]);
   }
 
-  JsonArray lbl = doc.createNestedArray("lbll");
+  JsonArray lbl = doc.createNestedArray("lbl");
   for(uint8_t i=0; i<countof(mySettings.lbl); i++)
   {
     lbl.add(mySettings.lbl[i]);
@@ -597,7 +597,7 @@ callbackResponse processBridge(const callbackData &data)
     serialWriteToCoMcu(doc, 1);
     String result;
     serializeJson(doc, result);
-    return callbackResponse("britDge", result.c_str());
+    return callbackResponse("bridge", result.c_str());
   }
   else if(doc["method"] == "resetPZEM"){
     HardwareSerial PZEMSerial(1);
@@ -609,7 +609,7 @@ callbackResponse processBridge(const callbackData &data)
     serialWriteToCoMcu(doc, 0);
     String result;
     serializeJson(doc, result);
-    return callbackResponse("britDge", result.c_str());
+    return callbackResponse("bridge", result.c_str());
   }
 }
 
@@ -730,7 +730,7 @@ void relayControlByIntrvlCb(){
 void relayControlByMultiTimeCb(){
   for(uint8_t i = 0; i < countof(mySettings.pR); i++){
     if(mySettings.cpM[i] == 3){
-      StaticJsonDocument<DOCSIZE_MIN> doc;
+      StaticJsonDocument<1024> doc;
       DeserializationError error = deserializeJson(doc, mySettings.cp3A[i]);
       if(error != DeserializationError::Ok){
         log_manager->warn(PSTR(__func__),PSTR("Failed to parse JSON for CH%d: %s\n"),i+1, mySettings.cp3A[i].c_str());
@@ -789,7 +789,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["model"] != nullptr){strlcpy(config.model, data["model"].as<const char*>(), sizeof(config.model));}
   if(data["group"] != nullptr){strlcpy(config.group, data["group"].as<const char*>(), sizeof(config.group));}
   if(data["broker"] != nullptr){strlcpy(config.broker, data["broker"].as<const char*>(), sizeof(config.broker));}
-  if(data["port"] != nullptr){data["port"].as<uint16_t>();}
+  if(data["port"] != nullptr){config.port = data["port"].as<uint16_t>();}
   if(data["wssid"] != nullptr){strlcpy(config.wssid, data["wssid"].as<const char*>(), sizeof(config.wssid));}
   if(data["wpass"] != nullptr){strlcpy(config.wpass, data["wpass"].as<const char*>(), sizeof(config.wpass));}
   if(data["dssid"] != nullptr){strlcpy(config.dssid, data["dssid"].as<const char*>(), sizeof(config.dssid));}
@@ -906,7 +906,7 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["cpM3"] != nullptr){mySettings.cpM[2] = data["cpM3"].as<uint8_t>();}
   if(data["cpM4"] != nullptr){mySettings.cpM[3] = data["cpM4"].as<uint8_t>();}
 
-  if(data["lbl1"] != nullptr){strlcpy(mySettings.lbl[0], data["lbl1"].as<const char*>(), sizeof(mySettings.lbl[0]));}
+  if(data["lbl1"] != nullptr){Serial.println("----------------------");strlcpy(mySettings.lbl[0], data["lbl1"].as<const char*>(), sizeof(mySettings.lbl[0]));}
   if(data["lbl2"] != nullptr){strlcpy(mySettings.lbl[1], data["lbl2"].as<const char*>(), sizeof(mySettings.lbl[1]));}
   if(data["lbl3"] != nullptr){strlcpy(mySettings.lbl[2], data["lbl3"].as<const char*>(), sizeof(mySettings.lbl[2]));}
   if(data["lbl4"] != nullptr){strlcpy(mySettings.lbl[3], data["lbl4"].as<const char*>(), sizeof(mySettings.lbl[3]));}
@@ -1253,7 +1253,7 @@ void wsSendAttributes(){
   doc["ch4"] = mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
   wsSend(doc);
   doc.clear();
-  JsonObject lbl = doc.createNestedObject("lbll");
+  JsonObject lbl = doc.createNestedObject("lbl");
   lbl["lbl1"] = mySettings.lbl[0];
   lbl["lbl2"] = mySettings.lbl[1];
   lbl["lbl3"] = mySettings.lbl[2];
