@@ -11,11 +11,9 @@
 
 using namespace libudawa;
 Settings mySettings;
-Adafruit_BME280 bme;
 Stream_Stats<float> _volt;
 Stream_Stats<float> _amp;
 Stream_Stats<float> _watt;
-Stream_Stats<float> _ener;
 Stream_Stats<float> _freq;
 Stream_Stats<float> _pf;
 
@@ -24,21 +22,36 @@ Stream_Stats<float> _rh;
 Stream_Stats<float> _hpa;
 Stream_Stats<float> _alt;
 
+#define INTV_publishSwitchLoop  1 * TASK_SECOND
+#define INTV_publishDeviceTelemetryLoop TASK_SECOND
+#define INTV_calcWeatherDataLoop 1 * TASK_SECOND
+#define INTV_calcPowerUsageLoop 1 * TASK_SECOND
+#define INTV_wsSendTelemetryLoop 1 * TASK_SECOND
+#define INTV_wsSendSensorsLoop 1 * TASK_SECOND
+#define INTV_relayControlCP1Loop 1 * TASK_SECOND
+#define INTV_relayControlCP2Loop 1 * TASK_SECOND
+#define INTV_relayControlCP3Loop 1 * TASK_SECOND
+#define INTV_relayControlCP4Loop 1 * TASK_SECOND
+#define INTV_selfDiagnosticShortLoop 120 * TASK_SECOND
+#define INTV_selfDiagnosticLongLoop 1800 * TASK_SECOND
+#define INTV_memoryMonitorLoop 10 * TASK_SECOND
+
 Task syncClientAttr(TASK_IMMEDIATE, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
-Task publishSwitchLoop(1 * TASK_SECOND, TASK_FOREVER, &publishSwitchCb, &r, 0, NULL, NULL, 0);
+Task publishSwitchLoop(INTV_publishSwitchLoop, TASK_FOREVER, &publishSwitchCb, &r, 0, NULL, NULL, 0);
 Task publishDeviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &publishDeviceTelemetryCb, &r, 0, NULL, NULL, 0);
-Task calcWeatherDataLoop(30 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 0, NULL, NULL, 0);
+Task calcWeatherDataLoop(INTV_calcWeatherDataLoop, TASK_FOREVER, &calcWeatherDataCb, &r, 0, NULL, NULL, 0);
 Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL, 0);
-Task calcPowerUsageLoop(1 * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
-Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL, 0);
-Task wsSendTelemetryLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, &wsSendEnable, NULL, 0);
-Task wsSendSensorsLoop(1 * TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, &wsSendEnable, NULL, 0);
-Task relayControlBycp1ALoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlBycp1ACb, &r, 0, NULL, NULL, 0);
-Task relayControlByDateTimeLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByDateTimeCb, &r, 0, NULL, NULL, 0);
-Task relayControlByIntrvlLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByIntrvlCb, &r, 0, NULL, NULL, 0);
-Task relayControlByMultiTimeLoop(1 * TASK_SECOND, TASK_FOREVER, &relayControlByMultiTimeCb, &r, 0, NULL, NULL, 0);
-Task selfDiagnosticShortLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticShortCb, &r, 0, NULL, NULL, 0);
-Task selfDiagnosticLongLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticLongCb, &r, 0, NULL, NULL, 0);
+Task calcPowerUsageLoop(INTV_calcPowerUsageLoop, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
+Task recPowerUsageLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL, 0);
+Task wsSendTelemetryLoop(INTV_wsSendTelemetryLoop, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, &wsSendEnable, NULL, 0);
+Task wsSendSensorsLoop(INTV_wsSendSensorsLoop, TASK_FOREVER, &wsSendSensorsCb, &r, 0, &wsSendEnable, NULL, 0);
+Task relayControlCP1Loop(INTV_relayControlCP1Loop, TASK_FOREVER, &relayControlCP1Cb, &r, 0, NULL, NULL, 0);
+Task relayControlCP2Loop(INTV_relayControlCP2Loop, TASK_FOREVER, &relayControlCP2Cb, &r, 0, NULL, NULL, 0);
+Task relayControlCP3Loop(INTV_relayControlCP3Loop, TASK_FOREVER, &relayControlCP3Cb, &r, 0, NULL, NULL, 0);
+Task relayControlCP4Loop(INTV_relayControlCP4Loop, TASK_FOREVER, &relayControlCP4Cb, &r, 0, NULL, NULL, 0);
+Task selfDiagnosticShortLoop(INTV_selfDiagnosticShortLoop, TASK_FOREVER, &selfDiagnosticShortCb, &r, 0, NULL, NULL, 0);
+Task selfDiagnosticLongLoop(INTV_selfDiagnosticLongLoop, TASK_FOREVER, &selfDiagnosticLongCb, &r, 0, NULL, NULL, 0);
+Task memoryMonitorLoop(INTV_memoryMonitorLoop, TASK_FOREVER, &memoryMonitorCb, &r, 0, NULL, NULL, 0);
 
 const size_t cbSize = 5;
 GCB cb[cbSize] = {
@@ -85,21 +98,19 @@ void setup()
   setSwitch("ch3", "OFF");
   setSwitch("ch4", "OFF");
 
-  mySettings.flag_bme280 = bme.begin(0x76);
-  if(!mySettings.flag_bme280){
-    log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
-  }
-
   calcPowerUsageLoop.enable();  
   calcWeatherDataLoop.enable();
 
-  relayControlBycp1ALoop.enable();
-  relayControlByDateTimeLoop.enable();
-  relayControlByIntrvlLoop.enable();
-  relayControlByMultiTimeLoop.enable();
+  relayControlCP1Loop.enable();
+  relayControlCP2Loop.enable();
+  relayControlCP3Loop.enable();
+  relayControlCP4Loop.enable();
   publishSwitchLoop.enable();
   selfDiagnosticShortLoop.enable();
   selfDiagnosticLongLoop.enable();
+  if(config.logLev == 5){
+    memoryMonitorLoop.enable();
+  }
 }
 
 void loop()
@@ -108,7 +119,6 @@ void loop()
 }
 
 void syncClientAttrCb(){
-  log_manager->debug(PSTR(__func__),PSTR("Executed.\n"));
   syncClientAttributes();
   wsSendAttributes();
   mySettings.publishSwitch[0] = true;
@@ -155,11 +165,10 @@ void selfDiagnosticShortCb(){
   if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 5){
     setAlarm(222, 1, 10, 1000);
   }
-
 }
 
-void selfDiagnosticLongCb(){
-
+void selfDiagnosticLongCb(){ 
+  
 }
 
 void calcPowerUsageCb(){
@@ -185,9 +194,20 @@ void calcPowerUsageCb(){
   if(!isnan(PZEM.pf())){
     _pf.Add(PZEM.pf());
   }
+
+  StaticJsonDocument<DOCSIZE_MIN> doc;
+  doc["_volt"] = PZEM.voltage();
+  doc["_amp"] = PZEM.current();
+  doc["_watt"] = PZEM.power();
+  doc["_freq"] = PZEM.frequency();
+  doc["_pf"] = PZEM.pf();
+  doc["_ener"] = PZEM.energy();
+
+  tb.sendAttributeDoc(doc);
 }
 
 void recPowerUsageCb(){
+  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   if(tb.connected()){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     doc["volt"] = _volt.Get_Average();
@@ -198,14 +218,7 @@ void recPowerUsageCb(){
 
     HardwareSerial PZEMSerial(1);
     PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-    float ener = PZEM.energy();
-    if(mySettings.lastEner == -1){
-      mySettings.lastEner = ener;
-    }
-    else{
-      doc["ener"] = ener - mySettings.lastEner;
-      mySettings.lastEner = ener;
-    }
+    doc["ener"] = PZEM.energy();
 
     tb.sendTelemetryDoc(doc);
     _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
@@ -213,6 +226,11 @@ void recPowerUsageCb(){
 }
 
 void calcWeatherDataCb(){
+  Adafruit_BME280 bme;
+  mySettings.flag_bme280 = bme.begin(0x76);
+  if(!mySettings.flag_bme280){
+    log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
+  }
   if(mySettings.flag_bme280){
     mySettings.celc = bme.readTemperature();
     mySettings.rh = bme.readHumidity();
@@ -223,10 +241,18 @@ void calcWeatherDataCb(){
     _rh.Add(mySettings.rh);
     _hpa.Add(mySettings.hpa);
     _alt.Add(mySettings.alt);
+
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    doc["_celc"] = mySettings.celc;
+    doc["_rh"] = mySettings.rh;
+    doc["_hpa"] = mySettings.hpa;
+    doc["_alt"] = mySettings.alt;
+    tb.sendAttributeDoc(doc);
   }
 }
 
 void recWeatherDataCb(){
+  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   if(tb.connected()){
     mySettings._celc = _celc.Get_Average();
     mySettings._rh = _rh.Get_Average();
@@ -675,7 +701,8 @@ void setSwitch(String ch, String state)
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
 }
 
-void relayControlByDateTimeCb(){
+void relayControlCP2Cb(){
+  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
@@ -695,8 +722,9 @@ void relayControlByDateTimeCb(){
   }
 }
 
-void relayControlBycp1ACb()
+void relayControlCP1Cb()
 {
+  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if (mySettings.cp1B[i] < 2){mySettings.cp1B[i] = 2;} //safenet
@@ -726,7 +754,8 @@ void relayControlBycp1ACb()
   }
 }
 
-void relayControlByIntrvlCb(){
+void relayControlCP4Cb(){
+  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if(mySettings.cp4A[i] != 0 && mySettings.cp4B[i] != 0 && mySettings.cpM[i] == 4)
@@ -746,7 +775,8 @@ void relayControlByIntrvlCb(){
   }
 }
 
-void relayControlByMultiTimeCb(){
+void relayControlCP3Cb(){
+  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++){
     if(mySettings.cpM[i] == 3){
       StaticJsonDocument<1024> doc;
@@ -1086,27 +1116,27 @@ void syncClientAttributes()
 
 void publishDeviceTelemetryCb()
 {
-  if(tb.connected()){
-    StaticJsonDocument<DOCSIZE_MIN> doc;
+    StaticJsonDocument<DOCSIZE_MIN> root;
+    JsonObject doc = root.to<JsonObject>();
 
     doc["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
     doc["rssi"] = WiFi.RSSI();
     doc["uptime"] = millis()/1000;
     doc["dt"] = rtc.getEpoch();
     doc["dts"] = rtc.getDateTime();
-    tb.sendTelemetryDoc(doc);
-    doc.clear();
-  }
+    tb.sendTelemetryObj(doc);
 }
 
 void publishSwitchCb(){
   for (uint8_t i = 0; i < 4; i++){
     if(mySettings.publishSwitch[i]){
       StaticJsonDocument<DOCSIZE_MIN> doc;
-      String chName = "ch" + String(i+1);
-      doc[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
       JsonObject data = doc.to<JsonObject>();
-      if(tb.connected()){ tb.sendTelemetryDoc(doc); }
+
+      String chName = "ch" + String(i+1);
+      data[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
+      
+      if(tb.connected()){ tb.sendTelemetryObj(data); }
       if(ws.count() > 0){ wsSend(data); }
       mySettings.publishSwitch[i] = false;
     }
@@ -1126,6 +1156,7 @@ void wsSend(JsonObject &doc, AsyncWebSocketClient * client){
 
 bool wsSendEnable(){
   if(config.fIface && (ws.count() > 0)){
+    log_manager->verbose(PSTR(__func__),PSTR("Enabled.\n"));
     return true;
   }
   else{
@@ -1287,3 +1318,7 @@ void wsSendAttributes(){
   root.clear();
 }
 
+void memoryMonitorCb(){
+  log_manager->verbose(PSTR(__func__), PSTR("Free: %d Total: %d Minimum: %d Largest: %d\n"), heap_caps_get_free_size(MALLOC_CAP_8BIT), 
+    heap_caps_get_total_size(MALLOC_CAP_8BIT), heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}

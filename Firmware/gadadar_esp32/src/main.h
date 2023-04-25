@@ -86,8 +86,6 @@ struct Settings
     bool flag_bme280 = false;
     float seaHpa = 1019.00;
 
-    float lastEner = -1;
-
     float _celc = 0.0;
     float _rh = 0.0;
     float _hpa = 0.0;
@@ -124,10 +122,10 @@ JsonObject processOnUpdateFinished(JsonObject &data);
 
 void loadSettings();
 void saveSettings();
-void relayControlBycp1ACb();
-void relayControlByDateTimeCb();
-void relayControlByIntrvlCb();
-void relayControlByMultiTimeCb();
+void relayControlCP1Cb();
+void relayControlCP2Cb();
+void relayControlCP3Cb();
+void relayControlCP4Cb();
 void syncClientAttributes();
 void publishDeviceTelemetryCb();
 void setSwitch(String  ch, String state);
@@ -145,5 +143,6 @@ void calcPowerUsageCb();
 void calcWeatherDataCb();
 void syncClientAttrCb();
 bool wsSendEnable();
+void memoryMonitorCb();
 
 #endif
