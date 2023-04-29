@@ -35,7 +35,6 @@ Stream_Stats<float> _alt;
 #define INTV_relayControlCP4Loop 1 * TASK_SECOND
 #define INTV_selfDiagnosticShortLoop 120 * TASK_SECOND
 #define INTV_selfDiagnosticLongLoop 1800 * TASK_SECOND
-#define INTV_memoryMonitorLoop 10 * TASK_SECOND
 
 Task syncClientAttr(TASK_IMMEDIATE, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
 Task publishSwitchLoop(INTV_publishSwitchLoop, TASK_FOREVER, &publishSwitchCb, &r, 0, NULL, NULL, 0);
@@ -52,7 +51,6 @@ Task relayControlCP3Loop(INTV_relayControlCP3Loop, TASK_FOREVER, &relayControlCP
 Task relayControlCP4Loop(INTV_relayControlCP4Loop, TASK_FOREVER, &relayControlCP4Cb, &r, 0, NULL, NULL, 0);
 Task selfDiagnosticShortLoop(INTV_selfDiagnosticShortLoop, TASK_FOREVER, &selfDiagnosticShortCb, &r, 0, NULL, NULL, 0);
 Task selfDiagnosticLongLoop(INTV_selfDiagnosticLongLoop, TASK_FOREVER, &selfDiagnosticLongCb, &r, 0, NULL, NULL, 0);
-Task memoryMonitorLoop(INTV_memoryMonitorLoop, TASK_FOREVER, &memoryMonitorCb, &r, 0, NULL, NULL, 0);
 
 const size_t cbSize = 5;
 GCB cb[cbSize] = {
@@ -114,9 +112,6 @@ void setup()
   publishSwitchLoop.enable();
   selfDiagnosticShortLoop.enable();
   selfDiagnosticLongLoop.enable();
-  if(config.logLev == 5){
-    memoryMonitorLoop.enable();
-  }
 }
 
 void loop()
@@ -1313,9 +1308,4 @@ void wsSendAttributes(){
   lbl["lbl4"] = mySettings.lbl[3];
   wsSend(doc);
   root.clear();
-}
-
-void memoryMonitorCb(){
-  log_manager->verbose(PSTR(__func__), PSTR("Free: %d Total: %d Minimum: %d Largest: %d\n"), heap_caps_get_free_size(MALLOC_CAP_8BIT), 
-    heap_caps_get_total_size(MALLOC_CAP_8BIT), heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }

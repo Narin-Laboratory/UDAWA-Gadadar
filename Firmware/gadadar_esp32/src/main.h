@@ -144,6 +144,5 @@ void calcPowerUsageCb();
 void calcWeatherDataCb();
 void syncClientAttrCb();
 bool wsSendEnable();
-void memoryMonitorCb();
 
 #endif
