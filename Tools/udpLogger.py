@@ -10,15 +10,15 @@ sock = socket.socket(socket.AF_INET, # Internet
 sock.bind((UDP_IP, UDP_PORT))
 
 logging.basicConfig(
-    filename='udawa.log',
-    filemode='a',
+    #filename='udawa.log',
+    #filemode='a',
     format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.DEBUG,
     datefmt='%Y-%m-%d %H:%M:%S')
 
 while True:
     try:
-        data, addr = sock.recvfrom(512)
+        data, addr = sock.recvfrom(1024)
         text = data.decode("utf-8")
         text = text.strip()
         msg = text.split('~');

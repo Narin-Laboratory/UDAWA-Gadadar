@@ -285,8 +285,12 @@ void loadSettings()
   if(doc["cp2B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp2B"].as<JsonArray>()) { mySettings.cp2B[index] = v.as<unsigned long>(); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.cp2B); i++) { mySettings.cp2B[i] = 0; } }
 
-  if(doc["cp3A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp3A"].as<JsonArray>()) { mySettings.cp3A[index] = v.as<String>(); index++; } } 
-  else { for(uint8_t i = 0; i < countof(mySettings.cp3A); i++) { mySettings.cp3A[i] = "[{}]"; } }
+  if(doc["cp3A"] != nullptr) {
+    for(uint8_t i=0; i<countof(mySettings.cp3A); i++)
+    {
+      serializeJson(doc["cp3A"][i], mySettings.cp3A[i]);
+    }
+  }
 
 
   if(doc["cp4A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp4A"].as<JsonArray>()) { mySettings.cp4A[index] = v.as<unsigned long>(); index++; } } 
@@ -353,7 +357,14 @@ void saveSettings()
   JsonArray cp3A = doc.createNestedArray("cp3A");
   for(uint8_t i=0; i<countof(mySettings.cp3A); i++)
   {
-    cp3A.add(mySettings.cp3A[i]);
+    String index = String("cp3A") + String(i + 1);
+    StaticJsonDocument<DOCSIZE_MIN> data;
+    DeserializationError err = deserializeJson(data, mySettings.cp3A[i]);
+    if(err == DeserializationError::Ok){
+      cp3A.add(data);
+    }else{
+      log_manager->verbose(PSTR(__func__),PSTR("%s setting parse failed: %s (%s).\n"), index.c_str(), mySettings.cp3A[i].c_str(), err.c_str());
+    }
   }
 
   JsonArray cp4A = doc.createNestedArray("cp4A");
@@ -514,7 +525,7 @@ JsonObject processOnTbDisconnected(JsonObject &data){
 }
 
 JsonObject processEmitAlarmWs(JsonObject &data){
-  if(config.fIface){
+  if(!config.fIface || config.wsCount < 1){
     return data;
   }
   wsSend(data);
@@ -1102,6 +1113,8 @@ void syncClientAttributes()
   doc["fWOTA"] = (int)config.fWOTA;
   doc["fIface"] = (int)config.fIface;
   doc["hname"] = config.hname;
+  doc["logIP"] = config.logIP;
+  doc["logPrt"] = config.logPrt;
   tb.sendAttributeObj(doc);
   root.clear();
 }
@@ -1237,6 +1250,8 @@ void wsSendAttributes(){
   cfg["fWOTA"] = (int)config.fWOTA;
   cfg["fIface"] = (int)config.fIface;
   cfg["hname"] = config.hname;
+  cfg["logIP"] = config.logIP;
+  cfg["logPrt"] = config.logPrt;
   wsSend(doc);
   root.clear();
   JsonObject cp1A = doc.createNestedObject("cp1A");
