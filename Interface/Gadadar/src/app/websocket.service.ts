@@ -4,7 +4,7 @@ import { AnonymousSubject } from 'rxjs/internal/Subject';
 import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-const UDAWA_WS = "ws://" + window.location.hostname + "/ws";
+const UDAWA_WS = "ws://" + window.location.hostname + ":81";
 
 export interface Message {}
 

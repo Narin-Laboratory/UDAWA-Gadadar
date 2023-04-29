@@ -51,6 +51,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define DOCSIZE 2048
 #define DOCSIZE_MIN 512
 #define USE_SERIAL2
+#define USE_WEB_IFACE
 #include <libudawa.h>
 #include <TimeLib.h>
 #include <HardwareSerial.h>
@@ -133,7 +134,7 @@ void publishSwitchCb();
 void recPowerUsageCb();
 void recWeatherDataCb();
 void wsSend(JsonObject &doc);
-void wsSend(JsonObject &doc, AsyncWebSocketClient * client);
+void wsSend(JsonObject &doc, uint8_t num);
 void wsSendTelemetryCb();
 void wsSendSensorsCb();
 void wsSendAttributes();

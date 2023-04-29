@@ -11,6 +11,7 @@
 
 using namespace libudawa;
 Settings mySettings;
+Adafruit_BME280 bme;
 Stream_Stats<float> _volt;
 Stream_Stats<float> _amp;
 Stream_Stats<float> _watt;
@@ -97,6 +98,11 @@ void setup()
   setSwitch("ch2", "OFF");
   setSwitch("ch3", "OFF");
   setSwitch("ch4", "OFF");
+
+  mySettings.flag_bme280 = bme.begin(0x76);
+  if(!mySettings.flag_bme280){
+    log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
+  }
 
   calcPowerUsageLoop.enable();  
   calcWeatherDataLoop.enable();
@@ -207,7 +213,7 @@ void calcPowerUsageCb(){
 }
 
 void recPowerUsageCb(){
-  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   if(tb.connected()){
     StaticJsonDocument<DOCSIZE_MIN> doc;
     doc["volt"] = _volt.Get_Average();
@@ -226,11 +232,6 @@ void recPowerUsageCb(){
 }
 
 void calcWeatherDataCb(){
-  Adafruit_BME280 bme;
-  mySettings.flag_bme280 = bme.begin(0x76);
-  if(!mySettings.flag_bme280){
-    log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
-  }
   if(mySettings.flag_bme280){
     mySettings.celc = bme.readTemperature();
     mySettings.rh = bme.readHumidity();
@@ -252,7 +253,7 @@ void calcWeatherDataCb(){
 }
 
 void recWeatherDataCb(){
-  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   if(tb.connected()){
     mySettings._celc = _celc.Get_Average();
     mySettings._rh = _rh.Get_Average();
@@ -416,32 +417,28 @@ JsonObject processWsEvent(JsonObject &doc){
   int evType = doc["evType"].as<int>();
 
 
-  if(evType == (int)WS_EVT_CONNECT){
+  if(evType == (int)WStype_CONNECTED){
     syncClientAttr.setInterval(TASK_IMMEDIATE);
     syncClientAttr.setIterations(TASK_ONCE);
-    syncClientAttr.enable();
+    syncClientAttr.enableIfNot();
 
-    wsSendTelemetryLoop.setInterval(1 * TASK_SECOND);
+    wsSendTelemetryLoop.setInterval(INTV_wsSendTelemetryLoop);
     wsSendTelemetryLoop.setIterations(TASK_FOREVER);
-    wsSendTelemetryLoop.setCallback(&wsSendTelemetryCb);
-    wsSendTelemetryLoop.setOnEnable(&wsSendEnable);
-    wsSendTelemetryLoop.enable();
+    wsSendTelemetryLoop.enableIfNot();
 
-    wsSendSensorsLoop.setInterval(1 * TASK_SECOND);
+    wsSendSensorsLoop.setInterval(INTV_wsSendSensorsLoop);
     wsSendSensorsLoop.setIterations(TASK_FOREVER);
-    wsSendSensorsLoop.setCallback(&wsSendSensorsCb);
-    wsSendSensorsLoop.setOnEnable(&wsSendEnable);
-    wsSendSensorsLoop.enable();
+    wsSendSensorsLoop.enableIfNot();
 
   }
-  if(evType == (int)WS_EVT_DISCONNECT){
-    if(ws.count() < 1){
+  if(evType == (int)WStype_DISCONNECTED){
+    if(config.wsCount < 1){
       wsSendTelemetryLoop.disable();
       wsSendSensorsLoop.disable();
       log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
     }
   }
-  else if(evType == (int)WS_EVT_DATA){
+  else if(evType == (int)WStype_TEXT){
     if(doc["cmd"] == nullptr){
       log_manager->debug(PSTR(__func__), "Command not found.\n");
       return doc;
@@ -522,7 +519,7 @@ JsonObject processOnTbDisconnected(JsonObject &data){
 }
 
 JsonObject processEmitAlarmWs(JsonObject &data){
-  if(ws.count() < 1){
+  if(config.fIface){
     return data;
   }
   wsSend(data);
@@ -702,7 +699,7 @@ void setSwitch(String ch, String state)
 }
 
 void relayControlCP2Cb(){
-  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
@@ -724,7 +721,7 @@ void relayControlCP2Cb(){
 
 void relayControlCP1Cb()
 {
-  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if (mySettings.cp1B[i] < 2){mySettings.cp1B[i] = 2;} //safenet
@@ -755,7 +752,7 @@ void relayControlCP1Cb()
 }
 
 void relayControlCP4Cb(){
-  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if(mySettings.cp4A[i] != 0 && mySettings.cp4B[i] != 0 && mySettings.cpM[i] == 4)
@@ -776,7 +773,7 @@ void relayControlCP4Cb(){
 }
 
 void relayControlCP3Cb(){
-  log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
   for(uint8_t i = 0; i < countof(mySettings.pR); i++){
     if(mySettings.cpM[i] == 3){
       StaticJsonDocument<1024> doc;
@@ -1137,7 +1134,7 @@ void publishSwitchCb(){
       data[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
       
       if(tb.connected()){ tb.sendTelemetryObj(data); }
-      if(ws.count() > 0){ wsSend(data); }
+      if(config.fIface){ wsSend(data); }
       mySettings.publishSwitch[i] = false;
     }
   }
@@ -1146,16 +1143,16 @@ void publishSwitchCb(){
 void wsSend(JsonObject &doc){
   String buffer;
   serializeJson(doc, buffer);
-  ws.textAll(buffer.c_str());
+  ws.broadcastTXT(buffer);
 }
-void wsSend(JsonObject &doc, AsyncWebSocketClient * client){
+void wsSend(JsonObject &doc, uint8_t num){
   String buffer;
   serializeJson(doc, buffer);
-  ws.text(client->id(), buffer.c_str());
+  ws.sendTXT(num, buffer);
 }
 
 bool wsSendEnable(){
-  if(config.fIface && (ws.count() > 0)){
+  if(config.fIface){
     log_manager->verbose(PSTR(__func__),PSTR("Enabled.\n"));
     return true;
   }
@@ -1165,7 +1162,7 @@ bool wsSendEnable(){
 }
 
 void wsSendTelemetryCb(){
-  if(ws.count() > 0){
+  if(config.fIface){
     StaticJsonDocument<DOCSIZE_MIN> root;
     JsonObject doc = root.to<JsonObject>();
     JsonObject devTel = doc.createNestedObject("devTel");
@@ -1179,7 +1176,7 @@ void wsSendTelemetryCb(){
 }
 
 void wsSendSensorsCb(){
-  if(ws.count() > 0){
+  if(config.fIface){
     HardwareSerial PZEMSerial(1);
     PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
