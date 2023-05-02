@@ -54,7 +54,6 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define USE_WEB_IFACE
 #include <libudawa.h>
 #include <TimeLib.h>
-#include <HardwareSerial.h>
 #include <PZEM004Tv30.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
@@ -69,7 +68,6 @@ struct Settings
     unsigned long cp1B[4];
     uint8_t pR[4];
     String cp3A[4];
-    uint32_t lastUpdated;
     uint8_t ON;
     bool dutyState[4];
     unsigned long stateOnTs[4];
@@ -100,49 +98,27 @@ struct Settings
     char lbl[4][16];
 };
 
-callbackResponse processSaveConfig(const callbackData &data);
-callbackResponse processSaveSettings(const callbackData &data);
-callbackResponse processSharedAttributesUpdate(const callbackData &data);
-callbackResponse processSyncClientAttributes(const callbackData &data);
-callbackResponse processReboot(const callbackData &data);
-callbackResponse processSetSwitch(const callbackData &data);
-callbackResponse processGetSwitchCh1(const callbackData &data);
-callbackResponse processGetSwitchCh2(const callbackData &data);
-callbackResponse processGetSwitchCh3(const callbackData &data);
-callbackResponse processGetSwitchCh4(const callbackData &data);
-callbackResponse processSaveConfigCoMCU(const callbackData &data);
-callbackResponse processSetPanic(const callbackData &data);
-callbackResponse processBridge(const callbackData &data);
-callbackResponse processResetConfig(const callbackData &data);
-callbackResponse processUpdateSpiffs(const callbackData &data);
-JsonObject processEmitAlarmWs(JsonObject &data);
-JsonObject processWsEvent(JsonObject &data);
-JsonObject processOnTbConnected(JsonObject &data);
-JsonObject processOnTbDisconnected(JsonObject &data);
-JsonObject processOnUpdateFinished(JsonObject &data);
-
 void loadSettings();
 void saveSettings();
 void relayControlCP1Cb();
 void relayControlCP2Cb();
 void relayControlCP3Cb();
 void relayControlCP4Cb();
-void syncClientAttributes();
-void publishDeviceTelemetryCb();
 void setSwitch(String  ch, String state);
-void publishSwitchCb();
 void recPowerUsageCb();
 void recWeatherDataCb();
-void wsSend(JsonObject &doc);
-void wsSend(JsonObject &doc, uint8_t num);
-void wsSendTelemetryCb();
-void wsSendSensorsCb();
-void wsSendAttributes();
-void selfDiagnosticShortCb();
-void selfDiagnosticLongCb();
 void calcPowerUsageCb();
 void calcWeatherDataCb();
-void syncClientAttrCb();
-bool wsSendEnable();
-
+void selfDiagnosticCb();
+void attUpdateCb(const Shared_Attribute_Data &data);
+void onTbConnected();
+void onTbDisconnected();
+void setPanic(const RPC_Data &data);
+RPC_Response genericClientRPC(const RPC_Data &data);
+void onReboot();
+void stateReset(bool resetOpMode);
+void deviceTelemetryLoopCb();
+void onAlarm(int code);
+void publishSwitchCb();
+void onSyncClientAttr();
 #endif

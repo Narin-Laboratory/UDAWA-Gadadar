@@ -23,95 +23,64 @@ Stream_Stats<float> _rh;
 Stream_Stats<float> _hpa;
 Stream_Stats<float> _alt;
 
-#define INTV_publishSwitchLoop  1 * TASK_SECOND
-#define INTV_publishDeviceTelemetryLoop TASK_SECOND
-#define INTV_calcWeatherDataLoop 1 * TASK_SECOND
-#define INTV_calcPowerUsageLoop 1 * TASK_SECOND
-#define INTV_wsSendTelemetryLoop 1 * TASK_SECOND
-#define INTV_wsSendSensorsLoop 1 * TASK_SECOND
-#define INTV_relayControlCP1Loop 1 * TASK_SECOND
-#define INTV_relayControlCP2Loop 1 * TASK_SECOND
-#define INTV_relayControlCP3Loop 1 * TASK_SECOND
-#define INTV_relayControlCP4Loop 1 * TASK_SECOND
-#define INTV_selfDiagnosticShortLoop 120 * TASK_SECOND
-#define INTV_selfDiagnosticLongLoop 1800 * TASK_SECOND
+Task relayControlCP1Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP1Cb, &r, 1, NULL, NULL);
+Task relayControlCP2Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP2Cb, &r, 1, NULL, NULL);
+Task relayControlCP3Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP3Cb, &r, 1, NULL, NULL);
+Task relayControlCP4Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP4Cb, &r, 1, NULL, NULL);
+Task selfDiagnosticLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticCb, &r, 1, NULL, NULL);
+Task taskPublishSwitch(TASK_IMMEDIATE, TASK_ONCE, &publishSwitchCb, &r, 0, NULL, NULL);
 
-Task syncClientAttr(TASK_IMMEDIATE, TASK_ONCE, &syncClientAttrCb, &r, 0, NULL, NULL, 0);
-Task publishSwitchLoop(INTV_publishSwitchLoop, TASK_FOREVER, &publishSwitchCb, &r, 0, NULL, NULL, 0);
-Task publishDeviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &publishDeviceTelemetryCb, &r, 0, NULL, NULL, 0);
-Task calcWeatherDataLoop(INTV_calcWeatherDataLoop, TASK_FOREVER, &calcWeatherDataCb, &r, 0, NULL, NULL, 0);
-Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL, 0);
-Task calcPowerUsageLoop(INTV_calcPowerUsageLoop, TASK_FOREVER, &calcPowerUsageCb, &r, 0, NULL, NULL, 0);
-Task recPowerUsageLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL, 0);
-Task wsSendTelemetryLoop(INTV_wsSendTelemetryLoop, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, &wsSendEnable, NULL, 0);
-Task wsSendSensorsLoop(INTV_wsSendSensorsLoop, TASK_FOREVER, &wsSendSensorsCb, &r, 0, &wsSendEnable, NULL, 0);
-Task relayControlCP1Loop(INTV_relayControlCP1Loop, TASK_FOREVER, &relayControlCP1Cb, &r, 0, NULL, NULL, 0);
-Task relayControlCP2Loop(INTV_relayControlCP2Loop, TASK_FOREVER, &relayControlCP2Cb, &r, 0, NULL, NULL, 0);
-Task relayControlCP3Loop(INTV_relayControlCP3Loop, TASK_FOREVER, &relayControlCP3Cb, &r, 0, NULL, NULL, 0);
-Task relayControlCP4Loop(INTV_relayControlCP4Loop, TASK_FOREVER, &relayControlCP4Cb, &r, 0, NULL, NULL, 0);
-Task selfDiagnosticShortLoop(INTV_selfDiagnosticShortLoop, TASK_FOREVER, &selfDiagnosticShortCb, &r, 0, NULL, NULL, 0);
-Task selfDiagnosticLongLoop(INTV_selfDiagnosticLongLoop, TASK_FOREVER, &selfDiagnosticLongCb, &r, 0, NULL, NULL, 0);
-
-const size_t cbSize = 5;
-GCB cb[cbSize] = {
-  { "emitAlarmWs", processEmitAlarmWs },
-  { "wsEvent", processWsEvent },
-  { "onTbConnected", processOnTbConnected },
-  { "onTbDisconnected", processOnTbDisconnected },
-  { "onUpdateFinished", processOnUpdateFinished }
-};
-
-const size_t callbacksSize = 16;
-GenericCallback callbacks[callbacksSize] = {
-  { "sharedAttributesUpdate", processSharedAttributesUpdate },
-  { "provisionResponse", processProvisionResponse },
-  { "saveConfig", processSaveConfig },
-  { "saveSettings", processSaveSettings },
-  { "saveConfigCoMCU", processSaveConfigCoMCU },
-  { "syncClientAttributes", processSyncClientAttributes },
-  { "reboot", processReboot },
-  { "setSwitch", processSetSwitch },
-  { "getCh1", processGetSwitchCh1},
-  { "getCh2", processGetSwitchCh2},
-  { "getCh3", processGetSwitchCh3},
-  { "getCh4", processGetSwitchCh4},
-  { "setPanic", processSetPanic},
-  { "bridge", processBridge},
-  { "resetConfig",  processResetConfig},
-  { "updateSpiffs", processUpdateSpiffs}
-};
+Task calcPowerUsageLoop(TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 1, NULL, NULL);
+Task calcWeatherDataLoop(60 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 1, NULL, NULL);
+Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL);
+Task recWeatherDataLoop((mySettings.itW + 120) * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL);
+Task deviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &deviceTelemetryLoopCb, &r, 0, NULL, NULL);
 
 void setup()
 {
+  long startMillis = millis();
+
+  processSharedAttributeUpdateCb = &attUpdateCb;
+  onTbDisconnectedCb = &onTbDisconnected;
+  onTbConnectedCb = &onTbConnected;
+  processSaveSettingsCb = &saveSettings;
+  processSetPanicCb = &setPanic;
+  processGenericClientRPCCb = &genericClientRPC;
+  plannedRebootOnEnableCb = &onReboot;
+  emitAlarmCb = &onAlarm;
+  onSyncClientAttrCb = &onSyncClientAttr;
   startup();
   loadSettings();
   syncConfigCoMCU();
   if(String(config.model) == String("Generic")){
     strlcpy(config.model, "Gadadar", sizeof(config.model));
   }
-  cbSubscribe(cb, cbSize);
   setAlarm(999, 1, 1, 3000);
-
-  setSwitch("ch1", "OFF");
-  setSwitch("ch2", "OFF");
-  setSwitch("ch3", "OFF");
-  setSwitch("ch4", "OFF");
+  stateReset(0);
 
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }
 
-  calcPowerUsageLoop.enable();  
-  calcWeatherDataLoop.enable();
+  if(mySettings.itD > 0){
+    deviceTelemetryLoop.setInterval(mySettings.itD * TASK_SECOND);
+    deviceTelemetryLoop.setIterations(TASK_FOREVER);
+    deviceTelemetryLoop.enable();
+  }
 
-  relayControlCP1Loop.enable();
-  relayControlCP2Loop.enable();
-  relayControlCP3Loop.enable();
-  relayControlCP4Loop.enable();
-  publishSwitchLoop.enable();
-  selfDiagnosticShortLoop.enable();
-  selfDiagnosticLongLoop.enable();
+  if(mySettings.itP > 0){
+    recPowerUsageLoop.setInterval(mySettings.itP * TASK_SECOND);
+    recPowerUsageLoop.setIterations(TASK_FOREVER);
+    recPowerUsageLoop.enable();
+  }
+  if(mySettings.itW > 0){
+    recWeatherDataLoop.setInterval((mySettings.itW + 120) * TASK_SECOND);
+    recWeatherDataLoop.setIterations(TASK_FOREVER);
+    recWeatherDataLoop.enable();
+  }
+
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void loop()
@@ -119,16 +88,9 @@ void loop()
   udawa();
 }
 
-void syncClientAttrCb(){
-  syncClientAttributes();
-  wsSendAttributes();
-  mySettings.publishSwitch[0] = true;
-  mySettings.publishSwitch[1] = true;
-  mySettings.publishSwitch[2] = true;
-  mySettings.publishSwitch[3] = true;
-}
+void selfDiagnosticCb(){
+  long startMillis = millis();
 
-void selfDiagnosticShortCb(){
   HardwareSerial PZEMSerial(1);
   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
@@ -166,67 +128,71 @@ void selfDiagnosticShortCb(){
   if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 5){
     setAlarm(222, 1, 10, 1000);
   }
-}
 
-void selfDiagnosticLongCb(){ 
-  
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void calcPowerUsageCb(){
+  long startMillis = millis();
+
   HardwareSerial PZEMSerial(1);
   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
+  
+  if(isnan(PZEM.voltage())){return;}
+  
   if(!isnan(PZEM.voltage())){
     _volt.Add(PZEM.voltage());
+    tb.sendAttributeFloat("_volt", PZEM.voltage());
+    tb.sendAttributeFloat("_ener", PZEM.energy());
   }
 
   if(!isnan(PZEM.current())){
     _amp.Add(PZEM.current());
+    tb.sendAttributeFloat("_amp", PZEM.current());
   }
 
   if(!isnan(PZEM.power())){
     _watt.Add(PZEM.power());
+    tb.sendAttributeFloat("_watt", PZEM.power());
   }
 
   if(!isnan(PZEM.frequency())){
     _freq.Add(PZEM.frequency());
+    tb.sendAttributeFloat("_freq", PZEM.frequency());
   }
 
   if(!isnan(PZEM.pf())){
     _pf.Add(PZEM.pf());
+    tb.sendAttributeFloat("_pf", PZEM.pf());
   }
 
-  StaticJsonDocument<DOCSIZE_MIN> doc;
-  doc["_volt"] = PZEM.voltage();
-  doc["_amp"] = PZEM.current();
-  doc["_watt"] = PZEM.power();
-  doc["_freq"] = PZEM.frequency();
-  doc["_pf"] = PZEM.pf();
-  doc["_ener"] = PZEM.energy();
-
-  tb.sendAttributeDoc(doc);
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void recPowerUsageCb(){
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  long startMillis = millis();
+
   if(tb.connected()){
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    doc["volt"] = _volt.Get_Average();
-    doc["amp"] = _amp.Get_Average();
-    doc["watt"] = _watt.Get_Average();
-    doc["freq"] = _freq.Get_Average();
-    doc["pf"] = _pf.Get_Average();
+    tb.sendTelemetryFloat("volt", _volt.Get_Average());
+    tb.sendTelemetryFloat("amp", _amp.Get_Average());
+    tb.sendTelemetryFloat("watt", _watt.Get_Average());
+    tb.sendTelemetryFloat("freq",  _freq.Get_Average());
+    tb.sendTelemetryFloat("pf",  _pf.Get_Average());
 
     HardwareSerial PZEMSerial(1);
     PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-    doc["ener"] = PZEM.energy();
+    tb.sendTelemetryFloat("ener", PZEM.energy());
 
-    tb.sendTelemetryDoc(doc);
+   
     _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
   }
+
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void calcWeatherDataCb(){
+  long startMillis = millis();
+
   if(mySettings.flag_bme280){
     mySettings.celc = bme.readTemperature();
     mySettings.rh = bme.readHumidity();
@@ -238,35 +204,38 @@ void calcWeatherDataCb(){
     _hpa.Add(mySettings.hpa);
     _alt.Add(mySettings.alt);
 
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    doc["_celc"] = mySettings.celc;
-    doc["_rh"] = mySettings.rh;
-    doc["_hpa"] = mySettings.hpa;
-    doc["_alt"] = mySettings.alt;
-    tb.sendAttributeDoc(doc);
+    tb.sendAttributeFloat("_celc",mySettings.celc);
+    tb.sendAttributeFloat("_rh", mySettings.rh);
+    tb.sendAttributeFloat("_hpa", mySettings.hpa);
+    tb.sendAttributeFloat("_alt", mySettings.alt);
   }
+
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void recWeatherDataCb(){
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  long startMillis = millis();
+
   if(tb.connected()){
     mySettings._celc = _celc.Get_Average();
     mySettings._rh = _rh.Get_Average();
     mySettings._hpa = _hpa.Get_Average();
     mySettings._alt = _alt.Get_Average();
 
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    doc["celc"] = mySettings._celc;
-    doc["rh"] = mySettings._rh;
-    doc["hpa"] = mySettings._hpa;
-    doc["alt"] = mySettings._alt;
-    tb.sendTelemetryDoc(doc);
+    tb.sendTelemetryFloat("celc",mySettings._celc);
+    tb.sendTelemetryFloat("rh", mySettings._rh);
+    tb.sendTelemetryFloat("hpa", mySettings._hpa);
+    tb.sendTelemetryFloat("alt", mySettings._alt);
     _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear();
   }
+
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void loadSettings()
 {
+  long startMillis = millis();
+
   StaticJsonDocument<DOCSIZE> doc;
   readSettings(doc, settingsPath);
 
@@ -324,10 +293,14 @@ void loadSettings()
   String tmp;
   if(config.logLev >= 4){serializeJson(doc, tmp);}
   log_manager->debug(PSTR(__func__), "Loaded settings:\n %s \n", tmp.c_str());
+
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void saveSettings()
 {
+  long startMillis = millis();
+
   StaticJsonDocument<DOCSIZE> doc;
 
   JsonArray cp1A = doc.createNestedArray("cp1A");
@@ -408,278 +381,14 @@ void saveSettings()
   String tmp;
   if(config.logLev >= 4){serializeJson(doc, tmp);}
   log_manager->debug(PSTR(__func__), "Written settings:\n %s \n", tmp.c_str());
-}
 
-JsonObject processOnUpdateFinished(JsonObject &data){
-  saveSettings();
-  return data;
-}
-
-JsonObject processWsEvent(JsonObject &doc){
-  if(doc["evType"] == nullptr){
-    log_manager->debug(PSTR(__func__), "Event type not found.\n");
-    return doc;
-  }
-  int evType = doc["evType"].as<int>();
-
-
-  if(evType == (int)WStype_CONNECTED){
-    syncClientAttr.setInterval(TASK_IMMEDIATE);
-    syncClientAttr.setIterations(TASK_ONCE);
-    syncClientAttr.enableIfNot();
-
-    wsSendTelemetryLoop.setInterval(INTV_wsSendTelemetryLoop);
-    wsSendTelemetryLoop.setIterations(TASK_FOREVER);
-    wsSendTelemetryLoop.enableIfNot();
-
-    wsSendSensorsLoop.setInterval(INTV_wsSendSensorsLoop);
-    wsSendSensorsLoop.setIterations(TASK_FOREVER);
-    wsSendSensorsLoop.enableIfNot();
-
-  }
-  if(evType == (int)WStype_DISCONNECTED){
-    if(config.wsCount < 1){
-      wsSendTelemetryLoop.disable();
-      wsSendSensorsLoop.disable();
-      log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
-    }
-  }
-  else if(evType == (int)WStype_TEXT){
-    if(doc["cmd"] == nullptr){
-      log_manager->debug(PSTR(__func__), "Command not found.\n");
-      return doc;
-    }
-    const char* cmd = doc["cmd"].as<const char*>();
-    if(strcmp(cmd, (const char*) "attr") == 0){
-      processSharedAttributesUpdate(doc);
-      syncClientAttr.setInterval(TASK_IMMEDIATE);
-      syncClientAttr.setIterations(TASK_ONCE);
-      syncClientAttr.enable();
-    }
-    else if(strcmp(cmd, (const char*) "saveSettings") == 0){
-      saveSettings();
-    }
-    else if(strcmp(cmd, (const char*) "saveConfig") == 0){
-      configSave();
-    }
-    else if(strcmp(cmd, (const char*) "setPanic") == 0){
-      JsonObject params = doc.createNestedObject("params");
-      params["state"]= "ON";
-      processSetPanic(doc);
-    }
-    else if(strcmp(cmd, (const char*) "reboot") == 0){
-      reboot();
-    }
-    else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-      setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
-    }
-  }
-
-  return doc;
-}
-
-JsonObject processOnTbConnected(JsonObject &data){
-  StaticJsonDocument<DOCSIZE_MIN> doc;
-  doc["method"] = "sharedAttributesUpdate";
-  JsonObject params = doc.createNestedObject("params");
-  params["name"] = config.name;
-  JsonObject payload = doc.template as<JsonObject>();
-  tb.server_rpc_call(payload);
-
-  if(tb.callbackSubscribe(callbacks, callbacksSize))
-  {
-    log_manager->info(PSTR(__func__),PSTR("Callbacks subscribed successfuly!\n"));
-  }
-  if (tb.Firmware_Update(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION))
-  {
-    log_manager->info(PSTR(__func__),PSTR("OTA Update finished, rebooting...\n"));
-    reboot();
-  }
-
-  syncClientAttr.setInterval(TASK_IMMEDIATE);
-  syncClientAttr.setIterations(TASK_ONCE);
-  syncClientAttr.enable();
-
-  publishDeviceTelemetryLoop.setInterval(mySettings.itD * TASK_SECOND);
-  publishDeviceTelemetryLoop.setIterations(TASK_FOREVER);
-  publishDeviceTelemetryLoop.setCallback(&publishDeviceTelemetryCb);
-  publishDeviceTelemetryLoop.enable();
-
-  recPowerUsageLoop.setInterval(mySettings.itP * TASK_SECOND);
-  recPowerUsageLoop.setIterations(TASK_FOREVER);
-  recPowerUsageLoop.setCallback(&recPowerUsageCb);
-  recPowerUsageLoop.enable();
-
-  recWeatherDataLoop.setInterval(mySettings.itW * TASK_SECOND);
-  recWeatherDataLoop.setIterations(TASK_FOREVER);
-  recWeatherDataLoop.setCallback(&recWeatherDataCb);
-  recWeatherDataLoop.enable();
-  return data;
-}
-
-JsonObject processOnTbDisconnected(JsonObject &data){
-  publishDeviceTelemetryLoop.disable();
-  recPowerUsageLoop.disable();
-  recWeatherDataLoop.disable();
-  return data;
-}
-
-JsonObject processEmitAlarmWs(JsonObject &data){
-  if(!config.fIface || config.wsCount < 1){
-    return data;
-  }
-  wsSend(data);
-  return data;
-}
-
-callbackResponse processUpdateSpiffs(const callbackData &data){
-  updateSpiffs.enableDelayed(10);
-  return callbackResponse("updateSpiffs", 1);
-}
-
-callbackResponse processSaveConfig(const callbackData &data)
-{
-  configSave();
-  return callbackResponse("saveConfig", 1);
-}
-
-callbackResponse processSaveSettings(const callbackData &data)
-{
-  saveSettings();
-  loadSettings();
-
-  mySettings.lastUpdated = millis();
-  return callbackResponse("saveSettings", 1);
-}
-
-callbackResponse processSaveConfigCoMCU(const callbackData &data)
-{
-  configCoMCUSave();
-  configCoMCULoad();
-  //syncConfigCoMCU();
-  return callbackResponse("saveConfigCoMCU", 1);
-}
-
-callbackResponse processReboot(const callbackData &data)
-{
-  reboot();
-  return callbackResponse("reboot", 1);
-}
-
-callbackResponse processSyncClientAttributes(const callbackData &data)
-{
-  syncClientAttr.setInterval(TASK_IMMEDIATE);
-  syncClientAttr.setIterations(TASK_ONCE);
-  syncClientAttr.enable();
-  return callbackResponse("syncClientAttributes", 1);
-}
-
-callbackResponse processSetSwitch(const callbackData &data)
-{
-  if(data["params"]["ch"] != nullptr && data["params"]["state"] != nullptr)
-  {
-    String ch = data["params"]["ch"].as<String>();
-    String state = data["params"]["state"].as<String>();
-    log_manager->debug(PSTR(__func__),"Calling setSwitch (%s - %s)...\n", ch, state);
-    setSwitch(ch, state);
-  }
-  return callbackResponse(data["params"]["ch"].as<const char*>(), data["params"]["state"].as<const char*>());
-}
-
-callbackResponse processGetSwitchCh1(const callbackData &data)
-{
-  return callbackResponse("ch1", mySettings.dutyState[0] == mySettings.ON ? "ON" : "OFF");
-}
-
-callbackResponse processGetSwitchCh2(const callbackData &data)
-{
-  return callbackResponse("ch2", mySettings.dutyState[1] == mySettings.ON ? "ON" : "OFF");
-}
-
-callbackResponse processGetSwitchCh3(const callbackData &data)
-{
-  return callbackResponse("ch3", mySettings.dutyState[2] == mySettings.ON ? "ON" : "OFF");
-}
-
-callbackResponse processGetSwitchCh4(const callbackData &data)
-{
-  return callbackResponse("ch4", mySettings.dutyState[3] == mySettings.ON ? "ON" : "OFF");
-}
-
-callbackResponse processSetPanic(const callbackData &data)
-{
-
-  StaticJsonDocument<DOCSIZE_MIN> doc;
-  doc["method"] = "sCfg";
-  String state = data["params"]["state"].as<String>();
-  if(state == String("ON")){
-    doc["fP"] = 1;
-    configcomcu.fP = 1;
-
-    mySettings.cpM[0] = 0;
-    mySettings.cpM[1] = 0;
-    mySettings.cpM[2] = 0;
-    mySettings.cpM[3] = 0;
-    setSwitch("ch1", "OFF");
-    setSwitch("ch2", "OFF");
-    setSwitch("ch3", "OFF");
-    setSwitch("ch4", "OFF");
-  }
-  else{
-    doc["fP"] = 0;
-    configcomcu.fP = 0;
-  }
-  serialWriteToCoMcu(doc, 0);
-  syncClientAttr.setInterval(TASK_IMMEDIATE);
-  syncClientAttr.setIterations(TASK_ONCE);
-  syncClientAttr.enable();
-  return callbackResponse("setPanic", data["params"]["state"].as<int>());
-}
-
-callbackResponse processBridge(const callbackData &data)
-{
-  StaticJsonDocument<DOCSIZE_MIN> doc;
-  doc["method"] = data["params"]["method"];
-  doc["params"] = data["params"];
-  if(data["params"]["isRpc"] != nullptr){
-    serialWriteToCoMcu(doc, 1);
-    String result;
-    serializeJson(doc, result);
-    return callbackResponse("bridge", result.c_str());
-  }
-  else if(doc["method"] == "resetPZEM"){
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-    PZEM.resetEnergy();
-    return callbackResponse("resetPZEM", 1);
-  }
-  else{
-    serialWriteToCoMcu(doc, 0);
-    String result;
-    serializeJson(doc, result);
-    return callbackResponse("bridge", result.c_str());
-  }
-}
-
-callbackResponse processResetConfig(const callbackData &data){
-  if(data["params"]["format"] != nullptr){
-    bool formatted = SPIFFS.format();
-    if(formatted)
-    {
-      log_manager->info(PSTR(__func__),PSTR("SPIFFS formatting success.\n"));
-    }
-    else
-    {
-      log_manager->warn(PSTR(__func__),PSTR("SPIFFS formatting failed.\n"));
-    }
-  }
-  configReset();
-  reboot();
-  return callbackResponse("resetConfig", 1);
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void setSwitch(String ch, String state)
 {
+  long startMillis = millis();
+
   bool fState = 0;
   uint8_t pR = 0;
   uint8_t itD = 0;
@@ -702,27 +411,11 @@ void setSwitch(String ch, String state)
 
   setCoMCUPin(pR, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
-}
+  taskPublishSwitch.setInterval(TASK_IMMEDIATE);
+  taskPublishSwitch.setIterations(TASK_ONCE);
+  taskPublishSwitch.enableDelayed(1 * TASK_SECOND);
 
-void relayControlCP2Cb(){
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
-  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
-  {
-    if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
-      if(mySettings.cp2A[i] <= (rtc.getEpoch()) && (mySettings.cp2B[i]) >=
-        (rtc.getEpoch() - mySettings.cp2A[i]) && mySettings.dutyState[i] != mySettings.ON){
-          mySettings.dutyState[i] = mySettings.ON;
-          String ch = "ch" + String(i+1);
-          setSwitch(ch, "ON");
-      }
-      else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.cp2B[i]) <=
-        (rtc.getEpoch() - mySettings.cp2A[i])){
-          mySettings.dutyState[i] = 1 - mySettings.ON;
-          String ch = "ch" + String(i+1);
-          setSwitch(ch, "OFF");
-      }
-    }
-  }
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void relayControlCP1Cb()
@@ -752,6 +445,27 @@ void relayControlCP1Cb()
           setSwitch(ch, "ON");
           mySettings.dutyCounter[i] = millis();
         }
+      }
+    }
+  }
+}
+
+void relayControlCP2Cb(){
+  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
+  {
+    if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
+      if(mySettings.cp2A[i] <= (rtc.getEpoch()) && (mySettings.cp2B[i]) >=
+        (rtc.getEpoch() - mySettings.cp2A[i]) && mySettings.dutyState[i] != mySettings.ON){
+          mySettings.dutyState[i] = mySettings.ON;
+          String ch = "ch" + String(i+1);
+          setSwitch(ch, "ON");
+      }
+      else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.cp2B[i]) <=
+        (rtc.getEpoch() - mySettings.cp2A[i])){
+          mySettings.dutyState[i] = 1 - mySettings.ON;
+          String ch = "ch" + String(i+1);
+          setSwitch(ch, "OFF");
       }
     }
   }
@@ -832,35 +546,9 @@ void relayControlCP3Cb(){
   }
 }
 
-callbackResponse processSharedAttributesUpdate(const callbackData &data)
+void attUpdateCb(const Shared_Attribute_Data &data)
 {
-  String s;
-  serializeJson(data, s);
-  log_manager->debug(PSTR(__func__), PSTR("Received attributes update request: %s\n"), s.c_str());
-
-  if(data["model"] != nullptr){strlcpy(config.model, data["model"].as<const char*>(), sizeof(config.model));}
-  if(data["group"] != nullptr){strlcpy(config.group, data["group"].as<const char*>(), sizeof(config.group));}
-  if(data["broker"] != nullptr){strlcpy(config.broker, data["broker"].as<const char*>(), sizeof(config.broker));}
-  if(data["port"] != nullptr){config.port = data["port"].as<uint16_t>();}
-  if(data["wssid"] != nullptr){strlcpy(config.wssid, data["wssid"].as<const char*>(), sizeof(config.wssid));}
-  if(data["wpass"] != nullptr){strlcpy(config.wpass, data["wpass"].as<const char*>(), sizeof(config.wpass));}
-  if(data["dssid"] != nullptr){strlcpy(config.dssid, data["dssid"].as<const char*>(), sizeof(config.dssid));}
-  if(data["dpass"] != nullptr){strlcpy(config.dpass, data["dpass"].as<const char*>(), sizeof(config.dpass));}
-  if(data["upass"] != nullptr){strlcpy(config.upass, data["upass"].as<const char*>(), sizeof(config.upass));}
-  if(data["accTkn"] != nullptr){strlcpy(config.accTkn, data["accTkn"].as<const char*>(), sizeof(config.accTkn));}
-  if(data["provDK"] != nullptr){strlcpy(config.provDK, data["provDK"].as<const char*>(), sizeof(config.provDK));}
-  if(data["provDS"] != nullptr){strlcpy(config.provDS, data["provDS"].as<const char*>(), sizeof(config.provDS));}
-  if(data["logLev"] != nullptr){config.logLev = data["logLev"].as<uint8_t>(); log_manager->set_log_level(PSTR("*"), (LogLevel) config.logLev);;}
-  if(data["gmtOff"] != nullptr){config.gmtOff = data["gmtOff"].as<int>();}
-  if(data["fIoT"] != nullptr){config.fIoT = data["fIoT"].as<int>();}
-  if(data["htU"] != nullptr){strlcpy(config.htU, data["htU"].as<const char*>(), sizeof(config.htU));}
-  if(data["htP"] != nullptr){strlcpy(config.htP, data["htP"].as<const char*>(), sizeof(config.htP));}
-  if(data["fWOTA"] != nullptr){config.fWOTA = data["fWOTA"].as<bool>();}
-  if(data["fIface"] != nullptr){config.fIface = data["fIface"].as<bool>();}
-  if(data["hname"] != nullptr){strlcpy(config.hname, data["hname"].as<const char*>(), sizeof(config.hname));}
-  if(data["logIP"] != nullptr){strlcpy(config.logIP, data["logIP"].as<const char*>(), sizeof(config.logIP));}
-  if(data["logPrt"] != nullptr){config.logPrt = data["logPrt"].as<uint16_t>();}
-
+  long startMillis = millis();
 
   if(data["cp1A1"] != nullptr)
   {
@@ -976,351 +664,225 @@ callbackResponse processSharedAttributesUpdate(const callbackData &data)
   if(data["pLB"] != nullptr){configcomcu.pLB = data["pLB"].as<uint8_t>();}
   if(data["lON"] != nullptr){configcomcu.lON = data["lON"].as<uint8_t>();}
 
-
-  if(data["cmd"] == nullptr){
-    wsSendAttributes();
-  }
-  mySettings.lastUpdated = millis();
-  return callbackResponse("sharedAttributesUpdate", 1);
+  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void syncClientAttributes()
-{
-  StaticJsonDocument<1024> root;
-  JsonObject doc = root.to<JsonObject>();
+void onTbConnected(){
+    long startMillis = millis();
 
-  IPAddress ip = WiFi.localIP();
-  char ipa[25];
-  sprintf(ipa, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  doc["ipad"] = ipa;
-  doc["compdate"] = COMPILED;
-  doc["fmTitle"] = CURRENT_FIRMWARE_TITLE;
-  doc["fmVersion"] = CURRENT_FIRMWARE_VERSION;
-  doc["stamac"] = WiFi.macAddress();
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["apmac"] = WiFi.softAPmacAddress();
-  doc["flFree"] = ESP.getFreeSketchSpace();
-  doc["fwSize"] = ESP.getSketchSize();
-  doc["flSize"] = ESP.getFlashChipSize();
-  doc["sdkVer"] = ESP.getSdkVersion();
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["model"] = config.model;
-  doc["group"] = config.group;
-  doc["broker"] = config.broker;
-  doc["port"] = config.port;
-  doc["wssid"] = config.wssid;
-  doc["ap"] = WiFi.SSID();
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["wpass"] = config.wpass;
-  doc["dssid"] = config.dssid;
-  doc["dpass"] = config.dpass;
-  doc["upass"] = config.upass;
-  doc["accTkn"] = config.accTkn;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["provDK"] = config.provDK;
-  doc["provDS"] = config.provDS;
-  doc["logLev"] = config.logLev;
-  doc["gmtOff"] = config.gmtOff;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["fIoT"] = (int)config.fIoT;
-  doc["cp1A1"] = mySettings.cp1A[0];
-  doc["cp1A2"] = mySettings.cp1A[1];
-  doc["cp1A3"] = mySettings.cp1A[2];
-  doc["cp1A4"] = mySettings.cp1A[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cp1B1"] = mySettings.cp1B[0];
-  doc["cp1B2"] = mySettings.cp1B[1];
-  doc["cp1B3"] = mySettings.cp1B[2];
-  doc["cp1B4"] = mySettings.cp1B[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cp2A1"] = (uint64_t)mySettings.cp2A[0] * 1000;
-  doc["cp2A2"] = (uint64_t)mySettings.cp2A[1] * 1000;
-  doc["cp2A3"] = (uint64_t)mySettings.cp2A[2] * 1000;
-  doc["cp2A4"] = (uint64_t)mySettings.cp2A[3] * 1000;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cp2B1"] = mySettings.cp2B[0];
-  doc["cp2B2"] = mySettings.cp2B[1];
-  doc["cp2B3"] = mySettings.cp2B[2];
-  doc["cp2B4"] = mySettings.cp2B[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cp4A1"] = mySettings.cp4A[0];
-  doc["cp4A2"] = mySettings.cp4A[1];
-  doc["cp4A3"] = mySettings.cp4A[2];
-  doc["cp4A4"] = mySettings.cp4A[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cp4B1"] = mySettings.cp4B[0];
-  doc["cp4B2"] = mySettings.cp4B[1];
-  doc["cp4B3"] = mySettings.cp4B[2];
-  doc["cp4B4"] = mySettings.cp4B[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["pR1"] = mySettings.pR[0];
-  doc["pR2"] = mySettings.pR[1];
-  doc["pR3"] = mySettings.pR[2];
-  doc["pR4"] = mySettings.pR[3];
-  doc["ON"] = mySettings.ON;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cp3A1"] = mySettings.cp3A[0];
-  doc["cp3A2"] = mySettings.cp3A[1];
-  doc["cp3A3"] = mySettings.cp3A[2];
-  doc["cp3A4"] = mySettings.cp3A[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["lbl1"] = mySettings.lbl[0];
-  doc["lbl2"] = mySettings.lbl[1];
-  doc["lbl3"] = mySettings.lbl[2];
-  doc["lbl4"] = mySettings.lbl[3];
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["itP"] = mySettings.itP;
-  doc["itW"] = mySettings.itW;
-  doc["itD"] = mySettings.itD;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["cpM1"] = mySettings.cpM[0];
-  doc["cpM2"] = mySettings.cpM[1];
-  doc["cpM3"] = mySettings.cpM[2];
-  doc["cpM4"] = mySettings.cpM[3];
-  doc["seaHpa"] = mySettings.seaHpa;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["pBz"] = configcomcu.pBz;
-  doc["pLR"] = configcomcu.pLR;
-  doc["pLG"] = configcomcu.pLG;
-  doc["pLB"] = configcomcu.pLB;
-  doc["htU"] = config.htU;
-  doc["htP"] = config.htP;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["lON"] = configcomcu.lON;
-  doc["bFr"] = configcomcu.bFr;
-  doc["fP"] = configcomcu.fP;
-  doc["fB"] = configcomcu.fB;
-  doc["bFr"] = configcomcu.bFr;
-  tb.sendAttributeObj(doc);
-  root.clear();
-  doc["fWOTA"] = (int)config.fWOTA;
-  doc["fIface"] = (int)config.fIface;
-  doc["hname"] = config.hname;
-  doc["logIP"] = config.logIP;
-  doc["logPrt"] = config.logPrt;
-  tb.sendAttributeObj(doc);
-  root.clear();
+    mySettings.publishSwitch[0] = 1;
+    mySettings.publishSwitch[1] = 1;
+    mySettings.publishSwitch[2] = 1;
+    mySettings.publishSwitch[3] = 1;
+    taskPublishSwitch.setInterval(TASK_IMMEDIATE);
+    taskPublishSwitch.setIterations(TASK_ONCE);
+    taskPublishSwitch.enableDelayed(3 * TASK_SECOND);
+
+    if(mySettings.itD > 0){
+        deviceTelemetryLoop.setInterval(mySettings.itD * TASK_SECOND);
+        deviceTelemetryLoop.setIterations(TASK_FOREVER);
+        deviceTelemetryLoop.enableDelayed(10 * TASK_SECOND);
+    }
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void publishDeviceTelemetryCb()
-{
-    StaticJsonDocument<DOCSIZE_MIN> root;
-    JsonObject doc = root.to<JsonObject>();
+void onTbDisconnected(){
+    long startMillis = millis();
+    deviceTelemetryLoop.disable();
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+}
 
-    doc["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    doc["rssi"] = WiFi.RSSI();
-    doc["uptime"] = millis()/1000;
-    doc["dt"] = rtc.getEpoch();
-    doc["dts"] = rtc.getDateTime();
-    tb.sendTelemetryObj(doc);
+void onReboot(){}
+
+void setPanic(const RPC_Data &data){
+    long startMillis = millis();
+
+    if(data[PSTR("st")] != nullptr){
+        StaticJsonDocument<DOCSIZE_MIN> doc;
+        doc[PSTR("method")] = PSTR("sCfg");
+        if(strcmp(data[PSTR("st")], PSTR("ON")) == 0){
+            doc[PSTR("fP")] = 1;
+            configcomcu.fP = 1;
+            setAlarm(666, 1, 1, 10000);
+            stateReset(1);
+        }
+        else{
+            doc[PSTR("fP")] = 0;
+            configcomcu.fP = 0;
+        }
+        serialWriteToCoMcu(doc, 0);
+    }
+
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+}
+
+RPC_Response genericClientRPC(const RPC_Data &data){
+    long startMillis = millis();
+
+    StaticJsonDocument<DOCSIZE_MIN> payload;    
+    DeserializationError err = deserializeJson(payload, data);
+
+    if(err == DeserializationError::Ok){
+        if(payload[PSTR("cmd")] != nullptr){
+            const char * cmd = payload["cmd"].as<const char *>();
+            log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
+
+            if(strcmp(cmd, PSTR("setSwitch")) == 0){
+                if(payload[PSTR("arg")][PSTR("ch")] != nullptr && payload[PSTR("arg")][PSTR("st")] != nullptr){
+                    setSwitch(payload[PSTR("arg")][PSTR("ch")].as<String>(), payload[PSTR("arg")][PSTR("st")].as<String>());
+                }
+            }
+        }   
+    }
+    else{
+        log_manager->verbose(PSTR(__func__), PSTR("Failed to parse JSON: %s\n"), err.c_str());
+        if(data[PSTR("cmd")] != nullptr){
+            const char * cmd = data["cmd"].as<const char *>();
+            log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
+
+            if(strcmp(cmd, PSTR("setSwitch")) == 0){
+                if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
+                    setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
+                }
+            }
+        }  
+    }
+
+    StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
+    doc[PSTR("rpc")] = PSTR("OK");
+
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+    return RPC_Response(doc);
+}
+
+void stateReset(bool resetOpMode){
+    if(resetOpMode){
+        mySettings.cpM[0] = 0;
+        mySettings.cpM[1] = 0;
+        mySettings.cpM[2] = 0;
+        mySettings.cpM[3] = 0;
+        log_manager->verbose(PSTR(__func__), PSTR("Relay operations are changed to manual.\n."));
+    }
+    setSwitch("ch1", "OFF");
+    setSwitch("ch2", "OFF");
+    setSwitch("ch3", "OFF");
+    setSwitch("ch4", "OFF");
+    log_manager->verbose(PSTR(__func__), PSTR("Relay operations are disabled.\n."));
+}
+
+void deviceTelemetryLoopCb(){
+    tb.sendAttributeInt(PSTR("uptime"), millis());
+    tb.sendAttributeInt(PSTR("heap"), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    tb.sendAttributeInt(PSTR("rssi"), WiFi.RSSI());
+    tb.sendAttributeInt(PSTR("dt"), rtc.getEpoch());
+}
+
+void onAlarm(int code){
+    long startMillis = millis();
+
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void publishSwitchCb(){
-  for (uint8_t i = 0; i < 4; i++){
-    if(mySettings.publishSwitch[i]){
-      StaticJsonDocument<DOCSIZE_MIN> doc;
-      JsonObject data = doc.to<JsonObject>();
+    long startMillis = millis();
 
-      String chName = "ch" + String(i+1);
-      data[chName.c_str()] = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
-      
-      if(tb.connected()){ tb.sendTelemetryObj(data); }
-      if(config.fIface){ wsSend(data); }
-      mySettings.publishSwitch[i] = false;
-    }
-  }
-}
+    for (uint8_t i = 0; i < sizeof(mySettings.dutyState); i++){
+        if(mySettings.publishSwitch[i]){
+            String chName = "ch" + String(i+1);
+            int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
+            
+            if(config.fIoT){
+                tb.sendTelemetryInt(chName.c_str(), state);
+            }
 
-void wsSend(JsonObject &doc){
-  String buffer;
-  serializeJson(doc, buffer);
-  ws.broadcastTXT(buffer);
-}
-void wsSend(JsonObject &doc, uint8_t num){
-  String buffer;
-  serializeJson(doc, buffer);
-  ws.sendTXT(num, buffer);
-}
-
-bool wsSendEnable(){
-  if(config.fIface){
-    log_manager->verbose(PSTR(__func__),PSTR("Enabled.\n"));
-    return true;
-  }
-  else{
-    return false;
-  }
-}
-
-void wsSendTelemetryCb(){
-  if(config.fIface){
-    StaticJsonDocument<DOCSIZE_MIN> root;
-    JsonObject doc = root.to<JsonObject>();
-    JsonObject devTel = doc.createNestedObject("devTel");
-    devTel["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    devTel["rssi"] = WiFi.RSSI();
-    devTel["uptime"] = millis()/1000;
-    devTel["dt"] = rtc.getEpoch();
-    devTel["dts"] = rtc.getDateTime();
-    wsSend(doc);
-  }
-}
-
-void wsSendSensorsCb(){
-  if(config.fIface){
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-    StaticJsonDocument<DOCSIZE_MIN> root;
-    JsonObject doc = root.to<JsonObject>();
-    JsonObject pzem = doc.createNestedObject("pzem");
-    if(!isnan(PZEM.voltage())){
-      pzem["volt"] = round2(PZEM.voltage());
-      pzem["amp"] = round2(PZEM.current());
-      pzem["watt"] = round2(PZEM.power());
-      pzem["ener"] = round2(PZEM.energy());
-      pzem["freq"] = round2(PZEM.frequency());
-      pzem["pf"] = round2(PZEM.pf())*100;
-      wsSend(doc);
-      doc.clear();
+            mySettings.publishSwitch[i] = false;
+        }
     }
 
-    JsonObject bme280 = doc.createNestedObject("bme280");
-    bme280["celc"] = round2(mySettings.celc);
-    bme280["rh"] = round2(mySettings.rh);
-    bme280["hpa"] = round2(mySettings.hpa);
-    bme280["alt"] = round2(mySettings.alt);
-    wsSend(doc);
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);   
+}
+
+void onSyncClientAttr(){
+    long startMillis = millis();
+
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    char buffer[DOCSIZE_MIN];
+
+    doc[PSTR("cp1A1")] = mySettings.cp1A[0];
+    doc[PSTR("cp1A2")] = mySettings.cp1A[1];
+    doc[PSTR("cp1A3")] = mySettings.cp1A[2];
+    doc[PSTR("cp1A4")] = mySettings.cp1A[3];
+    doc[PSTR("cp1B1")] = mySettings.cp1B[0];
+    doc[PSTR("cp1B2")] = mySettings.cp1B[1];
+    doc[PSTR("cp1B3")] = mySettings.cp1B[2];
+    doc[PSTR("cp1B4")] = mySettings.cp1B[3];
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
     doc.clear();
-  }
-}
-
-void wsSendAttributes(){
-  StaticJsonDocument<DOCSIZE_MIN> root;
-  JsonObject doc = root.to<JsonObject>();
-  IPAddress ip = WiFi.localIP();
-  char ipa[25];
-  sprintf(ipa, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  JsonObject attr = doc.createNestedObject("attr");
-  attr["ipad"] = ipa;
-  attr["compdate"] = COMPILED;
-  attr["fmTitle"] = CURRENT_FIRMWARE_TITLE;
-  attr["fmVersion"] = CURRENT_FIRMWARE_VERSION;
-  attr["stamac"] = WiFi.macAddress();
-  attr["apmac"] = WiFi.softAPmacAddress();
-  attr["flFree"] = ESP.getFreeSketchSpace();
-  attr["fwSize"] = ESP.getSketchSize();
-  attr["flSize"] = ESP.getFlashChipSize();
-  attr["sdkVer"] = ESP.getSdkVersion();
-  wsSend(doc);
-  root.clear();
-  JsonObject cfg = doc.createNestedObject("cfg");
-  cfg["model"] = config.model;
-  cfg["group"] = config.group;
-  cfg["broker"] = config.broker;
-  cfg["port"] = config.port;
-  cfg["wssid"] = config.wssid;
-  cfg["ap"] = WiFi.SSID();
-  cfg["wpass"] = config.wpass;
-  cfg["gmtOff"] = config.gmtOff;
-  cfg["htU"] = config.htU;
-  cfg["htP"] = config.htP;
-  cfg["name"] = config.name;
-  cfg["itP"] = mySettings.itP;
-  cfg["itW"] = mySettings.itW;
-  cfg["itD"] = mySettings.itD;
-  cfg["fIoT"] = (int)config.fIoT;
-  cfg["fWOTA"] = (int)config.fWOTA;
-  cfg["fIface"] = (int)config.fIface;
-  cfg["hname"] = config.hname;
-  cfg["logIP"] = config.logIP;
-  cfg["logPrt"] = config.logPrt;
-  wsSend(doc);
-  root.clear();
-  JsonObject cp1A = doc.createNestedObject("cp1A");
-  cp1A["cp1A1"] = mySettings.cp1A[0];
-  cp1A["cp1A2"] = mySettings.cp1A[1];
-  cp1A["cp1A3"] = mySettings.cp1A[2];
-  cp1A["cp1A4"] = mySettings.cp1A[3];
-  wsSend(doc);
-  root.clear();
-  JsonObject cp1B = doc.createNestedObject("cp1B");
-  cp1B["cp1B1"] = mySettings.cp1B[0];
-  cp1B["cp1B2"] = mySettings.cp1B[1];
-  cp1B["cp1B3"] = mySettings.cp1B[2];
-  cp1B["cp1B4"] = mySettings.cp1B[3];
-  wsSend(doc);
-  root.clear();
-  JsonObject cp2A = doc.createNestedObject("cp2A");
-  cp2A["cp2A1"] = (uint64_t)mySettings.cp2A[0] * 1000;
-  cp2A["cp2A2"] = (uint64_t)mySettings.cp2A[1] * 1000;
-  cp2A["cp2A3"] = (uint64_t)mySettings.cp2A[2] * 1000;
-  cp2A["cp2A4"] = (uint64_t)mySettings.cp2A[3] * 1000;
-  wsSend(doc);
-  root.clear();
-  JsonObject cp2B = doc.createNestedObject("cp2B");
-  cp2B["cp2B1"] = mySettings.cp2B[0];
-  cp2B["cp2B2"] = mySettings.cp2B[1];
-  cp2B["cp2B3"] = mySettings.cp2B[2];
-  cp2B["cp2B4"] = mySettings.cp2B[3];
-  wsSend(doc);
-  root.clear();
-  JsonObject cp4A = doc.createNestedObject("cp4A");
-  cp4A["cp4A1"] = mySettings.cp4A[0];
-  cp4A["cp4A2"] = mySettings.cp4A[1];
-  cp4A["cp4A3"] = mySettings.cp4A[2];
-  cp4A["cp4A4"] = mySettings.cp4A[3];
-  wsSend(doc);
-  root.clear();
-  JsonObject cp4B = doc.createNestedObject("cp4B");
-  cp4B["cp4B1"] = mySettings.cp4B[0];
-  cp4B["cp4B2"] = mySettings.cp4B[1];
-  cp4B["cp4B3"] = mySettings.cp4B[2];
-  cp4B["cp4B4"] = mySettings.cp4B[3];
-  wsSend(doc);
-  root.clear();
-  JsonObject cpM = doc.createNestedObject("cpM");
-  cpM["cpM1"] = mySettings.cpM[0];
-  cpM["cpM2"] = mySettings.cpM[1];
-  cpM["cpM3"] = mySettings.cpM[2];
-  cpM["cpM4"] = mySettings.cpM[3];
-  wsSend(doc);
-  root.clear();
-  JsonObject cp3A = doc.createNestedObject("cp3A");
-  cp3A["cp3A1"] = mySettings.cp3A[0];
-  cp3A["cp3A2"] = mySettings.cp3A[1];
-  cp3A["cp3A3"] = mySettings.cp3A[2];
-  cp3A["cp3A4"] = mySettings.cp3A[3];
-  wsSend(doc);
-  root.clear();
-  doc["ch1"] = mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
-  doc["ch2"] = mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
-  doc["ch3"] = mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
-  doc["ch4"] = mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
-  wsSend(doc);
-  root.clear();
-  JsonObject lbl = doc.createNestedObject("lbl");
-  lbl["lbl1"] = mySettings.lbl[0];
-  lbl["lbl2"] = mySettings.lbl[1];
-  lbl["lbl3"] = mySettings.lbl[2];
-  lbl["lbl4"] = mySettings.lbl[3];
-  wsSend(doc);
-  root.clear();
+    doc[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
+    doc[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
+    doc[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
+    doc[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
+    doc[PSTR("cp2B1")] = mySettings.cp2B[0];
+    doc[PSTR("cp2B2")] = mySettings.cp2B[1];
+    doc[PSTR("cp2B3")] = mySettings.cp2B[2];
+    doc[PSTR("cp2B4")] = mySettings.cp2B[3];
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("cp4A1")] = mySettings.cp4A[0];
+    doc[PSTR("cp4A2")] = mySettings.cp4A[1];
+    doc[PSTR("cp4A3")] = mySettings.cp4A[2];
+    doc[PSTR("cp4A4")] = mySettings.cp4A[3];
+    doc[PSTR("cp4B1")] = mySettings.cp4B[0];
+    doc[PSTR("cp4B2")] = mySettings.cp4B[1];
+    doc[PSTR("cp4B3")] = mySettings.cp4B[2];
+    doc[PSTR("cp4B4")] = mySettings.cp4B[3];
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("pR1")] = mySettings.pR[0];
+    doc[PSTR("pR2")] = mySettings.pR[1];
+    doc[PSTR("pR3")] = mySettings.pR[2];
+    doc[PSTR("pR4")] = mySettings.pR[3];
+    doc[PSTR("ON")] = mySettings.ON;
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("lbl1")] = mySettings.lbl[0];
+    doc[PSTR("lbl2")] = mySettings.lbl[1];
+    doc[PSTR("lbl3")] = mySettings.lbl[2];
+    doc[PSTR("lbl4")] = mySettings.lbl[3];
+    doc[PSTR("itP")] = mySettings.itP;
+    doc[PSTR("itW")] = mySettings.itW;
+    doc[PSTR("itD")] = mySettings.itD;
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    doc[PSTR("cpM1")] = mySettings.cpM[0];
+    doc[PSTR("cpM2")] = mySettings.cpM[1];
+    doc[PSTR("cpM3")] = mySettings.cpM[2];
+    doc[PSTR("cpM4")] = mySettings.cpM[3];
+    doc[PSTR("seaHpa")] = mySettings.seaHpa;
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer);
+    doc.clear();
+    
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
