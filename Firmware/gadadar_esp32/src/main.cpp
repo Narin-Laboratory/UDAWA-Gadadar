@@ -31,10 +31,13 @@ Task selfDiagnosticLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticCb, &r, 
 Task taskPublishSwitch(TASK_IMMEDIATE, TASK_ONCE, &publishSwitchCb, &r, 0, NULL, NULL);
 
 Task calcPowerUsageLoop(TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 1, NULL, NULL);
-Task calcWeatherDataLoop(60 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 1, NULL, NULL);
+Task calcWeatherDataLoop(TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 1, NULL, NULL);
 Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL);
-Task recWeatherDataLoop((mySettings.itW + 120) * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL);
+Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL);
 Task deviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &deviceTelemetryLoopCb, &r, 0, NULL, NULL);
+
+Task wsSendTelemetryLoop(TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, NULL, NULL);
+Task wsSendSensorsLoop(TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, NULL, NULL);
 
 void setup()
 {
@@ -59,6 +62,8 @@ void setup()
   setAlarm(999, 1, 1, 3000);
   stateReset(0);
 
+  tb.setBufferSize(1024);
+
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
@@ -76,7 +81,7 @@ void setup()
     recPowerUsageLoop.enable();
   }
   if(mySettings.itW > 0){
-    recWeatherDataLoop.setInterval((mySettings.itW + 120) * TASK_SECOND);
+    recWeatherDataLoop.setInterval(mySettings.itW * TASK_SECOND);
     recWeatherDataLoop.setIterations(TASK_FOREVER);
     recWeatherDataLoop.enable();
   }
@@ -134,40 +139,40 @@ void selfDiagnosticCb(){
 }
 
 void calcPowerUsageCb(){
-  long startMillis = millis();
+    long startMillis = millis();
 
-  HardwareSerial PZEMSerial(1);
-  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-  
-  if(isnan(PZEM.voltage())){return;}
-  
-  if(!isnan(PZEM.voltage())){
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+    if(isnan(PZEM.voltage())){return;}
+
+    if(!isnan(PZEM.voltage())){
     _volt.Add(PZEM.voltage());
     tb.sendAttributeFloat("_volt", PZEM.voltage());
     tb.sendAttributeFloat("_ener", PZEM.energy());
-  }
+    }
 
-  if(!isnan(PZEM.current())){
+    if(!isnan(PZEM.current())){
     _amp.Add(PZEM.current());
     tb.sendAttributeFloat("_amp", PZEM.current());
-  }
+    }
 
-  if(!isnan(PZEM.power())){
+    if(!isnan(PZEM.power())){
     _watt.Add(PZEM.power());
     tb.sendAttributeFloat("_watt", PZEM.power());
-  }
+    }
 
-  if(!isnan(PZEM.frequency())){
+    if(!isnan(PZEM.frequency())){
     _freq.Add(PZEM.frequency());
     tb.sendAttributeFloat("_freq", PZEM.frequency());
-  }
+    }
 
-  if(!isnan(PZEM.pf())){
+    if(!isnan(PZEM.pf())){
     _pf.Add(PZEM.pf());
     tb.sendAttributeFloat("_pf", PZEM.pf());
-  }
+    }
 
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void recPowerUsageCb(){
@@ -211,7 +216,7 @@ void calcWeatherDataCb(){
     tb.sendAttributeFloat("_alt", mySettings.alt);
   }
 
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void recWeatherDataCb(){
@@ -230,7 +235,7 @@ void recWeatherDataCb(){
     _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear();
   }
 
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void loadSettings()
@@ -772,10 +777,16 @@ void stateReset(bool resetOpMode){
 }
 
 void deviceTelemetryLoopCb(){
-    tb.sendAttributeInt(PSTR("uptime"), millis());
-    tb.sendAttributeInt(PSTR("heap"), heap_caps_get_free_size(MALLOC_CAP_8BIT));
-    tb.sendAttributeInt(PSTR("rssi"), WiFi.RSSI());
-    tb.sendAttributeInt(PSTR("dt"), rtc.getEpoch());
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    String buffer;
+    
+    doc[PSTR("uptime")] = millis(); 
+    doc[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT); 
+    doc[PSTR("rssi")] = WiFi.RSSI(); 
+    doc[PSTR("dt")] = rtc.getEpoch(); 
+
+    serializeJson(doc, buffer);
+    tb.sendAttributeJSON(buffer.c_str());
 }
 
 void onAlarm(int code){
@@ -796,6 +807,14 @@ void publishSwitchCb(){
                 tb.sendTelemetryInt(chName.c_str(), state);
             }
 
+            if(config.wsCount > 0){
+                String buffer;
+                StaticJsonDocument<32> doc;
+                doc[chName.c_str()] = state;
+                serializeJson(doc, buffer);
+                ws.broadcastTXT(buffer);
+            }
+
             mySettings.publishSwitch[i] = false;
         }
     }
@@ -806,8 +825,8 @@ void publishSwitchCb(){
 void onSyncClientAttr(){
     long startMillis = millis();
 
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    char buffer[DOCSIZE_MIN];
+    StaticJsonDocument<1024> doc;
+    char buffer[1024];
 
     doc[PSTR("cp1A1")] = mySettings.cp1A[0];
     doc[PSTR("cp1A2")] = mySettings.cp1A[1];
@@ -884,12 +903,88 @@ void onSyncClientAttr(){
     serializeJson(doc, buffer);
     tb.sendAttributeJSON(buffer);
     doc.clear();
+
+    if(config.wsCount > 0){
+        JsonObject cp1A = doc.createNestedObject("cp1A");
+        cp1A[PSTR("cp1A1")] = mySettings.cp1A[0];
+        cp1A[PSTR("cp1A2")] = mySettings.cp1A[1];
+        cp1A[PSTR("cp1A3")] = mySettings.cp1A[2];
+        cp1A[PSTR("cp1A4")] = mySettings.cp1A[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cp1B = doc.createNestedObject("cp1B");
+        cp1B[PSTR("cp1B1")] = mySettings.cp1B[0];
+        cp1B[PSTR("cp1B2")] = mySettings.cp1B[1];
+        cp1B[PSTR("cp1B3")] = mySettings.cp1B[2];
+        cp1B[PSTR("cp1B4")] = mySettings.cp1B[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cp2A = doc.createNestedObject("cp2A");
+        cp2A[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
+        cp2A[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
+        cp2A[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
+        cp2A[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cp2B = doc.createNestedObject("cp2B");
+        cp2B[PSTR("cp2B1")] = mySettings.cp2B[0];
+        cp2B[PSTR("cp2B2")] = mySettings.cp2B[1];
+        cp2B[PSTR("cp2B3")] = mySettings.cp2B[2];
+        cp2B[PSTR("cp2B4")] = mySettings.cp2B[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cp4A = doc.createNestedObject("cp4A");
+        cp4A[PSTR("cp4A1")] = mySettings.cp4A[0];
+        cp4A[PSTR("cp4A2")] = mySettings.cp4A[1];
+        cp4A[PSTR("cp4A3")] = mySettings.cp4A[2];
+        cp4A[PSTR("cp4A4")] = mySettings.cp4A[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cp4B = doc.createNestedObject("cp4B");
+        cp4B[PSTR("cp4B1")] = mySettings.cp4B[0];
+        cp4B[PSTR("cp4B2")] = mySettings.cp4B[1];
+        cp4B[PSTR("cp4B3")] = mySettings.cp4B[2];
+        cp4B[PSTR("cp4B4")] = mySettings.cp4B[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cp3A = doc.createNestedObject("cp3A");
+        cp3A[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
+        cp3A[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
+        cp3A[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
+        cp3A[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject lbl = doc.createNestedObject("lbl");
+        lbl[PSTR("lbl1")] = mySettings.lbl[0];
+        lbl[PSTR("lbl2")] = mySettings.lbl[1];
+        lbl[PSTR("lbl3")] = mySettings.lbl[2];
+        lbl[PSTR("lbl4")] = mySettings.lbl[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+        doc.clear();
+        JsonObject cpM = doc.createNestedObject("cpM");
+        cpM[PSTR("cpM1")] = mySettings.cpM[0];
+        cpM[PSTR("cpM2")] = mySettings.cpM[1];
+        cpM[PSTR("cpM3")] = mySettings.cpM[2];
+        cpM[PSTR("cpM4")] = mySettings.cpM[3];
+        serializeJson(doc, buffer);
+        ws.broadcastTXT(buffer);
+    }
     
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void onWsEvent(const JsonObject &doc){
     long startMillis = millis();
+    
+    serializeJsonPretty(doc, Serial);
 
     if(doc["evType"] == nullptr){
         log_manager->debug(PSTR(__func__), "Event type not found.\n");
@@ -899,56 +994,106 @@ void onWsEvent(const JsonObject &doc){
 
 
     if(evType == (int)WStype_CONNECTED){
-        /*syncClientAttr.setInterval(TASK_IMMEDIATE);
-        syncClientAttr.setIterations(TASK_ONCE);
-        syncClientAttr.enableIfNot();
+        taskSyncClientAttr.setInterval(TASK_IMMEDIATE);
+        taskSyncClientAttr.setIterations(TASK_ONCE);
+        taskSyncClientAttr.enable();
 
-        wsSendTelemetryLoop.setInterval(INTV_wsSendTelemetryLoop);
+        wsSendTelemetryLoop.setInterval(TASK_SECOND);
         wsSendTelemetryLoop.setIterations(TASK_FOREVER);
-        wsSendTelemetryLoop.enableIfNot();
+        wsSendTelemetryLoop.restart();
 
-        wsSendSensorsLoop.setInterval(INTV_wsSendSensorsLoop);
+        wsSendSensorsLoop.setInterval(TASK_SECOND);
         wsSendSensorsLoop.setIterations(TASK_FOREVER);
-        wsSendSensorsLoop.enableIfNot();*/
-
+        wsSendSensorsLoop.restart();
     }
     if(evType == (int)WStype_DISCONNECTED){
         if(config.wsCount < 1){
-        //wsSendTelemetryLoop.disable();
-        //wsSendSensorsLoop.disable();
-        log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
+            wsSendTelemetryLoop.disable();
+            wsSendSensorsLoop.disable();
+            log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
         }
     }
     else if(evType == (int)WStype_TEXT){
         if(doc["cmd"] == nullptr){
-        log_manager->debug(PSTR(__func__), "Command not found.\n");
-        return;
+            log_manager->debug(PSTR(__func__), "Command not found.\n");
+            return;
         }
         const char* cmd = doc["cmd"].as<const char*>();
         if(strcmp(cmd, (const char*) "attr") == 0){
-        //processSharedAttributesUpdate(doc);
-        //syncClientAttr.setInterval(TASK_IMMEDIATE);
-        //syncClientAttr.setIterations(TASK_ONCE);
-        //syncClientAttr.enable();
+        processSharedAttributeUpdate(doc);
+        
+        taskSyncClientAttr.setInterval(TASK_IMMEDIATE);
+        taskSyncClientAttr.setIterations(TASK_ONCE);
+        taskSyncClientAttr.enable();
         }
         else if(strcmp(cmd, (const char*) "saveSettings") == 0){
-        saveSettings();
+          saveSettings();
         }
-        else if(strcmp(cmd, (const char*) "saveConfig") == 0){
-        configSave();
+        else if(strcmp(cmd, (const char*) "configSave") == 0){
+          configSave();
         }
         else if(strcmp(cmd, (const char*) "setPanic") == 0){
-        //JsonObject params = doc.createNestedObject("params");
-        //params["state"]= "ON";
-        //processSetPanic(doc);
+          doc[PSTR("st")] = configcomcu.fP ? "OFF" : "ON";
+          processSetPanic(doc);
         }
         else if(strcmp(cmd, (const char*) "reboot") == 0){
-        plannedReboot(5);
+          plannedReboot(5);
         }
         else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+          setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
         }
     }
 
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+}
+
+void wsSendTelemetryCb(){
+  long startMillis = millis();
+  if(config.fIface && config.wsCount > 0){
+    String buffer;
+    StaticJsonDocument<DOCSIZE_MIN> root;
+    JsonObject doc = root.to<JsonObject>();
+    JsonObject devTel = doc.createNestedObject("devTel");
+    devTel["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    devTel["rssi"] = WiFi.RSSI();
+    devTel["uptime"] = millis()/1000;
+    devTel["dt"] = rtc.getEpoch();
+    devTel["dts"] = rtc.getDateTime();
+    serializeJson(doc, buffer);
+    ws.broadcastTXT(buffer);
+  }
+  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+}
+
+void wsSendSensorsCb(){
+  long startMillis = millis();
+  if(config.fIface && config.wsCount > 0){
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+    String buffer;
+    StaticJsonDocument<DOCSIZE_MIN> root;
+    JsonObject doc = root.to<JsonObject>();
+    JsonObject pzem = doc.createNestedObject("pzem");
+    if(!isnan(PZEM.voltage())){
+      pzem["volt"] = round2(PZEM.voltage());
+      pzem["amp"] = round2(PZEM.current());
+      pzem["watt"] = round2(PZEM.power());
+      pzem["ener"] = round2(PZEM.energy());
+      pzem["freq"] = round2(PZEM.frequency());
+      pzem["pf"] = round2(PZEM.pf())*100;
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+    }
+
+    JsonObject bme280 = doc.createNestedObject("bme280");
+    bme280["celc"] = round2(mySettings.celc);
+    bme280["rh"] = round2(mySettings.rh);
+    bme280["hpa"] = round2(mySettings.hpa);
+    bme280["alt"] = round2(mySettings.alt);
+    serializeJson(doc, buffer);
+    ws.broadcastTXT(buffer);
+  }
+  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }

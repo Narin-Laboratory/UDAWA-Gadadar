@@ -1,24 +1,12 @@
 <div [ngSwitch]="state">
-    <div *ngSwitchCase=0>
-        <div class="card text-bg-danger mb-3">
-            <div class="card-body text-center">
-                <div class="display-6">
-                    {{switch}} {{state == 1 ? 'ON' : 'OFF'}}
-                </div>
-                <p><strong>{{lbl}}</strong></p>
-                <p><small>{{opMode[cpM]}}</small></p>
-            </div>
-        </div>
-    </div>
-    <div *ngSwitchCase=1>
-        <div class="card text-bg-success mb-3">
-            <div class="card-body text-center">
-                <div class="display-6">
-                    {{switch}} {{state == 1 ? 'ON' : 'OFF'}}
-                </div>
-                <p><strong>{{lbl}}</strong></p>
-                <p><small>{{opMode[cpM]}}</small></p>
-            </div>
-        </div>
-    </div>
+    <article *ngSwitchCase=0 style="background-color: crimson;">
+        <header><strong>{{lbl}}</strong></header>
+        <h1>{{switch}} {{state == 1 ? 'ON' : 'OFF'}}</h1>
+        <footer><small>{{opMode[cpM]}}</small></footer>
+    </article>
+    <article *ngSwitchCase=1 style="background-color: green;">
+        <header><strong>{{lbl}}</strong></header>
+        <h1>{{switch}} {{state == 1 ? 'ON' : 'OFF'}}</h1>
+        <footer><small>{{opMode[cpM]}}</small></footer>
+    </article>
 </div>

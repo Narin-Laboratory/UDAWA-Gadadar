@@ -122,4 +122,6 @@ void onAlarm(int code);
 void publishSwitchCb();
 void onSyncClientAttr();
 void onWsEvent(const JsonObject &data);
+void wsSendTelemetryCb();
+void wsSendSensorsCb();
 #endif

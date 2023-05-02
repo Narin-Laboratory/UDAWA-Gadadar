@@ -1,17 +1,18 @@
-<nav class="navbar navbar-dark" style="background-color: #3f51b5;">
-  <div class="container-fluid">
-    <div class="navbar-brand" href="#">
-      <img src="assets/img/udawa.svg" alt="Bootstrap" width="40" height="40">
-      UDAWA Smart System
-    </div>
-  </div>
-</nav>
-<div class="d-flex justify-content-center bg-success px-2 py-2 text-bg-success">
-  <div class="flex-item ms-2 me-3"><span class="badge text-bg-success">{{cfg['name'] + ' (' + cfg['model'] + ') '}}</span></div>
-  <div class="flex-item ms-2 me-3"><span class="badge text-bg-success">{{deviceTelemetry['dts']}}</span></div>
-  <div class="flex-item ms-2 me-3"><span class="badge text-bg-success">{{deviceTelemetry['heap']}}</span></div>
-</div>
-<div class="container">
+<header class="container-fluid">
+  <nav>
+    <ul>
+      <li><img src="assets/img/udawa.svg" alt="Bootstrap" width="40" height="40"></li>
+      <li><strong>UDAWA Smart System</strong></li>
+    </ul>
+    <ul>
+      <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
+      <li><small>{{deviceTelemetry['dts']}}</small></li>
+      <li><small>{{deviceTelemetry['heap']}}</small></li>
+    </ul>
+  </nav>
+        
+</header>
+<main class="container-fluid">
   <div class="row">
     <div class="col-sm-12">
       <app-dashboard (panic)="panic()" (reboot)="reboot()" (saveConfig)="saveConfig()" (savePermanent)="savePermanent()"
@@ -22,4 +23,4 @@
         [(cp4A)]="cp4A" [(cp4B)]="cp4B" [(cp3A)]="cp3A" [(lbl)]="lbl" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
     </div>
   </div>
-</div>
+</main>
