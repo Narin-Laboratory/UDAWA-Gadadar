@@ -30,14 +30,14 @@ Task relayControlCP4Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP4Cb, &r, 1, N
 Task selfDiagnosticLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticCb, &r, 1, NULL, NULL);
 Task taskPublishSwitch(TASK_IMMEDIATE, TASK_ONCE, &publishSwitchCb, &r, 0, NULL, NULL);
 
-Task calcPowerUsageLoop(TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 1, NULL, NULL);
-Task calcWeatherDataLoop(TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 1, NULL, NULL);
+Task calcPowerUsageLoop(10 * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 1, NULL, NULL);
+Task calcWeatherDataLoop(60 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 1, NULL, NULL);
 Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL);
 Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL);
 Task deviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &deviceTelemetryLoopCb, &r, 0, NULL, NULL);
 
-Task wsSendTelemetryLoop(TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, NULL, NULL);
-Task wsSendSensorsLoop(TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, NULL, NULL);
+Task wsSendTelemetryLoop(3 * TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, NULL, NULL);
+Task wsSendSensorsLoop(3 * TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, NULL, NULL);
 
 void setup()
 {
@@ -974,6 +974,10 @@ void onSyncClientAttr(){
         cpM[PSTR("cpM2")] = mySettings.cpM[1];
         cpM[PSTR("cpM3")] = mySettings.cpM[2];
         cpM[PSTR("cpM4")] = mySettings.cpM[3];
+        doc[PSTR("ch1")] = (int)mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
+        doc[PSTR("ch2")] = (int)mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
+        doc[PSTR("ch3")] = (int)mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
+        doc[PSTR("ch4")] = (int)mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
         serializeJson(doc, buffer);
         ws.broadcastTXT(buffer);
     }
@@ -998,11 +1002,11 @@ void onWsEvent(const JsonObject &doc){
         taskSyncClientAttr.setIterations(TASK_ONCE);
         taskSyncClientAttr.enable();
 
-        wsSendTelemetryLoop.setInterval(TASK_SECOND);
+        wsSendTelemetryLoop.setInterval(3 * TASK_SECOND);
         wsSendTelemetryLoop.setIterations(TASK_FOREVER);
         wsSendTelemetryLoop.restart();
 
-        wsSendSensorsLoop.setInterval(TASK_SECOND);
+        wsSendSensorsLoop.setInterval(3 * TASK_SECOND);
         wsSendSensorsLoop.setIterations(TASK_FOREVER);
         wsSendSensorsLoop.restart();
     }
@@ -1050,15 +1054,14 @@ void onWsEvent(const JsonObject &doc){
 void wsSendTelemetryCb(){
   long startMillis = millis();
   if(config.fIface && config.wsCount > 0){
-    String buffer;
-    StaticJsonDocument<DOCSIZE_MIN> root;
-    JsonObject doc = root.to<JsonObject>();
+    char buffer[DOCSIZE_MIN];
+    StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject devTel = doc.createNestedObject("devTel");
-    devTel["heap"] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    devTel["rssi"] = WiFi.RSSI();
-    devTel["uptime"] = millis()/1000;
-    devTel["dt"] = rtc.getEpoch();
-    devTel["dts"] = rtc.getDateTime();
+    devTel[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    devTel[PSTR("rssi")] = WiFi.RSSI();
+    devTel[PSTR("uptime")] = millis()/1000;
+    devTel[PSTR("dt")] = rtc.getEpoch();
+    devTel[PSTR("dts")] = rtc.getDateTime();
     serializeJson(doc, buffer);
     ws.broadcastTXT(buffer);
   }
@@ -1071,27 +1074,26 @@ void wsSendSensorsCb(){
     HardwareSerial PZEMSerial(1);
     PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-    String buffer;
-    StaticJsonDocument<DOCSIZE_MIN> root;
-    JsonObject doc = root.to<JsonObject>();
+    char buffer[DOCSIZE_MIN];
+    StaticJsonDocument<DOCSIZE_MIN> doc;
     JsonObject pzem = doc.createNestedObject("pzem");
     if(!isnan(PZEM.voltage())){
-      pzem["volt"] = round2(PZEM.voltage());
-      pzem["amp"] = round2(PZEM.current());
-      pzem["watt"] = round2(PZEM.power());
-      pzem["ener"] = round2(PZEM.energy());
-      pzem["freq"] = round2(PZEM.frequency());
-      pzem["pf"] = round2(PZEM.pf())*100;
+      pzem[PSTR("volt")] = round2(PZEM.voltage());
+      pzem[PSTR("amp")] = round2(PZEM.current());
+      pzem[PSTR("watt")] = round2(PZEM.power());
+      pzem[PSTR("ener")] = round2(PZEM.energy());
+      pzem[PSTR("freq")] = round2(PZEM.frequency());
+      pzem[PSTR("pf")] = round2(PZEM.pf())*100;
       serializeJson(doc, buffer);
       ws.broadcastTXT(buffer);
       doc.clear();
     }
 
     JsonObject bme280 = doc.createNestedObject("bme280");
-    bme280["celc"] = round2(mySettings.celc);
-    bme280["rh"] = round2(mySettings.rh);
-    bme280["hpa"] = round2(mySettings.hpa);
-    bme280["alt"] = round2(mySettings.alt);
+    bme280[PSTR("celc")] = round2(mySettings.celc);
+    bme280[PSTR("rh")] = round2(mySettings.rh);
+    bme280[PSTR("hpa")] = round2(mySettings.hpa);
+    bme280[PSTR("alt")] = round2(mySettings.alt);
     serializeJson(doc, buffer);
     ws.broadcastTXT(buffer);
   }

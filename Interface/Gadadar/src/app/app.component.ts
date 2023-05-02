@@ -41,7 +41,6 @@ export class AppComponent {
       }
       if(msg['cfg'] != null){
         this.cfg = msg['cfg'];
-        console.log(this.cfg);
       }
       if(msg['devTel'] != null){
         this.deviceTelemetry = msg['devTel'];

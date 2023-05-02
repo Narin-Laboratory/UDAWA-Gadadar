@@ -6,6 +6,7 @@ import { map } from 'rxjs/operators';
 
 const UDAWA_WS = "ws://" + window.location.hostname + ":81";
 
+
 export interface Message {}
 
 @Injectable({providedIn: 'root'})
@@ -52,7 +53,7 @@ export class WebsocketService {
             next: (data: Object) => {
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify(data));
-                    console.log('Message sent to websocket: ', data);
+                    //console.log('Message sent to websocket: ', data);
                 }
             }
         };
