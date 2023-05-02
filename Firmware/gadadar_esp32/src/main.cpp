@@ -49,6 +49,7 @@ void setup()
   plannedRebootOnEnableCb = &onReboot;
   emitAlarmCb = &onAlarm;
   onSyncClientAttrCb = &onSyncClientAttr;
+  wsEventCb = &onWsEvent;
   startup();
   loadSettings();
   syncConfigCoMCU();
@@ -884,5 +885,70 @@ void onSyncClientAttr(){
     tb.sendAttributeJSON(buffer);
     doc.clear();
     
+    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+}
+
+void onWsEvent(const JsonObject &doc){
+    long startMillis = millis();
+
+    if(doc["evType"] == nullptr){
+        log_manager->debug(PSTR(__func__), "Event type not found.\n");
+        return;
+    }
+    int evType = doc["evType"].as<int>();
+
+
+    if(evType == (int)WStype_CONNECTED){
+        /*syncClientAttr.setInterval(TASK_IMMEDIATE);
+        syncClientAttr.setIterations(TASK_ONCE);
+        syncClientAttr.enableIfNot();
+
+        wsSendTelemetryLoop.setInterval(INTV_wsSendTelemetryLoop);
+        wsSendTelemetryLoop.setIterations(TASK_FOREVER);
+        wsSendTelemetryLoop.enableIfNot();
+
+        wsSendSensorsLoop.setInterval(INTV_wsSendSensorsLoop);
+        wsSendSensorsLoop.setIterations(TASK_FOREVER);
+        wsSendSensorsLoop.enableIfNot();*/
+
+    }
+    if(evType == (int)WStype_DISCONNECTED){
+        if(config.wsCount < 1){
+        //wsSendTelemetryLoop.disable();
+        //wsSendSensorsLoop.disable();
+        log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
+        }
+    }
+    else if(evType == (int)WStype_TEXT){
+        if(doc["cmd"] == nullptr){
+        log_manager->debug(PSTR(__func__), "Command not found.\n");
+        return;
+        }
+        const char* cmd = doc["cmd"].as<const char*>();
+        if(strcmp(cmd, (const char*) "attr") == 0){
+        //processSharedAttributesUpdate(doc);
+        //syncClientAttr.setInterval(TASK_IMMEDIATE);
+        //syncClientAttr.setIterations(TASK_ONCE);
+        //syncClientAttr.enable();
+        }
+        else if(strcmp(cmd, (const char*) "saveSettings") == 0){
+        saveSettings();
+        }
+        else if(strcmp(cmd, (const char*) "saveConfig") == 0){
+        configSave();
+        }
+        else if(strcmp(cmd, (const char*) "setPanic") == 0){
+        //JsonObject params = doc.createNestedObject("params");
+        //params["state"]= "ON";
+        //processSetPanic(doc);
+        }
+        else if(strcmp(cmd, (const char*) "reboot") == 0){
+        plannedReboot(5);
+        }
+        else if(strcmp(cmd, (const char*) "setSwitch") == 0){
+        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+        }
+    }
+
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }

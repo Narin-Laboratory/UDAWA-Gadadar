@@ -4,7 +4,8 @@ import { AnonymousSubject } from 'rxjs/internal/Subject';
 import { Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-const UDAWA_WS = "ws://" + window.location.hostname + ":81";
+//const UDAWA_WS = "ws://" + window.location.hostname + ":81";
+const UDAWA_WS = "ws://172.100.11.147:81";
 
 export interface Message {}
 
@@ -40,7 +41,7 @@ export class WebsocketService {
             ws.onerror = obs.error.bind(obs);
             ws.onclose = obs.complete.bind(obs);
             ws.onclose = () => {
-                location.reload();
+                //location.reload();
             }
             return ws.close.bind(ws);
         });

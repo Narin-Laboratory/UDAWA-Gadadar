@@ -121,4 +121,5 @@ void deviceTelemetryLoopCb();
 void onAlarm(int code);
 void publishSwitchCb();
 void onSyncClientAttr();
+void onWsEvent(const JsonObject &data);
 #endif
