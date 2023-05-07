@@ -12,32 +12,20 @@
 using namespace libudawa;
 Settings mySettings;
 Adafruit_BME280 bme;
-Stream_Stats<float> _volt;
-Stream_Stats<float> _amp;
-Stream_Stats<float> _watt;
-Stream_Stats<float> _freq;
-Stream_Stats<float> _pf;
 
-Stream_Stats<float> _celc;
-Stream_Stats<float> _rh;
-Stream_Stats<float> _hpa;
-Stream_Stats<float> _alt;
+BaseType_t xReturnedWsSendTelemetry;
+BaseType_t xReturnedWsSendSensors;
+BaseType_t xReturnedRecPowerUsage;
+BaseType_t xReturnedRecWeatherData;
+BaseType_t xReturnedPublishSwitch;
+BaseType_t xReturnedRelayControl;
 
-Task relayControlCP1Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP1Cb, &r, 1, NULL, NULL);
-Task relayControlCP2Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP2Cb, &r, 1, NULL, NULL);
-Task relayControlCP3Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP3Cb, &r, 1, NULL, NULL);
-Task relayControlCP4Loop(TASK_SECOND, TASK_FOREVER, &relayControlCP4Cb, &r, 1, NULL, NULL);
-Task selfDiagnosticLoop(120 * TASK_SECOND, TASK_FOREVER, &selfDiagnosticCb, &r, 1, NULL, NULL);
-Task taskPublishSwitch(TASK_IMMEDIATE, TASK_ONCE, &publishSwitchCb, &r, 0, NULL, NULL);
-
-Task calcPowerUsageLoop(10 * TASK_SECOND, TASK_FOREVER, &calcPowerUsageCb, &r, 1, NULL, NULL);
-Task calcWeatherDataLoop(60 * TASK_SECOND, TASK_FOREVER, &calcWeatherDataCb, &r, 1, NULL, NULL);
-Task recPowerUsageLoop(mySettings.itP * TASK_SECOND, TASK_FOREVER, &recPowerUsageCb, &r, 0, NULL, NULL);
-Task recWeatherDataLoop(mySettings.itW * TASK_SECOND, TASK_FOREVER, &recWeatherDataCb, &r, 0, NULL, NULL);
-Task deviceTelemetryLoop(mySettings.itD * TASK_SECOND, TASK_FOREVER, &deviceTelemetryLoopCb, &r, 0, NULL, NULL);
-
-Task wsSendTelemetryLoop(3 * TASK_SECOND, TASK_FOREVER, &wsSendTelemetryCb, &r, 0, NULL, NULL);
-Task wsSendSensorsLoop(3 * TASK_SECOND, TASK_FOREVER, &wsSendSensorsCb, &r, 0, NULL, NULL);
+TaskHandle_t xHandleWsSendTelemetry = NULL;
+TaskHandle_t xHandleWsSendSensors = NULL;
+TaskHandle_t xHandleRecPowerUsage = NULL;
+TaskHandle_t xHandleRecWeatherData = NULL;
+TaskHandle_t xHandlePublishSwitch = NULL;
+TaskHandle_t xHandleRelayControl = NULL;
 
 void setup()
 {
@@ -59,7 +47,6 @@ void setup()
   if(String(config.model) == String("Generic")){
     strlcpy(config.model, "Gadadar", sizeof(config.model));
   }
-  setAlarm(999, 1, 1, 3000);
   stateReset(0);
 
   tb.setBufferSize(1024);
@@ -67,23 +54,34 @@ void setup()
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
+  }else{
+    if(xHandleRecWeatherData == NULL){
+      xReturnedRecWeatherData = xTaskCreatePinnedToCore(recWeatherDataTR, PSTR("recWeatherData"), 6144, NULL, 1, &xHandleRecWeatherData, 1);
+      if(xReturnedRecWeatherData == pdPASS){
+        log_manager->warn(PSTR(__func__), PSTR("Task recWeatherData has been created.\n"));
+      }
+    }
   }
 
-  if(mySettings.itD > 0){
-    deviceTelemetryLoop.setInterval(mySettings.itD * TASK_SECOND);
-    deviceTelemetryLoop.setIterations(TASK_FOREVER);
-    deviceTelemetryLoop.enable();
+  if(xHandleRecPowerUsage == NULL){
+    xReturnedRecPowerUsage = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), 6144, NULL, 1, &xHandleRecPowerUsage, 1);
+    if(xReturnedRecPowerUsage == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task recPowerUsage has been created.\n"));
+    }
   }
 
-  if(mySettings.itP > 0){
-    recPowerUsageLoop.setInterval(mySettings.itP * TASK_SECOND);
-    recPowerUsageLoop.setIterations(TASK_FOREVER);
-    recPowerUsageLoop.enable();
+  if(xHandlePublishSwitch == NULL){
+    xReturnedPublishSwitch = xTaskCreatePinnedToCore(publishSwitchTR, PSTR("publishSwitch"), 4096, NULL, 1, &xHandlePublishSwitch, 1);
+    if(xReturnedPublishSwitch == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task publishSwitch has been created.\n"));
+    }
   }
-  if(mySettings.itW > 0){
-    recWeatherDataLoop.setInterval(mySettings.itW * TASK_SECOND);
-    recWeatherDataLoop.setIterations(TASK_FOREVER);
-    recWeatherDataLoop.enable();
+
+  if(xHandleRelayControl == NULL){
+    xReturnedRelayControl = xTaskCreatePinnedToCore(relayControlTR, PSTR("relayControl"), 6144, NULL, 1, &xHandleRelayControl, 1);
+    if(xReturnedRelayControl == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task relayControl has been created.\n"));
+    }
   }
 
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
@@ -101,13 +99,13 @@ void selfDiagnosticCb(){
   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
   if(!mySettings.flag_bme280){
-    setAlarm(111, 1, 5, 1000);
+    //setAlarm(111, 1, 5, 1000);
   }
   if(isnan(PZEM.voltage()) || PZEM.voltage() <= 0){
-    setAlarm(121, 1, 5, 1000);
+    //setAlarm(121, 1, 5, 1000);
   }
   if(rtc.getYear() < 2023){
-    setAlarm(131, 1, 5, 1000);
+    //setAlarm(131, 1, 5, 1000);
   }
 
   uint8_t ACTIVE_CH_COUNTER;
@@ -118,124 +116,184 @@ void selfDiagnosticCb(){
 
     if(mySettings.stateOnTs[i] > 0){
       if(millis() - mySettings.stateOnTs[i] > 3000000){
-        if(i = 0){setAlarm(211, 1, 10, 1000);}
-        else if(i = 0){setAlarm(212, 1, 10, 1000);}
-        else if(i = 0){setAlarm(213, 1, 10, 1000);}
-        else if(i = 0){setAlarm(214, 1, 10, 1000);}
+        if(i = 0){
+          //setAlarm(211, 1, 10, 1000);
+        }
+        else if(i = 0){
+          //setAlarm(212, 1, 10, 1000);
+        }
+        else if(i = 0){
+          //setAlarm(213, 1, 10, 1000);
+        }
+        else if(i = 0){
+          //setAlarm(214, 1, 10, 1000);
+        }
       }
     }
 
   }
 
   if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER > 0 && (int)PZEM.power() < 5){
-    setAlarm(221, 1, 10, 1000);
+    //setAlarm(221, 1, 10, 1000);
   }
 
   if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 5){
-    setAlarm(222, 1, 10, 1000);
+    //setAlarm(222, 1, 10, 1000);
   }
 
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void calcPowerUsageCb(){
-    long startMillis = millis();
+void recPowerUsageTR(void *arg){
+  Stream_Stats<float> _volt;
+  Stream_Stats<float> _amp;
+  Stream_Stats<float> _watt;
+  Stream_Stats<float> _freq;
+  Stream_Stats<float> _pf;
 
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+  unsigned long timerCalcPowerUsage = millis();
+  unsigned long timerRecPowerUsage = millis();
+  
+  while(true){
+    if( xSemaphoreSettings != NULL ){
+      if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+      {
+        HardwareSerial PZEMSerial(1);
+        PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+        
+        if(!isnan(PZEM.voltage())){ _volt.Add(PZEM.voltage()); mySettings._volt = PZEM.voltage();}
+        if(!isnan(PZEM.current())){ _amp.Add(PZEM.current()); mySettings._amp = PZEM.current();}
+        if(!isnan(PZEM.power())){ _watt.Add(PZEM.power()); mySettings._watt = PZEM.power();}
+        if(!isnan(PZEM.frequency())){ _freq.Add(PZEM.frequency()); mySettings._freq = PZEM.frequency();}
+        if(!isnan(PZEM.pf())){ _pf.Add(PZEM.pf()); mySettings._pf = PZEM.pf();}
 
-    if(isnan(PZEM.voltage())){return;}
-
-    if(!isnan(PZEM.voltage())){
-    _volt.Add(PZEM.voltage());
-    tb.sendAttributeFloat("_volt", PZEM.voltage());
-    tb.sendAttributeFloat("_ener", PZEM.energy());
+        xSemaphoreGive( xSemaphoreSettings );
+      }
+      else
+      {
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+      }
     }
 
-    if(!isnan(PZEM.current())){
-    _amp.Add(PZEM.current());
-    tb.sendAttributeFloat("_amp", PZEM.current());
+    if(tb.connected() && config.provSent){
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      float ener;
+      unsigned long now = millis();
+      if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
+        
+        doc[PSTR("_volt")] = mySettings._volt;
+        doc[PSTR("_amp")] = mySettings._amp;
+        doc[PSTR("_watt")] = mySettings._watt;
+        doc[PSTR("_freq")] = mySettings._freq;
+        doc[PSTR("_pf")] = mySettings._pf;
+        doc[PSTR("_ener")] = mySettings._ener;
+        
+        tbSendAttribute(doc);
+        doc.clear();
+
+        timerCalcPowerUsage = now;
+      }
+
+      now = millis();
+      if( (now - timerRecPowerUsage) > (mySettings.itP * 1000) ){
+        doc[PSTR("volt")] = _volt.Get_Average();
+        doc[PSTR("amp")] = _amp.Get_Average();
+        doc[PSTR("watt")] = _watt.Get_Average();
+        doc[PSTR("freq")] = _freq.Get_Average();
+        doc[PSTR("pf")] = _pf.Get_Average();
+        doc[PSTR("ener")] = ener;
+
+        if(tbSendTelemetry(doc)){
+          _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
+        }
+        
+        timerRecPowerUsage = now;
+      }
     }
 
-    if(!isnan(PZEM.power())){
-    _watt.Add(PZEM.power());
-    tb.sendAttributeFloat("_watt", PZEM.power());
-    }
-
-    if(!isnan(PZEM.frequency())){
-    _freq.Add(PZEM.frequency());
-    tb.sendAttributeFloat("_freq", PZEM.frequency());
-    }
-
-    if(!isnan(PZEM.pf())){
-    _pf.Add(PZEM.pf());
-    tb.sendAttributeFloat("_pf", PZEM.pf());
-    }
-
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+  }
 }
 
-void recPowerUsageCb(){
-  long startMillis = millis();
+void recWeatherDataTR(void *arg){
+  Stream_Stats<float> _celc;
+  Stream_Stats<float> _rh;
+  Stream_Stats<float> _hpa;
+  Stream_Stats<float> _alt;
+  
+  unsigned long timerCalcWeatherData = millis();
+  unsigned long timerRecWeatherData = millis();
 
-  if(tb.connected()){
-    tb.sendTelemetryFloat("volt", _volt.Get_Average());
-    tb.sendTelemetryFloat("amp", _amp.Get_Average());
-    tb.sendTelemetryFloat("watt", _watt.Get_Average());
-    tb.sendTelemetryFloat("freq",  _freq.Get_Average());
-    tb.sendTelemetryFloat("pf",  _pf.Get_Average());
+  while(true){
+    if(mySettings.flag_bme280){
+      if( xSemaphoreSettings != NULL ){
+        if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+        {
+          mySettings._celc = bme.readTemperature();
+          mySettings._rh = bme.readHumidity();
+          mySettings._hpa = bme.readPressure() / 100.0F;
+          mySettings._alt = bme.readAltitude(mySettings.seaHpa);
 
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-    tb.sendTelemetryFloat("ener", PZEM.energy());
+          _celc.Add(mySettings._celc);
+          _rh.Add(mySettings._rh);
+          _hpa.Add(mySettings._hpa);
+          _alt.Add(mySettings._alt);
+          xSemaphoreGive( xSemaphoreSettings );
+        }
+        else
+        {
+          log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        }
+      }
+    }
+    
+    if(config.provSent && tb.connected() && config.fIoT){
+      StaticJsonDocument<DOCSIZE_MIN> doc;
 
-   
-    _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
+      unsigned long now = millis();
+      if( (now - timerCalcWeatherData) > (mySettings.itWc * 1000) ){
+        doc[PSTR("_celc")] = mySettings._celc;
+        doc[PSTR("_rh")] = mySettings._rh;
+        doc[PSTR("_hpa")] = mySettings._hpa;
+        doc[PSTR("_alt")] = mySettings._alt;
+
+        tbSendAttribute(doc);
+        doc.clear();
+
+        timerCalcWeatherData = now;
+      }
+
+      if( (now - timerRecWeatherData) > (mySettings.itW * 1000) ){
+        if( xSemaphoreSettings != NULL ){
+          if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+          {
+            mySettings.celc = _celc.Get_Average();
+            mySettings.rh = _rh.Get_Average();
+            mySettings.hpa = _hpa.Get_Average();
+            mySettings.alt = _alt.Get_Average();
+            xSemaphoreGive( xSemaphoreSettings );
+          }
+          else
+          {
+            log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+          }
+        }
+
+        doc[PSTR("celc")] = mySettings.celc;
+        doc[PSTR("rh")] = mySettings.rh;
+        doc[PSTR("hpa")] = mySettings.hpa;
+        doc[PSTR("alt")] = mySettings.alt;
+
+        if(tbSendTelemetry(doc)){
+          _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear(); 
+        }
+
+        timerRecWeatherData = now;
+      }
+    }
+
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
-
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
-}
-
-void calcWeatherDataCb(){
-  long startMillis = millis();
-
-  if(mySettings.flag_bme280){
-    mySettings.celc = bme.readTemperature();
-    mySettings.rh = bme.readHumidity();
-    mySettings.hpa = bme.readPressure() / 100.0F;
-    mySettings.alt = bme.readAltitude(mySettings.seaHpa);
-
-    _celc.Add(mySettings.celc);
-    _rh.Add(mySettings.rh);
-    _hpa.Add(mySettings.hpa);
-    _alt.Add(mySettings.alt);
-
-    tb.sendAttributeFloat("_celc",mySettings.celc);
-    tb.sendAttributeFloat("_rh", mySettings.rh);
-    tb.sendAttributeFloat("_hpa", mySettings.hpa);
-    tb.sendAttributeFloat("_alt", mySettings.alt);
-  }
-
-  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
-}
-
-void recWeatherDataCb(){
-  long startMillis = millis();
-
-  if(tb.connected()){
-    mySettings._celc = _celc.Get_Average();
-    mySettings._rh = _rh.Get_Average();
-    mySettings._hpa = _hpa.Get_Average();
-    mySettings._alt = _alt.Get_Average();
-
-    tb.sendTelemetryFloat("celc",mySettings._celc);
-    tb.sendTelemetryFloat("rh", mySettings._rh);
-    tb.sendTelemetryFloat("hpa", mySettings._hpa);
-    tb.sendTelemetryFloat("alt", mySettings._alt);
-    _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear();
-  }
-
-  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void loadSettings()
@@ -286,7 +344,14 @@ void loadSettings()
   else{mySettings.itW = 300;}
 
   if(doc["itD"] != nullptr){mySettings.itD = doc["itD"].as<uint16_t>();}
-  else{mySettings.itD = 60;}
+  else{mySettings.itD = 15;}
+
+  if(doc["itPc"] != nullptr){mySettings.itPc = doc["itPc"].as<uint16_t>();}
+  else{mySettings.itPc = 3;}
+
+  if(doc["itWc"] != nullptr){mySettings.itWc = doc["itWc"].as<uint16_t>();}
+  else{mySettings.itWc = 3;}
+
 
   for(uint8_t i = 0; i < countof(mySettings.dutyCounter); i++) { mySettings.dutyCounter[i] = 86400; }
 
@@ -373,6 +438,8 @@ void saveSettings()
   doc["ON"] = mySettings.ON;
   doc["itP"] = mySettings.itP;
   doc["itW"] = mySettings.itW;
+  doc["itPc"] = mySettings.itPc;
+  doc["itWc"] = mySettings.itWc;
   doc["itD"] = mySettings.itD;
 
   JsonArray cpM = doc.createNestedArray("cpM");
@@ -417,16 +484,22 @@ void setSwitch(String ch, String state)
 
   setCoMCUPin(pR, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
-  taskPublishSwitch.setInterval(TASK_IMMEDIATE);
-  taskPublishSwitch.setIterations(TASK_ONCE);
-  taskPublishSwitch.enableDelayed(1 * TASK_SECOND);
-
+  
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void relayControlCP1Cb()
-{
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+void relayControlTR(void *arg){
+  while(true){
+    relayControlCP1();
+    relayControlCP2();
+    relayControlCP3();
+    relayControlCP4();
+
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+  }
+}
+
+void relayControlCP1(){
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if (mySettings.cp1B[i] < 2){mySettings.cp1B[i] = 2;} //safenet
@@ -456,8 +529,7 @@ void relayControlCP1Cb()
   }
 }
 
-void relayControlCP2Cb(){
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+void relayControlCP2(){
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
     if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
@@ -477,29 +549,7 @@ void relayControlCP2Cb(){
   }
 }
 
-void relayControlCP4Cb(){
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
-  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
-  {
-    if(mySettings.cp4A[i] != 0 && mySettings.cp4B[i] != 0 && mySettings.cpM[i] == 4)
-    {
-      if( mySettings.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4A[i] * 1000) ){
-        mySettings.dutyState[i] = mySettings.ON;
-        String ch = "ch" + String(i+1);
-        setSwitch(ch, "ON");
-        mySettings.cp4BTs[i] = millis();
-      }
-      if( mySettings.dutyState[i] == mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4B[i] * 1000) ){
-        mySettings.dutyState[i] = 1 - mySettings.ON;
-        String ch = "ch" + String(i+1);
-        setSwitch(ch, "OFF");
-      }
-    }
-  }
-}
-
-void relayControlCP3Cb(){
-  //log_manager->verbose(PSTR(__func__), PSTR("Overrun: %d, start delayed by: %d\n"), wifiKeeperLoop.getOverrun(), wifiKeeperLoop.getStartDelay());
+void relayControlCP3(){
   for(uint8_t i = 0; i < countof(mySettings.pR); i++){
     if(mySettings.cpM[i] == 3){
       StaticJsonDocument<1024> doc;
@@ -552,13 +602,43 @@ void relayControlCP3Cb(){
   }
 }
 
+void relayControlCP4(){
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
+  {
+    if(mySettings.cp4A[i] != 0 && mySettings.cp4B[i] != 0 && mySettings.cpM[i] == 4)
+    {
+      if( mySettings.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4A[i] * 1000) ){
+        mySettings.dutyState[i] = mySettings.ON;
+        String ch = "ch" + String(i+1);
+        setSwitch(ch, "ON");
+        mySettings.cp4BTs[i] = millis();
+      }
+      if( mySettings.dutyState[i] == mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4B[i] * 1000) ){
+        mySettings.dutyState[i] = 1 - mySettings.ON;
+        String ch = "ch" + String(i+1);
+        setSwitch(ch, "OFF");
+      }
+    }
+  } 
+}
+
 void attUpdateCb(const Shared_Attribute_Data &data)
 {
   long startMillis = millis();
 
-  if(data["cp1A1"] != nullptr)
-  {
-    mySettings.cp1A[0] = data["cp1A1"].as<uint8_t>();
+  if(data["cp1A1"] != nullptr){
+    if( xSemaphoreSettings != NULL ){
+      if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+      {
+        mySettings.cp1A[0] = data["cp1A1"].as<uint8_t>();
+        xSemaphoreGive( xSemaphoreSettings );
+      }
+      else
+      {
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+      }
+    }
+
     if(data["cp1A1"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch1"), String("OFF"));
@@ -566,7 +646,17 @@ void attUpdateCb(const Shared_Attribute_Data &data)
   }
   if(data["cp1A2"] != nullptr)
   {
-    mySettings.cp1A[1] = data["cp1A2"].as<uint8_t>();
+    if( xSemaphoreSettings != NULL ){
+      if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+      {
+        mySettings.cp1A[1] = data["cp1A2"].as<uint8_t>();
+        xSemaphoreGive( xSemaphoreSettings );
+      }
+      else
+      {
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+      }
+    }
     if(data["cp1A2"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch2"), String("OFF"));
@@ -574,7 +664,17 @@ void attUpdateCb(const Shared_Attribute_Data &data)
   }
   if(data["cp1A3"] != nullptr)
   {
-    mySettings.cp1A[2] = data["cp1A3"].as<uint8_t>();
+    if( xSemaphoreSettings != NULL ){
+      if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+      {
+        mySettings.cp1A[2] = data["cp1A3"].as<uint8_t>();
+        xSemaphoreGive( xSemaphoreSettings );
+      }
+      else
+      {
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+      }
+    }
     if(data["cp1A3"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch3"), String("OFF"));
@@ -582,93 +682,106 @@ void attUpdateCb(const Shared_Attribute_Data &data)
   }
   if(data["cp1A4"] != nullptr)
   {
-    mySettings.cp1A[3] = data["cp1A4"].as<uint8_t>();
+    if( xSemaphoreSettings != NULL ){
+      if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+      {
+        mySettings.cp1A[3] = data["cp1A4"].as<uint8_t>();
+        xSemaphoreGive( xSemaphoreSettings );
+      }
+      else
+      {
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+      }
+    }
     if(data["cp1A4"].as<uint8_t>() == 0)
     {
       setSwitch(String("ch4"), String("OFF"));
     }
   }
 
-  if(data["cp1B1"] != nullptr){mySettings.cp1B[0] = data["cp1B1"].as<unsigned long>();}
-  if(data["cp1B2"] != nullptr){mySettings.cp1B[1] = data["cp1B2"].as<unsigned long>();}
-  if(data["cp1B3"] != nullptr){mySettings.cp1B[2] = data["cp1B3"].as<unsigned long>();}
-  if(data["cp1B4"] != nullptr){mySettings.cp1B[3] = data["cp1B4"].as<unsigned long>();}
+  if( xSemaphoreSettings != NULL ){
+    if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+    {
+      if(data["cp1B1"] != nullptr){mySettings.cp1B[0] = data["cp1B1"].as<unsigned long>();}
+      if(data["cp1B2"] != nullptr){mySettings.cp1B[1] = data["cp1B2"].as<unsigned long>();}
+      if(data["cp1B3"] != nullptr){mySettings.cp1B[2] = data["cp1B3"].as<unsigned long>();}
+      if(data["cp1B4"] != nullptr){mySettings.cp1B[3] = data["cp1B4"].as<unsigned long>();}
 
-  if(data["cp3A1"] != nullptr){mySettings.cp3A[0] = data["cp3A1"].as<String>();}
-  if(data["cp3A2"] != nullptr){mySettings.cp3A[1] = data["cp3A2"].as<String>();}
-  if(data["cp3A3"] != nullptr){mySettings.cp3A[2] = data["cp3A3"].as<String>();}
-  if(data["cp3A4"] != nullptr){mySettings.cp3A[3] = data["cp3A4"].as<String>();}
+      if(data["cp3A1"] != nullptr){mySettings.cp3A[0] = data["cp3A1"].as<String>();}
+      if(data["cp3A2"] != nullptr){mySettings.cp3A[1] = data["cp3A2"].as<String>();}
+      if(data["cp3A3"] != nullptr){mySettings.cp3A[2] = data["cp3A3"].as<String>();}
+      if(data["cp3A4"] != nullptr){mySettings.cp3A[3] = data["cp3A4"].as<String>();}
 
-  if(data["cp2A1"] != nullptr){
-    uint64_t micro = data["cp2A1"].as<uint64_t>();
-    uint32_t micro_high = micro >> 32;
-    uint32_t micro_low = micro & MAX_INT;
-    mySettings.cp2A[0] = micro2milli(micro_high, micro_low);
+      if(data["cp2A1"] != nullptr){
+        uint64_t micro = data["cp2A1"].as<uint64_t>();
+        uint32_t micro_high = micro >> 32;
+        uint32_t micro_low = micro & MAX_INT;
+        mySettings.cp2A[0] = micro2milli(micro_high, micro_low);
+      }
+      if(data["cp2A2"] != nullptr){
+        uint64_t micro = data["cp2A2"].as<uint64_t>();
+        uint32_t micro_high = micro >> 32;
+        uint32_t micro_low = micro & MAX_INT;
+        mySettings.cp2A[1] = micro2milli(micro_high, micro_low);
+      }
+      if(data["cp2A3"] != nullptr){
+        uint64_t micro = data["cp2A3"].as<uint64_t>();
+        uint32_t micro_high = micro >> 32;
+        uint32_t micro_low = micro & MAX_INT;
+        mySettings.cp2A[2] = micro2milli(micro_high, micro_low);
+      }
+      if(data["cp2A4"] != nullptr){
+        uint64_t micro = data["cp2A4"].as<uint64_t>();
+        uint32_t micro_high = micro >> 32;
+        uint32_t micro_low = micro & MAX_INT;
+        mySettings.cp2A[3] = micro2milli(micro_high, micro_low);
+      }
+
+      if(data["cp2B1"] != nullptr){mySettings.cp2B[0] = data["cp2B1"].as<unsigned long>();}
+      if(data["cp2B2"] != nullptr){mySettings.cp2B[1] = data["cp2B2"].as<unsigned long>();}
+      if(data["cp2B3"] != nullptr){mySettings.cp2B[2] = data["cp2B3"].as<unsigned long>();}
+      if(data["cp2B4"] != nullptr){mySettings.cp2B[3] = data["cp2B4"].as<unsigned long>();}
+
+      if(data["cp4A1"] != nullptr){mySettings.cp4A[0] = data["cp4A1"].as<unsigned long>();}
+      if(data["cp4A2"] != nullptr){mySettings.cp4A[1] = data["cp4A2"].as<unsigned long>();}
+      if(data["cp4A3"] != nullptr){mySettings.cp4A[2] = data["cp4A3"].as<unsigned long>();}
+      if(data["cp4A4"] != nullptr){mySettings.cp4A[3] = data["cp4A4"].as<unsigned long>();}
+
+      if(data["cp4B1"] != nullptr){mySettings.cp4B[0] = data["cp4B1"].as<unsigned long>();}
+      if(data["cp4B2"] != nullptr){mySettings.cp4B[1] = data["cp4B2"].as<unsigned long>();}
+      if(data["cp4B3"] != nullptr){mySettings.cp4B[2] = data["cp4B3"].as<unsigned long>();}
+      if(data["cp4B4"] != nullptr){mySettings.cp4B[3] = data["cp4B4"].as<unsigned long>();}
+
+      if(data["pR1"] != nullptr){mySettings.pR[0] = data["pR1"].as<uint8_t>();}
+      if(data["pR2"] != nullptr){mySettings.pR[1] = data["pR2"].as<uint8_t>();}
+      if(data["pR3"] != nullptr){mySettings.pR[2] = data["pR3"].as<uint8_t>();}
+      if(data["pR4"] != nullptr){mySettings.pR[3] = data["pR4"].as<uint8_t>();}
+
+      if(data["ON"] != nullptr){mySettings.ON = data["ON"].as<bool>();}
+      if(data["itP"] != nullptr){mySettings.itP = data["itP"].as<uint16_t>();}
+      if(data["itW"] != nullptr){mySettings.itW = data["itW"].as<uint16_t>();}
+      if(data["itPc"] != nullptr){mySettings.itPc = data["itPc"].as<uint16_t>();}
+      if(data["itWc"] != nullptr){mySettings.itWc = data["itWc"].as<uint16_t>();}
+      if(data["itD"] != nullptr){mySettings.itD = data["itD"].as<uint16_t>();}
+
+      if(data["cpM1"] != nullptr){mySettings.cpM[0] = data["cpM1"].as<uint8_t>();}
+      if(data["cpM2"] != nullptr){mySettings.cpM[1] = data["cpM2"].as<uint8_t>();}
+      if(data["cpM3"] != nullptr){mySettings.cpM[2] = data["cpM3"].as<uint8_t>();}
+      if(data["cpM4"] != nullptr){mySettings.cpM[3] = data["cpM4"].as<uint8_t>();}
+
+      if(data["lbl1"] != nullptr){strlcpy(mySettings.lbl[0], data["lbl1"].as<const char*>(), sizeof(mySettings.lbl[0]));}
+      if(data["lbl2"] != nullptr){strlcpy(mySettings.lbl[1], data["lbl2"].as<const char*>(), sizeof(mySettings.lbl[1]));}
+      if(data["lbl3"] != nullptr){strlcpy(mySettings.lbl[2], data["lbl3"].as<const char*>(), sizeof(mySettings.lbl[2]));}
+      if(data["lbl4"] != nullptr){strlcpy(mySettings.lbl[3], data["lbl4"].as<const char*>(), sizeof(mySettings.lbl[3]));}
+
+      if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
+      xSemaphoreGive( xSemaphoreSettings );
+    }
+    else
+    {
+      log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+    }
   }
-  if(data["cp2A2"] != nullptr){
-    uint64_t micro = data["cp2A2"].as<uint64_t>();
-    uint32_t micro_high = micro >> 32;
-    uint32_t micro_low = micro & MAX_INT;
-    mySettings.cp2A[1] = micro2milli(micro_high, micro_low);
-  }
-  if(data["cp2A3"] != nullptr){
-    uint64_t micro = data["cp2A3"].as<uint64_t>();
-    uint32_t micro_high = micro >> 32;
-    uint32_t micro_low = micro & MAX_INT;
-    mySettings.cp2A[2] = micro2milli(micro_high, micro_low);
-  }
-  if(data["cp2A4"] != nullptr){
-    uint64_t micro = data["cp2A4"].as<uint64_t>();
-    uint32_t micro_high = micro >> 32;
-    uint32_t micro_low = micro & MAX_INT;
-    mySettings.cp2A[3] = micro2milli(micro_high, micro_low);
-  }
-
-  if(data["cp2B1"] != nullptr){mySettings.cp2B[0] = data["cp2B1"].as<unsigned long>();}
-  if(data["cp2B2"] != nullptr){mySettings.cp2B[1] = data["cp2B2"].as<unsigned long>();}
-  if(data["cp2B3"] != nullptr){mySettings.cp2B[2] = data["cp2B3"].as<unsigned long>();}
-  if(data["cp2B4"] != nullptr){mySettings.cp2B[3] = data["cp2B4"].as<unsigned long>();}
-
-  if(data["cp4A1"] != nullptr){mySettings.cp4A[0] = data["cp4A1"].as<unsigned long>();}
-  if(data["cp4A2"] != nullptr){mySettings.cp4A[1] = data["cp4A2"].as<unsigned long>();}
-  if(data["cp4A3"] != nullptr){mySettings.cp4A[2] = data["cp4A3"].as<unsigned long>();}
-  if(data["cp4A4"] != nullptr){mySettings.cp4A[3] = data["cp4A4"].as<unsigned long>();}
-
-  if(data["cp4B1"] != nullptr){mySettings.cp4B[0] = data["cp4B1"].as<unsigned long>();}
-  if(data["cp4B2"] != nullptr){mySettings.cp4B[1] = data["cp4B2"].as<unsigned long>();}
-  if(data["cp4B3"] != nullptr){mySettings.cp4B[2] = data["cp4B3"].as<unsigned long>();}
-  if(data["cp4B4"] != nullptr){mySettings.cp4B[3] = data["cp4B4"].as<unsigned long>();}
-
-  if(data["pR1"] != nullptr){mySettings.pR[0] = data["pR1"].as<uint8_t>();}
-  if(data["pR2"] != nullptr){mySettings.pR[1] = data["pR2"].as<uint8_t>();}
-  if(data["pR3"] != nullptr){mySettings.pR[2] = data["pR3"].as<uint8_t>();}
-  if(data["pR4"] != nullptr){mySettings.pR[3] = data["pR4"].as<uint8_t>();}
-
-  if(data["ON"] != nullptr){mySettings.ON = data["ON"].as<bool>();}
-  if(data["itP"] != nullptr){mySettings.itP = data["itP"].as<uint16_t>();}
-  if(data["itW"] != nullptr){mySettings.itW = data["itW"].as<uint16_t>();}
-  if(data["itD"] != nullptr){mySettings.itD = data["itD"].as<uint16_t>();}
-
-  if(data["cpM1"] != nullptr){mySettings.cpM[0] = data["cpM1"].as<uint8_t>();}
-  if(data["cpM2"] != nullptr){mySettings.cpM[1] = data["cpM2"].as<uint8_t>();}
-  if(data["cpM3"] != nullptr){mySettings.cpM[2] = data["cpM3"].as<uint8_t>();}
-  if(data["cpM4"] != nullptr){mySettings.cpM[3] = data["cpM4"].as<uint8_t>();}
-
-  if(data["lbl1"] != nullptr){strlcpy(mySettings.lbl[0], data["lbl1"].as<const char*>(), sizeof(mySettings.lbl[0]));}
-  if(data["lbl2"] != nullptr){strlcpy(mySettings.lbl[1], data["lbl2"].as<const char*>(), sizeof(mySettings.lbl[1]));}
-  if(data["lbl3"] != nullptr){strlcpy(mySettings.lbl[2], data["lbl3"].as<const char*>(), sizeof(mySettings.lbl[2]));}
-  if(data["lbl4"] != nullptr){strlcpy(mySettings.lbl[3], data["lbl4"].as<const char*>(), sizeof(mySettings.lbl[3]));}
-
-  if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
-
-  if(data["fP"] != nullptr){configcomcu.fP = data["fP"].as<bool>();}
-  if(data["bFr"] != nullptr){configcomcu.bFr = data["bFr"].as<uint16_t>();}
-  if(data["fB"] != nullptr){configcomcu.fB = data["fB"].as<bool>();}
-  if(data["pBz"] != nullptr){configcomcu.pBz = data["pBz"].as<uint8_t>();}
-  if(data["pLR"] != nullptr){configcomcu.pLR = data["pLR"].as<uint8_t>();}
-  if(data["pLG"] != nullptr){configcomcu.pLG = data["pLG"].as<uint8_t>();}
-  if(data["pLB"] != nullptr){configcomcu.pLB = data["pLB"].as<uint8_t>();}
-  if(data["lON"] != nullptr){configcomcu.lON = data["lON"].as<uint8_t>();}
 
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
@@ -680,22 +793,12 @@ void onTbConnected(){
     mySettings.publishSwitch[1] = 1;
     mySettings.publishSwitch[2] = 1;
     mySettings.publishSwitch[3] = 1;
-    taskPublishSwitch.setInterval(TASK_IMMEDIATE);
-    taskPublishSwitch.setIterations(TASK_ONCE);
-    taskPublishSwitch.enableDelayed(3 * TASK_SECOND);
 
-    if(mySettings.itD > 0){
-        deviceTelemetryLoop.setInterval(mySettings.itD * TASK_SECOND);
-        deviceTelemetryLoop.setIterations(TASK_FOREVER);
-        deviceTelemetryLoop.enableDelayed(10 * TASK_SECOND);
-    }
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void onTbDisconnected(){
-    long startMillis = millis();
-    deviceTelemetryLoop.disable();
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+ 
 }
 
 void onReboot(){}
@@ -709,7 +812,7 @@ void setPanic(const RPC_Data &data){
         if(strcmp(data[PSTR("st")], PSTR("ON")) == 0){
             doc[PSTR("fP")] = 1;
             configcomcu.fP = 1;
-            setAlarm(666, 1, 1, 10000);
+            //setAlarm(666, 1, 1, 10000);
             stateReset(1);
         }
         else{
@@ -776,17 +879,17 @@ void stateReset(bool resetOpMode){
     log_manager->verbose(PSTR(__func__), PSTR("Relay operations are disabled.\n."));
 }
 
-void deviceTelemetryLoopCb(){
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    String buffer;
-    
-    doc[PSTR("uptime")] = millis(); 
-    doc[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT); 
-    doc[PSTR("rssi")] = WiFi.RSSI(); 
-    doc[PSTR("dt")] = rtc.getEpoch(); 
+void deviceTelemetry(){
+    if(config.provSent && tb.connected() && config.fIoT){
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      
+      doc[PSTR("uptime")] = millis(); 
+      doc[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT); 
+      doc[PSTR("rssi")] = WiFi.RSSI(); 
+      doc[PSTR("dt")] = rtc.getEpoch(); 
 
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer.c_str());
+      tbSendTelemetry(doc);
+    }
 }
 
 void onAlarm(int code){
@@ -795,116 +898,118 @@ void onAlarm(int code){
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void publishSwitchCb(){
-    long startMillis = millis();
-
+void publishSwitchTR(void * arg){
+  unsigned long timerDeviceTelemetry = millis();
+  while(true){
     for (uint8_t i = 0; i < sizeof(mySettings.dutyState); i++){
-        if(mySettings.publishSwitch[i]){
-            String chName = "ch" + String(i+1);
-            int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
-            
-            if(config.fIoT){
-                tb.sendTelemetryInt(chName.c_str(), state);
-            }
+      if(mySettings.publishSwitch[i]){
+          String chName = "ch" + String(i+1);
+          int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
 
-            if(config.wsCount > 0){
-                String buffer;
-                StaticJsonDocument<32> doc;
-                doc[chName.c_str()] = state;
-                serializeJson(doc, buffer);
-                ws.broadcastTXT(buffer);
-            }
+          char buffer[10];
+          StaticJsonDocument<DOCSIZE_MIN> doc;
+          doc[chName.c_str()] = state;
+          serializeJson(doc, buffer);
+          
+          if(config.fIoT && tb.connected() && config.provSent){
+              tbSendTelemetry(doc);
+          }
 
-            mySettings.publishSwitch[i] = false;
-        }
+          if(config.fIface && config.wsCount > 0){
+              ws.broadcastTXT(buffer);
+          }
+
+          mySettings.publishSwitch[i] = false;
+      }
     }
 
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);   
+    unsigned long now = millis();
+    if((millis() - now) > (mySettings.itD * 1000)){
+      deviceTelemetry();
+    }
+
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+  }
 }
 
-void onSyncClientAttr(){
+void onSyncClientAttr(uint8_t direction){
     long startMillis = millis();
 
-    StaticJsonDocument<1024> doc;
-    char buffer[1024];
+    StaticJsonDocument<DOCSIZE_MIN> doc;
+    
 
-    doc[PSTR("cp1A1")] = mySettings.cp1A[0];
-    doc[PSTR("cp1A2")] = mySettings.cp1A[1];
-    doc[PSTR("cp1A3")] = mySettings.cp1A[2];
-    doc[PSTR("cp1A4")] = mySettings.cp1A[3];
-    doc[PSTR("cp1B1")] = mySettings.cp1B[0];
-    doc[PSTR("cp1B2")] = mySettings.cp1B[1];
-    doc[PSTR("cp1B3")] = mySettings.cp1B[2];
-    doc[PSTR("cp1B4")] = mySettings.cp1B[3];
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
-    doc[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
-    doc[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
-    doc[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
-    doc[PSTR("cp2B1")] = mySettings.cp2B[0];
-    doc[PSTR("cp2B2")] = mySettings.cp2B[1];
-    doc[PSTR("cp2B3")] = mySettings.cp2B[2];
-    doc[PSTR("cp2B4")] = mySettings.cp2B[3];
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cp4A1")] = mySettings.cp4A[0];
-    doc[PSTR("cp4A2")] = mySettings.cp4A[1];
-    doc[PSTR("cp4A3")] = mySettings.cp4A[2];
-    doc[PSTR("cp4A4")] = mySettings.cp4A[3];
-    doc[PSTR("cp4B1")] = mySettings.cp4B[0];
-    doc[PSTR("cp4B2")] = mySettings.cp4B[1];
-    doc[PSTR("cp4B3")] = mySettings.cp4B[2];
-    doc[PSTR("cp4B4")] = mySettings.cp4B[3];
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("pR1")] = mySettings.pR[0];
-    doc[PSTR("pR2")] = mySettings.pR[1];
-    doc[PSTR("pR3")] = mySettings.pR[2];
-    doc[PSTR("pR4")] = mySettings.pR[3];
-    doc[PSTR("ON")] = mySettings.ON;
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("lbl1")] = mySettings.lbl[0];
-    doc[PSTR("lbl2")] = mySettings.lbl[1];
-    doc[PSTR("lbl3")] = mySettings.lbl[2];
-    doc[PSTR("lbl4")] = mySettings.lbl[3];
-    doc[PSTR("itP")] = mySettings.itP;
-    doc[PSTR("itW")] = mySettings.itW;
-    doc[PSTR("itD")] = mySettings.itD;
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
-    doc[PSTR("cpM1")] = mySettings.cpM[0];
-    doc[PSTR("cpM2")] = mySettings.cpM[1];
-    doc[PSTR("cpM3")] = mySettings.cpM[2];
-    doc[PSTR("cpM4")] = mySettings.cpM[3];
-    doc[PSTR("seaHpa")] = mySettings.seaHpa;
-    serializeJson(doc, buffer);
-    tb.sendAttributeJSON(buffer);
-    doc.clear();
+    if(tb.connected() && (direction == 0 || direction == 1)){
+      doc[PSTR("cp1A1")] = mySettings.cp1A[0];
+      doc[PSTR("cp1A2")] = mySettings.cp1A[1];
+      doc[PSTR("cp1A3")] = mySettings.cp1A[2];
+      doc[PSTR("cp1A4")] = mySettings.cp1A[3];
+      doc[PSTR("cp1B1")] = mySettings.cp1B[0];
+      doc[PSTR("cp1B2")] = mySettings.cp1B[1];
+      doc[PSTR("cp1B3")] = mySettings.cp1B[2];
+      doc[PSTR("cp1B4")] = mySettings.cp1B[3];
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
+      doc[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
+      doc[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
+      doc[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
+      doc[PSTR("cp2B1")] = mySettings.cp2B[0];
+      doc[PSTR("cp2B2")] = mySettings.cp2B[1];
+      doc[PSTR("cp2B3")] = mySettings.cp2B[2];
+      doc[PSTR("cp2B4")] = mySettings.cp2B[3];
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cp4A1")] = mySettings.cp4A[0];
+      doc[PSTR("cp4A2")] = mySettings.cp4A[1];
+      doc[PSTR("cp4A3")] = mySettings.cp4A[2];
+      doc[PSTR("cp4A4")] = mySettings.cp4A[3];
+      doc[PSTR("cp4B1")] = mySettings.cp4B[0];
+      doc[PSTR("cp4B2")] = mySettings.cp4B[1];
+      doc[PSTR("cp4B3")] = mySettings.cp4B[2];
+      doc[PSTR("cp4B4")] = mySettings.cp4B[3];
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("pR1")] = mySettings.pR[0];
+      doc[PSTR("pR2")] = mySettings.pR[1];
+      doc[PSTR("pR3")] = mySettings.pR[2];
+      doc[PSTR("pR4")] = mySettings.pR[3];
+      doc[PSTR("ON")] = mySettings.ON;
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("lbl1")] = mySettings.lbl[0];
+      doc[PSTR("lbl2")] = mySettings.lbl[1];
+      doc[PSTR("lbl3")] = mySettings.lbl[2];
+      doc[PSTR("lbl4")] = mySettings.lbl[3];
+      doc[PSTR("itP")] = mySettings.itP;
+      doc[PSTR("itW")] = mySettings.itW;
+      doc[PSTR("itPc")] = mySettings.itPc;
+      doc[PSTR("itWc")] = mySettings.itWc;
+      doc[PSTR("itD")] = mySettings.itD;
+      tbSendAttribute(doc);
+      doc.clear();
+      doc[PSTR("cpM1")] = mySettings.cpM[0];
+      doc[PSTR("cpM2")] = mySettings.cpM[1];
+      doc[PSTR("cpM3")] = mySettings.cpM[2];
+      doc[PSTR("cpM4")] = mySettings.cpM[3];
+      doc[PSTR("seaHpa")] = mySettings.seaHpa;
+      tbSendAttribute(doc);
+      doc.clear();
+    }
 
-    if(config.wsCount > 0){
+    if(config.wsCount > 0 && (direction == 0 || direction == 2)){
+        char buffer[1024];
         JsonObject cp1A = doc.createNestedObject("cp1A");
         cp1A[PSTR("cp1A1")] = mySettings.cp1A[0];
         cp1A[PSTR("cp1A2")] = mySettings.cp1A[1];
@@ -987,8 +1092,6 @@ void onSyncClientAttr(){
 
 void onWsEvent(const JsonObject &doc){
     long startMillis = millis();
-    
-    serializeJsonPretty(doc, Serial);
 
     if(doc["evType"] == nullptr){
         log_manager->debug(PSTR(__func__), "Event type not found.\n");
@@ -998,22 +1101,29 @@ void onWsEvent(const JsonObject &doc){
 
 
     if(evType == (int)WStype_CONNECTED){
-        taskSyncClientAttr.setInterval(TASK_IMMEDIATE);
-        taskSyncClientAttr.setIterations(TASK_ONCE);
-        taskSyncClientAttr.enable();
+        if(config.wsCount > 1){
+          ws.disconnect(doc["num"].as<uint8_t>());
+          return;
+        }
+        syncClientAttr(2);
+        if(config.wsCount == 1){
+          if(xHandleWsSendTelemetry == NULL){
+            xReturnedWsSendTelemetry = xTaskCreatePinnedToCore(wsSendTelemetryTR, PSTR("wsSendTelemetry"), 3072, NULL, 1, &xHandleWsSendTelemetry, 1);
+            if(xReturnedWsSendTelemetry == pdPASS){
+              log_manager->warn(PSTR(__func__), PSTR("Task wsSendTelemetry has been created.\n"));
+            }
+          }
 
-        wsSendTelemetryLoop.setInterval(3 * TASK_SECOND);
-        wsSendTelemetryLoop.setIterations(TASK_FOREVER);
-        wsSendTelemetryLoop.restart();
-
-        wsSendSensorsLoop.setInterval(3 * TASK_SECOND);
-        wsSendSensorsLoop.setIterations(TASK_FOREVER);
-        wsSendSensorsLoop.restart();
+          if(xHandleWsSendSensors == NULL){
+            xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), 5120, NULL, 1, &xHandleWsSendSensors, 1);
+            if(xReturnedWsSendSensors == pdPASS){
+              log_manager->warn(PSTR(__func__), PSTR("Task wsSendSensors has been created.\n"));
+            }
+          }
+        }
     }
     if(evType == (int)WStype_DISCONNECTED){
         if(config.wsCount < 1){
-            wsSendTelemetryLoop.disable();
-            wsSendSensorsLoop.disable();
             log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
         }
     }
@@ -1024,11 +1134,8 @@ void onWsEvent(const JsonObject &doc){
         }
         const char* cmd = doc["cmd"].as<const char*>();
         if(strcmp(cmd, (const char*) "attr") == 0){
-        processSharedAttributeUpdate(doc);
-        
-        taskSyncClientAttr.setInterval(TASK_IMMEDIATE);
-        taskSyncClientAttr.setIterations(TASK_ONCE);
-        taskSyncClientAttr.enable();
+          processSharedAttributeUpdate(doc);
+          syncClientAttr(1);
         }
         else if(strcmp(cmd, (const char*) "saveSettings") == 0){
           saveSettings();
@@ -1051,51 +1158,71 @@ void onWsEvent(const JsonObject &doc){
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void wsSendTelemetryCb(){
-  long startMillis = millis();
-  if(config.fIface && config.wsCount > 0){
-    char buffer[DOCSIZE_MIN];
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    JsonObject devTel = doc.createNestedObject("devTel");
-    devTel[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    devTel[PSTR("rssi")] = WiFi.RSSI();
-    devTel[PSTR("uptime")] = millis()/1000;
-    devTel[PSTR("dt")] = rtc.getEpoch();
-    devTel[PSTR("dts")] = rtc.getDateTime();
-    serializeJson(doc, buffer);
-    ws.broadcastTXT(buffer);
-  }
-  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
-}
-
-void wsSendSensorsCb(){
-  long startMillis = millis();
-  if(config.fIface && config.wsCount > 0){
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-    char buffer[DOCSIZE_MIN];
-    StaticJsonDocument<DOCSIZE_MIN> doc;
-    JsonObject pzem = doc.createNestedObject("pzem");
-    if(!isnan(PZEM.voltage())){
-      pzem[PSTR("volt")] = round2(PZEM.voltage());
-      pzem[PSTR("amp")] = round2(PZEM.current());
-      pzem[PSTR("watt")] = round2(PZEM.power());
-      pzem[PSTR("ener")] = round2(PZEM.energy());
-      pzem[PSTR("freq")] = round2(PZEM.frequency());
-      pzem[PSTR("pf")] = round2(PZEM.pf())*100;
+void wsSendTelemetryTR(void *arg){
+  while(true){
+    if(config.fIface && config.wsCount > 0){
+      char buffer[DOCSIZE_MIN];
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      JsonObject devTel = doc.createNestedObject("devTel");
+      devTel[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+      devTel[PSTR("rssi")] = WiFi.RSSI();
+      devTel[PSTR("uptime")] = millis()/1000;
+      devTel[PSTR("dt")] = rtc.getEpoch();
+      devTel[PSTR("dts")] = rtc.getDateTime();
       serializeJson(doc, buffer);
       ws.broadcastTXT(buffer);
-      doc.clear();
     }
-
-    JsonObject bme280 = doc.createNestedObject("bme280");
-    bme280[PSTR("celc")] = round2(mySettings.celc);
-    bme280[PSTR("rh")] = round2(mySettings.rh);
-    bme280[PSTR("hpa")] = round2(mySettings.hpa);
-    bme280[PSTR("alt")] = round2(mySettings.alt);
-    serializeJson(doc, buffer);
-    ws.broadcastTXT(buffer);
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
-  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+}
+
+void wsSendSensorsTR(void *arg){
+  while(true){
+    if(config.fIface && config.wsCount > 0){
+      char buffer[DOCSIZE_MIN];
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      if( xSemaphoreSettings != NULL ){
+        if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+        {
+          JsonObject pzem = doc.createNestedObject("pzem");
+          if(mySettings._volt >= 0){
+            pzem[PSTR("volt")] = round2(mySettings._volt);
+            pzem[PSTR("amp")] = round2(mySettings._amp);
+            pzem[PSTR("watt")] = round2(mySettings._watt);
+            pzem[PSTR("ener")] = round2(mySettings._ener);
+            pzem[PSTR("freq")] = round2(mySettings._freq);
+            pzem[PSTR("pf")] = round2(mySettings._pf)*100;
+            serializeJson(doc, buffer);
+            ws.broadcastTXT(buffer);
+            doc.clear();
+          }
+          xSemaphoreGive( xSemaphoreSettings );
+        }
+        else
+        {
+          log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        }
+      }
+
+
+      if( xSemaphoreSettings != NULL ){
+        if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+        {
+          JsonObject bme280 = doc.createNestedObject("bme280");
+          bme280[PSTR("celc")] = round2(mySettings._celc);
+          bme280[PSTR("rh")] = round2(mySettings._rh);
+          bme280[PSTR("hpa")] = round2(mySettings._hpa);
+          bme280[PSTR("alt")] = round2(mySettings._alt);
+          serializeJson(doc, buffer);
+          ws.broadcastTXT(buffer);
+          xSemaphoreGive( xSemaphoreSettings );
+        }
+        else
+        {
+          log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        }
+      }
+    }
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+  }
 }

@@ -75,6 +75,9 @@ struct Settings
     uint16_t itP = 900;
     uint16_t itW = 300;
     uint16_t itD = 60;
+    uint16_t itPc = 1;
+    uint16_t itWc = 1;
+    uint16_t itDc = 1;
     uint32_t cp2A[4];
     unsigned long cp2B[4];
     uint32_t cp4A[4];
@@ -95,20 +98,33 @@ struct Settings
     float hpa = 0.0;
     float alt = 0.0;
 
+    float volt = 0.0;
+    float amp = 0.0;
+    float watt = 0.0;
+    float ener = 0.0;
+    float freq = 0.0;
+    float pf = 0.0;
+
+    float _volt = 0.0;
+    float _amp = 0.0;
+    float _watt = 0.0;
+    float _ener = 0.0;
+    float _freq = 0.0;
+    float _pf = 0.0;
+
     char lbl[4][16];
 };
 
 void loadSettings();
 void saveSettings();
-void relayControlCP1Cb();
-void relayControlCP2Cb();
-void relayControlCP3Cb();
-void relayControlCP4Cb();
+void relayControlCP1();
+void relayControlCP2();
+void relayControlCP3();
+void relayControlCP4();
+void relayControlTR(void *arg);
 void setSwitch(String  ch, String state);
-void recPowerUsageCb();
-void recWeatherDataCb();
-void calcPowerUsageCb();
-void calcWeatherDataCb();
+void recPowerUsageTR(void *arg);
+void recWeatherDataTR(void *arg);
 void selfDiagnosticCb();
 void attUpdateCb(const Shared_Attribute_Data &data);
 void onTbConnected();
@@ -117,11 +133,10 @@ void setPanic(const RPC_Data &data);
 RPC_Response genericClientRPC(const RPC_Data &data);
 void onReboot();
 void stateReset(bool resetOpMode);
-void deviceTelemetryLoopCb();
 void onAlarm(int code);
-void publishSwitchCb();
-void onSyncClientAttr();
+void onSyncClientAttr(uint8_t direction);
 void onWsEvent(const JsonObject &data);
-void wsSendTelemetryCb();
-void wsSendSensorsCb();
+void wsSendTelemetryTR(void *arg);
+void wsSendSensorsTR(void *arg);
+void publishSwitchTR(void * arg);
 #endif
