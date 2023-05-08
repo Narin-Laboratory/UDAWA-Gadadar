@@ -88,32 +88,30 @@ struct Settings
     bool flag_bme280 = false;
     float seaHpa = 1019.00;
 
-    float _celc = 0.0;
-    float _rh = 0.0;
-    float _hpa = 0.0;
-    float _alt = 0.0;
-
-    float celc = 0.0;
-    float rh = 0.0;
-    float hpa = 0.0;
-    float alt = 0.0;
-
-    float volt = 0.0;
-    float amp = 0.0;
-    float watt = 0.0;
-    float ener = 0.0;
-    float freq = 0.0;
-    float pf = 0.0;
-
-    float _volt = 0.0;
-    float _amp = 0.0;
-    float _watt = 0.0;
-    float _ener = 0.0;
-    float _freq = 0.0;
-    float _pf = 0.0;
-
     char lbl[4][16];
 };
+
+#ifdef USE_WEB_IFACE
+struct PZEMMessage
+{
+    float volt;
+    float amp;
+    float watt;
+    float ener;
+    float freq;
+    float pf;
+};
+QueueHandle_t xQueuePZEMMessage;
+
+struct BME280Message
+{
+    float celc;
+    float rh;
+    float hpa;
+    float alt;
+};
+QueueHandle_t xQueueBME280Message;
+#endif
 
 void loadSettings();
 void saveSettings();
@@ -125,7 +123,6 @@ void relayControlTR(void *arg);
 void setSwitch(String  ch, String state);
 void recPowerUsageTR(void *arg);
 void recWeatherDataTR(void *arg);
-void selfDiagnosticCb();
 void attUpdateCb(const Shared_Attribute_Data &data);
 void onTbConnected();
 void onTbDisconnected();
@@ -135,8 +132,10 @@ void onReboot();
 void stateReset(bool resetOpMode);
 void onAlarm(int code);
 void onSyncClientAttr(uint8_t direction);
+#ifdef USE_WEB_IFACE
 void onWsEvent(const JsonObject &data);
 void wsSendTelemetryTR(void *arg);
 void wsSendSensorsTR(void *arg);
+#endif
 void publishSwitchTR(void * arg);
 #endif

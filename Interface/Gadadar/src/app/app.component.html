@@ -5,9 +5,7 @@
       <li><strong>UDAWA Smart System</strong></li>
     </ul>
     <ul>
-      <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
-      <li><small>{{deviceTelemetry['dts']}}</small></li>
-      <li><small>{{deviceTelemetry['heap']}}</small></li>
+      <li><small>{{deviceTelemetry['uptime']}}</small></li>
     </ul>
   </nav>
         
@@ -21,6 +19,13 @@
         [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(cpM)]="cpM"
         [(cp1A)]="cp1A" [(cp1B)]="cp1B" [(cp2A)]="cp2A" [(cp2B)]="cp2B"
         [(cp4A)]="cp4A" [(cp4B)]="cp4B" [(cp3A)]="cp3A" [(lbl)]="lbl" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
+        <article>
+          <ul>
+            <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
+            <li><small>{{deviceTelemetry['dts']}}</small></li>
+            <li><small>{{deviceTelemetry['heap']}}</small></li>
+          </ul>
+        </article>
     </div>
   </div>
 </main>

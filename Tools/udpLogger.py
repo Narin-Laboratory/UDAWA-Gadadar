@@ -2,7 +2,7 @@ import socket
 import traceback
 import logging
 
-UDP_IP = "192.168.18.255"
+UDP_IP = "172.100.11.255"
 UDP_PORT = 29514
 
 sock = socket.socket(socket.AF_INET, # Internet

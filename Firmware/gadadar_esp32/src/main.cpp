@@ -40,7 +40,9 @@ void setup()
   plannedRebootOnEnableCb = &onReboot;
   emitAlarmCb = &onAlarm;
   onSyncClientAttrCb = &onSyncClientAttr;
+  #ifdef USE_WEB_IFACE
   wsEventCb = &onWsEvent;
+  #endif
   startup();
   loadSettings();
   syncConfigCoMCU();
@@ -50,6 +52,11 @@ void setup()
   stateReset(0);
 
   tb.setBufferSize(1024);
+
+  #ifdef USE_WEB_IFACE
+  xQueuePZEMMessage = xQueueCreate( 1, sizeof( struct PZEMMessage ) );
+  xQueueBME280Message = xQueueCreate( 1, sizeof( struct BME280Message ) );
+  #endif
 
   mySettings.flag_bme280 = bme.begin(0x76);
   if(!mySettings.flag_bme280){
@@ -84,6 +91,22 @@ void setup()
     }
   }
 
+  #ifdef USE_WEB_IFACE
+  if(xHandleWsSendTelemetry == NULL){
+    xReturnedWsSendTelemetry = xTaskCreatePinnedToCore(wsSendTelemetryTR, PSTR("wsSendTelemetry"), 3072, NULL, 1, &xHandleWsSendTelemetry, 1);
+    if(xReturnedWsSendTelemetry == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task wsSendTelemetry has been created.\n"));
+    }
+  }
+
+  if(xHandleWsSendSensors == NULL){
+    xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), 5120, NULL, 1, &xHandleWsSendSensors, 1);
+    if(xReturnedWsSendSensors == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task wsSendSensors has been created.\n"));
+    }
+  }
+  #endif
+
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
@@ -92,101 +115,52 @@ void loop()
   udawa();
 }
 
-void selfDiagnosticCb(){
-  long startMillis = millis();
-
-  HardwareSerial PZEMSerial(1);
-  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-  if(!mySettings.flag_bme280){
-    //setAlarm(111, 1, 5, 1000);
-  }
-  if(isnan(PZEM.voltage()) || PZEM.voltage() <= 0){
-    //setAlarm(121, 1, 5, 1000);
-  }
-  if(rtc.getYear() < 2023){
-    //setAlarm(131, 1, 5, 1000);
-  }
-
-  uint8_t ACTIVE_CH_COUNTER;
-  for(uint8_t i = 0; i < 4; i++){
-    if(mySettings.dutyState[i] == mySettings.ON){
-      ACTIVE_CH_COUNTER++;
-    }
-
-    if(mySettings.stateOnTs[i] > 0){
-      if(millis() - mySettings.stateOnTs[i] > 3000000){
-        if(i = 0){
-          //setAlarm(211, 1, 10, 1000);
-        }
-        else if(i = 0){
-          //setAlarm(212, 1, 10, 1000);
-        }
-        else if(i = 0){
-          //setAlarm(213, 1, 10, 1000);
-        }
-        else if(i = 0){
-          //setAlarm(214, 1, 10, 1000);
-        }
-      }
-    }
-
-  }
-
-  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER > 0 && (int)PZEM.power() < 5){
-    //setAlarm(221, 1, 10, 1000);
-  }
-
-  if(!isnan(PZEM.voltage()) && ACTIVE_CH_COUNTER == 0 && (int)PZEM.power() > 5){
-    //setAlarm(222, 1, 10, 1000);
-  }
-
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
-}
-
 void recPowerUsageTR(void *arg){
-  Stream_Stats<float> _volt;
-  Stream_Stats<float> _amp;
-  Stream_Stats<float> _watt;
-  Stream_Stats<float> _freq;
-  Stream_Stats<float> _pf;
+  Stream_Stats<float> _volt_;
+  Stream_Stats<float> _amp_;
+  Stream_Stats<float> _watt_;
+  Stream_Stats<float> _freq_;
+  Stream_Stats<float> _pf_;
 
   unsigned long timerCalcPowerUsage = millis();
   unsigned long timerRecPowerUsage = millis();
+  unsigned long timerAlarm = millis();
   
   while(true){
-    if( xSemaphoreSettings != NULL ){
-      if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
-      {
-        HardwareSerial PZEMSerial(1);
-        PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-        
-        if(!isnan(PZEM.voltage())){ _volt.Add(PZEM.voltage()); mySettings._volt = PZEM.voltage();}
-        if(!isnan(PZEM.current())){ _amp.Add(PZEM.current()); mySettings._amp = PZEM.current();}
-        if(!isnan(PZEM.power())){ _watt.Add(PZEM.power()); mySettings._watt = PZEM.power();}
-        if(!isnan(PZEM.frequency())){ _freq.Add(PZEM.frequency()); mySettings._freq = PZEM.frequency();}
-        if(!isnan(PZEM.pf())){ _pf.Add(PZEM.pf()); mySettings._pf = PZEM.pf();}
+   
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-        xSemaphoreGive( xSemaphoreSettings );
-      }
-      else
+    float volt = PZEM.voltage();
+    float amp = PZEM.current();
+    float watt = PZEM.power();
+    float ener = PZEM.energy();
+    float freq = PZEM.frequency();
+    float pf = PZEM.pf();
+
+    #ifdef USE_WEB_IFACE
+    if( xQueuePZEMMessage != NULL && (config.wsCount > 0)){
+      PZEMMessage PZEMMsg;
+      PZEMMsg.amp = amp; PZEMMsg.watt = watt; PZEMMsg.ener = ener; PZEMMsg.freq = freq; PZEMMsg.pf = pf; PZEMMsg.volt = volt;
+      if( xQueueSend( xQueuePZEMMessage, &PZEMMsg, ( TickType_t ) 1000 ) != pdPASS )
       {
-        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+          log_manager->debug(PSTR(__func__), PSTR("Failed to fill PZEMMsg. Queue is full. \n"));
       }
     }
-
+    #endif
+        
     if(tb.connected() && config.provSent){
       StaticJsonDocument<DOCSIZE_MIN> doc;
       float ener;
       unsigned long now = millis();
       if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
         
-        doc[PSTR("_volt")] = mySettings._volt;
-        doc[PSTR("_amp")] = mySettings._amp;
-        doc[PSTR("_watt")] = mySettings._watt;
-        doc[PSTR("_freq")] = mySettings._freq;
-        doc[PSTR("_pf")] = mySettings._pf;
-        doc[PSTR("_ener")] = mySettings._ener;
+        doc[PSTR("_volt")] = volt;
+        doc[PSTR("_amp")] = amp;
+        doc[PSTR("_watt")] = watt;
+        doc[PSTR("_freq")] = freq;
+        doc[PSTR("_pf")] = pf;
+        doc[PSTR("_ener")] = ener;
         
         tbSendAttribute(doc);
         doc.clear();
@@ -196,19 +170,59 @@ void recPowerUsageTR(void *arg){
 
       now = millis();
       if( (now - timerRecPowerUsage) > (mySettings.itP * 1000) ){
-        doc[PSTR("volt")] = _volt.Get_Average();
-        doc[PSTR("amp")] = _amp.Get_Average();
-        doc[PSTR("watt")] = _watt.Get_Average();
-        doc[PSTR("freq")] = _freq.Get_Average();
-        doc[PSTR("pf")] = _pf.Get_Average();
+        doc[PSTR("volt")] = _volt_.Get_Average();
+        doc[PSTR("amp")] = _amp_.Get_Average();
+        doc[PSTR("watt")] = _watt_.Get_Average();
+        doc[PSTR("freq")] = _freq_.Get_Average();
+        doc[PSTR("pf")] = _pf_.Get_Average();
         doc[PSTR("ener")] = ener;
 
         if(tbSendTelemetry(doc)){
-          _volt.Clear(); _amp.Clear(); _watt.Clear(); _freq.Clear(); _pf.Clear();
+          _volt_.Clear(); _amp_.Clear(); _watt_.Clear(); _freq_.Clear(); _pf_.Clear();
         }
         
         timerRecPowerUsage = now;
       }
+    }
+
+    unsigned long now = millis();
+    if( (now - timerAlarm) > 30000 ){
+      if(volt <= 0){
+        setAlarm(121, 1, 5, 1000);
+      }
+
+      uint8_t ACTIVE_CH_COUNTER = 0;
+      for(uint8_t i = 0; i < 4; i++){
+        if(mySettings.dutyState[i] == mySettings.ON){
+          ACTIVE_CH_COUNTER++;
+        }
+
+        if(mySettings.stateOnTs[i] > 0){
+          if(millis() - mySettings.stateOnTs[i] > 3000000){
+            if(i = 0){
+              setAlarm(211, 1, 10, 1000);
+            }
+            else if(i = 0){
+              setAlarm(212, 1, 10, 1000);
+            }
+            else if(i = 0){
+              setAlarm(213, 1, 10, 1000);
+            }
+            else if(i = 0){
+              setAlarm(214, 1, 10, 1000);
+            }
+          }
+        }
+      }
+
+      if(ACTIVE_CH_COUNTER > 0 && (int)watt < 10){
+        setAlarm(221, 1, 10, 1000);
+      }
+
+      if(ACTIVE_CH_COUNTER == 0 && (int)watt > 10){
+        setAlarm(222, 1, 10, 1000);
+      }
+      timerAlarm = now;
     }
 
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
@@ -216,82 +230,75 @@ void recPowerUsageTR(void *arg){
 }
 
 void recWeatherDataTR(void *arg){
-  Stream_Stats<float> _celc;
-  Stream_Stats<float> _rh;
-  Stream_Stats<float> _hpa;
-  Stream_Stats<float> _alt;
+  Stream_Stats<float> _celc_;
+  Stream_Stats<float> _rh_;
+  Stream_Stats<float> _hpa_;
+  Stream_Stats<float> _alt_;
   
   unsigned long timerCalcWeatherData = millis();
   unsigned long timerRecWeatherData = millis();
 
   while(true){
-    if(mySettings.flag_bme280){
-      if( xSemaphoreSettings != NULL ){
-        if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
-        {
-          mySettings._celc = bme.readTemperature();
-          mySettings._rh = bme.readHumidity();
-          mySettings._hpa = bme.readPressure() / 100.0F;
-          mySettings._alt = bme.readAltitude(mySettings.seaHpa);
+    float celc = 0.0;
+    float rh = 0.0;
+    float hpa = 0.0;
+    float alt = 0.0;
 
-          _celc.Add(mySettings._celc);
-          _rh.Add(mySettings._rh);
-          _hpa.Add(mySettings._hpa);
-          _alt.Add(mySettings._alt);
-          xSemaphoreGive( xSemaphoreSettings );
-        }
-        else
+    if(!mySettings.flag_bme280){
+      setAlarm(111, 1, 5, 1000);
+    }
+    else{      
+      celc = bme.readTemperature();
+      rh = bme.readHumidity();
+      hpa = bme.readPressure() / 100.0F;
+      alt = bme.readAltitude(mySettings.seaHpa);
+
+      _celc_.Add(celc);
+      _rh_.Add(rh);
+      _hpa_.Add(hpa);
+      _alt_.Add(alt);
+      
+      #ifdef USE_WEB_IFACE
+      if( xQueueBME280Message != NULL && (config.wsCount > 0) ){
+        BME280Message BME280Msg;
+        BME280Msg.celc = celc; BME280Msg.rh = rh; BME280Msg.hpa = hpa; BME280Msg.alt = alt;
+        if( xQueueSend( xQueueBME280Message, &BME280Msg, ( TickType_t ) 1000 ) != pdPASS )
         {
-          log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+            log_manager->debug(PSTR(__func__), PSTR("Failed to fill BME280Msg. Queue is full. \n"));
+        }
+      }
+      #endif
+
+      if(config.provSent && tb.connected() && config.fIoT){
+        StaticJsonDocument<DOCSIZE_MIN> doc;
+
+        unsigned long now = millis();
+        if( (now - timerCalcWeatherData) > (mySettings.itWc * 1000) ){
+          doc[PSTR("_celc")] = celc;
+          doc[PSTR("_rh")] = rh;
+          doc[PSTR("_hpa")] = hpa;
+          doc[PSTR("_alt")] = alt;
+
+          tbSendAttribute(doc);
+          doc.clear();
+
+          timerCalcWeatherData = now;
+        }
+
+        if( (now - timerRecWeatherData) > (mySettings.itW * 1000) ){
+          doc[PSTR("celc")] = _celc_.Get_Average();
+          doc[PSTR("rh")] = _rh_.Get_Average();
+          doc[PSTR("hpa")] = _hpa_.Get_Average();
+          doc[PSTR("alt")] = _alt_.Get_Average();
+
+          if(tbSendTelemetry(doc)){
+            _celc_.Clear(); _rh_.Clear(); _hpa_.Clear(); _alt_.Clear(); 
+          }
+
+          timerRecWeatherData = now;
         }
       }
     }
-    
-    if(config.provSent && tb.connected() && config.fIoT){
-      StaticJsonDocument<DOCSIZE_MIN> doc;
-
-      unsigned long now = millis();
-      if( (now - timerCalcWeatherData) > (mySettings.itWc * 1000) ){
-        doc[PSTR("_celc")] = mySettings._celc;
-        doc[PSTR("_rh")] = mySettings._rh;
-        doc[PSTR("_hpa")] = mySettings._hpa;
-        doc[PSTR("_alt")] = mySettings._alt;
-
-        tbSendAttribute(doc);
-        doc.clear();
-
-        timerCalcWeatherData = now;
-      }
-
-      if( (now - timerRecWeatherData) > (mySettings.itW * 1000) ){
-        if( xSemaphoreSettings != NULL ){
-          if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
-          {
-            mySettings.celc = _celc.Get_Average();
-            mySettings.rh = _rh.Get_Average();
-            mySettings.hpa = _hpa.Get_Average();
-            mySettings.alt = _alt.Get_Average();
-            xSemaphoreGive( xSemaphoreSettings );
-          }
-          else
-          {
-            log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
-          }
-        }
-
-        doc[PSTR("celc")] = mySettings.celc;
-        doc[PSTR("rh")] = mySettings.rh;
-        doc[PSTR("hpa")] = mySettings.hpa;
-        doc[PSTR("alt")] = mySettings.alt;
-
-        if(tbSendTelemetry(doc)){
-          _celc.Clear(); _rh.Clear(); _hpa.Clear(); _alt.Clear(); 
-        }
-
-        timerRecWeatherData = now;
-      }
-    }
-
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
 }
@@ -460,7 +467,7 @@ void saveSettings()
 
 void setSwitch(String ch, String state)
 {
-  long startMillis = millis();
+  //long startMillis = millis();
 
   bool fState = 0;
   uint8_t pR = 0;
@@ -485,7 +492,7 @@ void setSwitch(String ch, String state)
   setCoMCUPin(pR, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
   
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+  //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void relayControlTR(void *arg){
@@ -787,14 +794,10 @@ void attUpdateCb(const Shared_Attribute_Data &data)
 }
 
 void onTbConnected(){
-    long startMillis = millis();
-
-    mySettings.publishSwitch[0] = 1;
-    mySettings.publishSwitch[1] = 1;
-    mySettings.publishSwitch[2] = 1;
-    mySettings.publishSwitch[3] = 1;
-
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+  mySettings.publishSwitch[0] = 1;
+  mySettings.publishSwitch[1] = 1;
+  mySettings.publishSwitch[2] = 1;
+  mySettings.publishSwitch[3] = 1;
 }
 
 void onTbDisconnected(){
@@ -870,13 +873,13 @@ void stateReset(bool resetOpMode){
         mySettings.cpM[1] = 0;
         mySettings.cpM[2] = 0;
         mySettings.cpM[3] = 0;
-        log_manager->verbose(PSTR(__func__), PSTR("Relay operations are changed to manual.\n."));
+        log_manager->verbose(PSTR(__func__), PSTR("Relay operations are changed to manual.\n"));
     }
     setSwitch("ch1", "OFF");
     setSwitch("ch2", "OFF");
     setSwitch("ch3", "OFF");
     setSwitch("ch4", "OFF");
-    log_manager->verbose(PSTR(__func__), PSTR("Relay operations are disabled.\n."));
+    log_manager->verbose(PSTR(__func__), PSTR("Relay operations are disabled.\n"));
 }
 
 void deviceTelemetry(){
@@ -888,14 +891,12 @@ void deviceTelemetry(){
       doc[PSTR("rssi")] = WiFi.RSSI(); 
       doc[PSTR("dt")] = rtc.getEpoch(); 
 
-      tbSendTelemetry(doc);
+      tbSendAttribute(doc);
     }
 }
 
 void onAlarm(int code){
-    long startMillis = millis();
 
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void publishSwitchTR(void * arg){
@@ -915,17 +916,20 @@ void publishSwitchTR(void * arg){
               tbSendTelemetry(doc);
           }
 
+          #ifdef USE_WEB_IFACE
           if(config.fIface && config.wsCount > 0){
               ws.broadcastTXT(buffer);
           }
+          #endif
 
           mySettings.publishSwitch[i] = false;
       }
     }
 
     unsigned long now = millis();
-    if((millis() - now) > (mySettings.itD * 1000)){
+    if((now - timerDeviceTelemetry) > (mySettings.itD * 1000)){
       deviceTelemetry();
+      timerDeviceTelemetry = now;
     }
 
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
@@ -1008,88 +1012,91 @@ void onSyncClientAttr(uint8_t direction){
       doc.clear();
     }
 
+    #ifdef USE_WEB_IFACE
     if(config.wsCount > 0 && (direction == 0 || direction == 2)){
-        char buffer[1024];
-        JsonObject cp1A = doc.createNestedObject("cp1A");
-        cp1A[PSTR("cp1A1")] = mySettings.cp1A[0];
-        cp1A[PSTR("cp1A2")] = mySettings.cp1A[1];
-        cp1A[PSTR("cp1A3")] = mySettings.cp1A[2];
-        cp1A[PSTR("cp1A4")] = mySettings.cp1A[3];
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cp1B = doc.createNestedObject("cp1B");
-        cp1B[PSTR("cp1B1")] = mySettings.cp1B[0];
-        cp1B[PSTR("cp1B2")] = mySettings.cp1B[1];
-        cp1B[PSTR("cp1B3")] = mySettings.cp1B[2];
-        cp1B[PSTR("cp1B4")] = mySettings.cp1B[3];
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cp2A = doc.createNestedObject("cp2A");
-        cp2A[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
-        cp2A[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
-        cp2A[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
-        cp2A[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cp2B = doc.createNestedObject("cp2B");
-        cp2B[PSTR("cp2B1")] = mySettings.cp2B[0];
-        cp2B[PSTR("cp2B2")] = mySettings.cp2B[1];
-        cp2B[PSTR("cp2B3")] = mySettings.cp2B[2];
-        cp2B[PSTR("cp2B4")] = mySettings.cp2B[3];
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cp4A = doc.createNestedObject("cp4A");
-        cp4A[PSTR("cp4A1")] = mySettings.cp4A[0];
-        cp4A[PSTR("cp4A2")] = mySettings.cp4A[1];
-        cp4A[PSTR("cp4A3")] = mySettings.cp4A[2];
-        cp4A[PSTR("cp4A4")] = mySettings.cp4A[3];
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cp4B = doc.createNestedObject("cp4B");
-        cp4B[PSTR("cp4B1")] = mySettings.cp4B[0];
-        cp4B[PSTR("cp4B2")] = mySettings.cp4B[1];
-        cp4B[PSTR("cp4B3")] = mySettings.cp4B[2];
-        cp4B[PSTR("cp4B4")] = mySettings.cp4B[3];
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cp3A = doc.createNestedObject("cp3A");
-        cp3A[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
-        cp3A[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
-        cp3A[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
-        cp3A[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject lbl = doc.createNestedObject("lbl");
-        lbl[PSTR("lbl1")] = mySettings.lbl[0];
-        lbl[PSTR("lbl2")] = mySettings.lbl[1];
-        lbl[PSTR("lbl3")] = mySettings.lbl[2];
-        lbl[PSTR("lbl4")] = mySettings.lbl[3];
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
-        doc.clear();
-        JsonObject cpM = doc.createNestedObject("cpM");
-        cpM[PSTR("cpM1")] = mySettings.cpM[0];
-        cpM[PSTR("cpM2")] = mySettings.cpM[1];
-        cpM[PSTR("cpM3")] = mySettings.cpM[2];
-        cpM[PSTR("cpM4")] = mySettings.cpM[3];
-        doc[PSTR("ch1")] = (int)mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
-        doc[PSTR("ch2")] = (int)mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
-        doc[PSTR("ch3")] = (int)mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
-        doc[PSTR("ch4")] = (int)mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
-        serializeJson(doc, buffer);
-        ws.broadcastTXT(buffer);
+      char buffer[1024];
+      JsonObject cp1A = doc.createNestedObject("cp1A");
+      cp1A[PSTR("cp1A1")] = mySettings.cp1A[0];
+      cp1A[PSTR("cp1A2")] = mySettings.cp1A[1];
+      cp1A[PSTR("cp1A3")] = mySettings.cp1A[2];
+      cp1A[PSTR("cp1A4")] = mySettings.cp1A[3];
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp1B = doc.createNestedObject("cp1B");
+      cp1B[PSTR("cp1B1")] = mySettings.cp1B[0];
+      cp1B[PSTR("cp1B2")] = mySettings.cp1B[1];
+      cp1B[PSTR("cp1B3")] = mySettings.cp1B[2];
+      cp1B[PSTR("cp1B4")] = mySettings.cp1B[3];
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp2A = doc.createNestedObject("cp2A");
+      cp2A[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
+      cp2A[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
+      cp2A[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
+      cp2A[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp2B = doc.createNestedObject("cp2B");
+      cp2B[PSTR("cp2B1")] = mySettings.cp2B[0];
+      cp2B[PSTR("cp2B2")] = mySettings.cp2B[1];
+      cp2B[PSTR("cp2B3")] = mySettings.cp2B[2];
+      cp2B[PSTR("cp2B4")] = mySettings.cp2B[3];
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp4A = doc.createNestedObject("cp4A");
+      cp4A[PSTR("cp4A1")] = mySettings.cp4A[0];
+      cp4A[PSTR("cp4A2")] = mySettings.cp4A[1];
+      cp4A[PSTR("cp4A3")] = mySettings.cp4A[2];
+      cp4A[PSTR("cp4A4")] = mySettings.cp4A[3];
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp4B = doc.createNestedObject("cp4B");
+      cp4B[PSTR("cp4B1")] = mySettings.cp4B[0];
+      cp4B[PSTR("cp4B2")] = mySettings.cp4B[1];
+      cp4B[PSTR("cp4B3")] = mySettings.cp4B[2];
+      cp4B[PSTR("cp4B4")] = mySettings.cp4B[3];
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp3A = doc.createNestedObject("cp3A");
+      cp3A[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
+      cp3A[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
+      cp3A[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
+      cp3A[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject lbl = doc.createNestedObject("lbl");
+      lbl[PSTR("lbl1")] = mySettings.lbl[0];
+      lbl[PSTR("lbl2")] = mySettings.lbl[1];
+      lbl[PSTR("lbl3")] = mySettings.lbl[2];
+      lbl[PSTR("lbl4")] = mySettings.lbl[3];
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
+      doc.clear();
+      JsonObject cpM = doc.createNestedObject("cpM");
+      cpM[PSTR("cpM1")] = mySettings.cpM[0];
+      cpM[PSTR("cpM2")] = mySettings.cpM[1];
+      cpM[PSTR("cpM3")] = mySettings.cpM[2];
+      cpM[PSTR("cpM4")] = mySettings.cpM[3];
+      doc[PSTR("ch1")] = (int)mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch2")] = (int)mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch3")] = (int)mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch4")] = (int)mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
+      serializeJson(doc, buffer);
+      ws.broadcastTXT(buffer);
     }
+    #endif
     
     log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
+#ifdef USE_WEB_IFACE
 void onWsEvent(const JsonObject &doc){
     long startMillis = millis();
 
@@ -1101,26 +1108,7 @@ void onWsEvent(const JsonObject &doc){
 
 
     if(evType == (int)WStype_CONNECTED){
-        if(config.wsCount > 1){
-          ws.disconnect(doc["num"].as<uint8_t>());
-          return;
-        }
-        syncClientAttr(2);
-        if(config.wsCount == 1){
-          if(xHandleWsSendTelemetry == NULL){
-            xReturnedWsSendTelemetry = xTaskCreatePinnedToCore(wsSendTelemetryTR, PSTR("wsSendTelemetry"), 3072, NULL, 1, &xHandleWsSendTelemetry, 1);
-            if(xReturnedWsSendTelemetry == pdPASS){
-              log_manager->warn(PSTR(__func__), PSTR("Task wsSendTelemetry has been created.\n"));
-            }
-          }
-
-          if(xHandleWsSendSensors == NULL){
-            xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), 5120, NULL, 1, &xHandleWsSendSensors, 1);
-            if(xReturnedWsSendSensors == pdPASS){
-              log_manager->warn(PSTR(__func__), PSTR("Task wsSendSensors has been created.\n"));
-            }
-          }
-        }
+      syncClientAttr(2);
     }
     if(evType == (int)WStype_DISCONNECTED){
         if(config.wsCount < 1){
@@ -1181,48 +1169,39 @@ void wsSendSensorsTR(void *arg){
     if(config.fIface && config.wsCount > 0){
       char buffer[DOCSIZE_MIN];
       StaticJsonDocument<DOCSIZE_MIN> doc;
-      if( xSemaphoreSettings != NULL ){
-        if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
+  
+      if( xQueuePZEMMessage != NULL ){
+        PZEMMessage PZEMMsg;
+        if( xQueueReceive( xQueuePZEMMessage,  &( PZEMMsg ), ( TickType_t ) 1000 ) == pdPASS )
         {
           JsonObject pzem = doc.createNestedObject("pzem");
-          if(mySettings._volt >= 0){
-            pzem[PSTR("volt")] = round2(mySettings._volt);
-            pzem[PSTR("amp")] = round2(mySettings._amp);
-            pzem[PSTR("watt")] = round2(mySettings._watt);
-            pzem[PSTR("ener")] = round2(mySettings._ener);
-            pzem[PSTR("freq")] = round2(mySettings._freq);
-            pzem[PSTR("pf")] = round2(mySettings._pf)*100;
-            serializeJson(doc, buffer);
-            ws.broadcastTXT(buffer);
-            doc.clear();
-          }
-          xSemaphoreGive( xSemaphoreSettings );
-        }
-        else
-        {
-          log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
-        }
-      }
-
-
-      if( xSemaphoreSettings != NULL ){
-        if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
-        {
-          JsonObject bme280 = doc.createNestedObject("bme280");
-          bme280[PSTR("celc")] = round2(mySettings._celc);
-          bme280[PSTR("rh")] = round2(mySettings._rh);
-          bme280[PSTR("hpa")] = round2(mySettings._hpa);
-          bme280[PSTR("alt")] = round2(mySettings._alt);
+          pzem[PSTR("volt")] = round2(PZEMMsg.volt);
+          pzem[PSTR("amp")] = round2(PZEMMsg.amp);
+          pzem[PSTR("watt")] = round2(PZEMMsg.watt);
+          pzem[PSTR("ener")] = round2(PZEMMsg.ener);
+          pzem[PSTR("freq")] = round2(PZEMMsg.freq);
+          pzem[PSTR("pf")] = round2(PZEMMsg.pf)*100;
           serializeJson(doc, buffer);
           ws.broadcastTXT(buffer);
-          xSemaphoreGive( xSemaphoreSettings );
+          doc.clear();
         }
-        else
+      } 
+
+      if( xQueueBME280Message != NULL ){
+        BME280Message BME280Msg;
+        if( xQueueReceive( xQueueBME280Message,  &( BME280Msg ), ( TickType_t ) 1000 ) == pdPASS )
         {
-          log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+          JsonObject bme280 = doc.createNestedObject("bme280");
+          bme280[PSTR("celc")] = round2(BME280Msg.celc);
+          bme280[PSTR("rh")] = round2(BME280Msg.rh);
+          bme280[PSTR("hpa")] = round2(BME280Msg.hpa);
+          bme280[PSTR("alt")] = round2(BME280Msg.alt);
+          serializeJson(doc, buffer);
+          ws.broadcastTXT(buffer);
         }
-      }
+      } 
     }
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
 }
+#endif
