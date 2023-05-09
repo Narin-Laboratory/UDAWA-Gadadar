@@ -88,7 +88,6 @@ export class AppComponent {
       }
       if(msg['cp3A'] != null){
         let temp = msg['cp3A'];
-        if(temp != ""){
           for(let k in temp){
             let item = JSON.parse(temp[k]);
             let param: string = '';
@@ -104,7 +103,6 @@ export class AppComponent {
             }
             this.cp3A[k] = param;
           }
-        }
       }
       for(let i = 1; i <= 4; i++){
         if(msg['ch'+i] != null){

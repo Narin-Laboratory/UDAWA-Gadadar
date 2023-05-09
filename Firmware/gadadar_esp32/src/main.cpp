@@ -337,7 +337,7 @@ void loadSettings()
 {
   long startMillis = millis();
 
-  StaticJsonDocument<DOCSIZE> doc;
+  StaticJsonDocument<DOCSIZE_SETTINGS> doc;
   readSettings(doc, settingsPath);
 
   if(doc["cpM"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cpM"].as<JsonArray>()) { mySettings.cpM[index] = v.as<uint8_t>(); index++; } } 
@@ -359,6 +359,12 @@ void loadSettings()
     for(uint8_t i=0; i<countof(mySettings.cp3A); i++)
     {
       serializeJson(doc["cp3A"][i], mySettings.cp3A[i]);
+    }
+  }
+  else{
+    for(uint8_t i=0; i<countof(mySettings.cp3A); i++)
+    {
+      mySettings.cp3A[i] = "[{\"h\": 0, \"i\": 0, \"s\": 0, \"d\": 0}]";
     }
   }
 
@@ -398,10 +404,6 @@ void loadSettings()
   if(doc["lbl"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbl"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.lbl); i++) { strlcpy(mySettings.lbl[i], "unnamed", sizeof(mySettings.lbl[i])); } }
 
-  String tmp;
-  if(config.logLev >= 4){serializeJson(doc, tmp);}
-  log_manager->debug(PSTR(__func__), "Loaded settings:\n %s \n", tmp.c_str());
-
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
@@ -409,7 +411,7 @@ void saveSettings()
 {
   long startMillis = millis();
 
-  StaticJsonDocument<DOCSIZE> doc;
+  StaticJsonDocument<DOCSIZE_SETTINGS> doc;
 
   JsonArray cp1A = doc.createNestedArray("cp1A");
   for(uint8_t i=0; i<countof(mySettings.cp1A); i++)
@@ -488,9 +490,6 @@ void saveSettings()
   doc["seaHpa"] = mySettings.seaHpa;
 
   writeSettings(doc, settingsPath);
-  String tmp;
-  if(config.logLev >= 4){serializeJson(doc, tmp);}
-  log_manager->debug(PSTR(__func__), "Written settings:\n %s \n", tmp.c_str());
 
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
@@ -937,18 +936,18 @@ void publishSwitchTR(void * arg){
           String chName = "ch" + String(i+1);
           int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
 
-          char buffer[12];
-          StaticJsonDocument<12> doc;
+          char buffer[64];
+          StaticJsonDocument<64> doc;
           doc[chName.c_str()] = state;
           serializeJson(doc, buffer);
           
           if(config.fIoT && tb.connected() && config.provSent){
-              tbSendTelemetry(buffer);
+            tbSendTelemetry(buffer);
           }
 
           #ifdef USE_WEB_IFACE
           if(config.fIface && config.wsCount > 0){
-              ws.broadcastTXT(buffer);
+            ws.broadcastTXT(buffer);
           }
           #endif
 
@@ -962,7 +961,7 @@ void publishSwitchTR(void * arg){
       timerDeviceTelemetry = now;
     }
 
-    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+    vTaskDelay((const TickType_t) 100 / portTICK_PERIOD_MS);
   }
 }
 
