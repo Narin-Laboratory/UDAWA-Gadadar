@@ -18,9 +18,15 @@ export class WebsocketService {
             map(
                 (response: MessageEvent): Message => {
                     //console.log(response.data);
-                    let data = JSON.parse(response.data)
-                    //console.log(data);
-                    return data;
+                    try {
+                        let data = JSON.parse(response.data);
+                        //console.log(data);
+                        return data;
+                    } catch (e) {
+                        let parseFailed = {"str": response.data};
+                        //console.log(parseFailed);
+                        return parseFailed;
+                    }
                 }
             )
         );

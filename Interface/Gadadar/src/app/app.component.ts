@@ -14,9 +14,9 @@ import { DashboardComponent } from './dashboard/dashboard.component';
 export class AppComponent {
   title = 'UDAWA Gadadar';
 
-  attr = {};
+  attr = {'dUsed': 0, 'dSize': 0};
   cfg = {};
-  deviceTelemetry = {};
+  deviceTelemetry = {'heap': 0};
   deviceAttributes = {};
   bme280 = {};
   pzem = {};
@@ -46,7 +46,9 @@ export class AppComponent {
         this.deviceTelemetry = msg['devTel'];
         const datepipe: DatePipe = new DatePipe('en-US')
         let formattedDate = datepipe.transform(this.deviceTelemetry['dt'] * 1000, 'YYYY-MM-dd HH:mm:ss');
-        this.deviceTelemetry['dts'] =formattedDate;
+        this.deviceTelemetry['dts'] = formattedDate;
+
+        this.deviceTelemetry['rssi'] = Math.min(Math.max(2 * (this.deviceTelemetry['rssi'] + 100), 0), 100);
       }
       if(msg['bme280'] != null){
         this.bme280 = msg['bme280'];
@@ -86,20 +88,22 @@ export class AppComponent {
       }
       if(msg['cp3A'] != null){
         let temp = msg['cp3A'];
-        for(let k in temp){
-          let item = JSON.parse(temp[k]);
-          let param: string = '';
-          for(let t in item){
-            let c: string = `${item[t]['h']}:${item[t]['i']}:${item[t]['s']}-${item[t]['d']}`;
-            if(param == ''){
-              param += c;
+        if(temp != ""){
+          for(let k in temp){
+            let item = JSON.parse(temp[k]);
+            let param: string = '';
+            for(let t in item){
+              let c: string = `${item[t]['h']}:${item[t]['i']}:${item[t]['s']}-${item[t]['d']}`;
+              if(param == ''){
+                param += c;
+              }
+              else{
+                param += ",";
+                param += c;
+              }
             }
-            else{
-              param += ",";
-              param += c;
-            }
+            this.cp3A[k] = param;
           }
-          this.cp3A[k] = param;
         }
       }
       for(let i = 1; i <= 4; i++){

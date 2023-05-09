@@ -34,12 +34,11 @@ void setup()
   processSharedAttributeUpdateCb = &attUpdateCb;
   onTbDisconnectedCb = &onTbDisconnected;
   onTbConnectedCb = &onTbConnected;
-  processSaveSettingsCb = &saveSettings;
   processSetPanicCb = &setPanic;
   processGenericClientRPCCb = &genericClientRPC;
-  plannedRebootOnEnableCb = &onReboot;
   emitAlarmCb = &onAlarm;
   onSyncClientAttrCb = &onSyncClientAttr;
+  onSaveSettings = &saveSettings;
   #ifdef USE_WEB_IFACE
   wsEventCb = &onWsEvent;
   #endif
@@ -63,7 +62,7 @@ void setup()
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }else{
     if(xHandleRecWeatherData == NULL){
-      xReturnedRecWeatherData = xTaskCreatePinnedToCore(recWeatherDataTR, PSTR("recWeatherData"), 6144, NULL, 1, &xHandleRecWeatherData, 1);
+      xReturnedRecWeatherData = xTaskCreatePinnedToCore(recWeatherDataTR, PSTR("recWeatherData"), STACKSIZE_RECWEATHERDATA, NULL, 1, &xHandleRecWeatherData, 1);
       if(xReturnedRecWeatherData == pdPASS){
         log_manager->warn(PSTR(__func__), PSTR("Task recWeatherData has been created.\n"));
       }
@@ -71,21 +70,21 @@ void setup()
   }
 
   if(xHandleRecPowerUsage == NULL){
-    xReturnedRecPowerUsage = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), 6144, NULL, 1, &xHandleRecPowerUsage, 1);
+    xReturnedRecPowerUsage = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), STACKSIZE_RECPOWERUSAGE, NULL, 1, &xHandleRecPowerUsage, 1);
     if(xReturnedRecPowerUsage == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task recPowerUsage has been created.\n"));
     }
   }
 
   if(xHandlePublishSwitch == NULL){
-    xReturnedPublishSwitch = xTaskCreatePinnedToCore(publishSwitchTR, PSTR("publishSwitch"), 4096, NULL, 1, &xHandlePublishSwitch, 1);
+    xReturnedPublishSwitch = xTaskCreatePinnedToCore(publishSwitchTR, PSTR("publishSwitch"), STACKSIZE_PUBLISHSWITCH, NULL, 1, &xHandlePublishSwitch, 1);
     if(xReturnedPublishSwitch == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task publishSwitch has been created.\n"));
     }
   }
 
   if(xHandleRelayControl == NULL){
-    xReturnedRelayControl = xTaskCreatePinnedToCore(relayControlTR, PSTR("relayControl"), 6144, NULL, 1, &xHandleRelayControl, 1);
+    xReturnedRelayControl = xTaskCreatePinnedToCore(relayControlTR, PSTR("relayControl"), STACKSIZE_RELAYCONTROL, NULL, 1, &xHandleRelayControl, 1);
     if(xReturnedRelayControl == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task relayControl has been created.\n"));
     }
@@ -93,14 +92,14 @@ void setup()
 
   #ifdef USE_WEB_IFACE
   if(xHandleWsSendTelemetry == NULL){
-    xReturnedWsSendTelemetry = xTaskCreatePinnedToCore(wsSendTelemetryTR, PSTR("wsSendTelemetry"), 3072, NULL, 1, &xHandleWsSendTelemetry, 1);
+    xReturnedWsSendTelemetry = xTaskCreatePinnedToCore(wsSendTelemetryTR, PSTR("wsSendTelemetry"), STACKSIZE_WSSENDTELEMETRY, NULL, 1, &xHandleWsSendTelemetry, 1);
     if(xReturnedWsSendTelemetry == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task wsSendTelemetry has been created.\n"));
     }
   }
 
   if(xHandleWsSendSensors == NULL){
-    xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), 5120, NULL, 1, &xHandleWsSendSensors, 1);
+    xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), STACKSIZE_WSSENDSENSORS, NULL, 1, &xHandleWsSendSensors, 1);
     if(xReturnedWsSendSensors == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task wsSendSensors has been created.\n"));
     }
@@ -110,9 +109,34 @@ void setup()
   log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
-void loop()
-{
+void loop(){
   udawa();
+
+  UBaseType_t a = STACKSIZE_SETALARM - (int)uxTaskGetStackHighWaterMark( xHandleAlarm );
+  UBaseType_t b = STACKSIZE_IFACE - (int)uxTaskGetStackHighWaterMark( xHandleIface );
+  UBaseType_t c = STACKSIZE_PUBLISHSWITCH - (int)uxTaskGetStackHighWaterMark( xHandlePublishSwitch );
+  UBaseType_t d = STACKSIZE_RECPOWERUSAGE - (int)uxTaskGetStackHighWaterMark( xHandleRecPowerUsage );
+  UBaseType_t e = STACKSIZE_RECWEATHERDATA - (int)uxTaskGetStackHighWaterMark( xHandleRecWeatherData );
+  UBaseType_t f = STACKSIZE_RELAYCONTROL - (int)uxTaskGetStackHighWaterMark( xHandleRelayControl );
+  UBaseType_t g = STACKSIZE_TB - (int)uxTaskGetStackHighWaterMark( xHandleTB );
+  UBaseType_t h = STACKSIZE_WIFIKEEPER - (int)uxTaskGetStackHighWaterMark( xHandleWifiKeeper );
+  #ifdef USE_WIFI_OTA
+  UBaseType_t i = STACKSIZE_WIFIOTA - (int)uxTaskGetStackHighWaterMark( xHandleWifiOta );
+  #endif
+  UBaseType_t j = STACKSIZE_WSSENDSENSORS - (int)uxTaskGetStackHighWaterMark( xHandleWsSendSensors );
+  UBaseType_t k = STACKSIZE_WSSENDTELEMETRY - (int)uxTaskGetStackHighWaterMark( xHandleWsSendTelemetry );
+
+  #ifdef USE_WIFI_OTA
+    int total = a+b+c+d+e+f+g+h+i+j+k;
+    log_manager->warn(PSTR(__func__), PSTR("alarm: %d, iface: %d, switch: %d, pzem: %d, bme: %d, control: %d, tb: %d, wifi: %d, ota: %d, wsSensor: %d, wsTele: %d, SUM: %d \n"),
+     a, b, c, d, e, f, g, h, i, j, k, total);
+  #else
+    int total = a+b+c+d+e+f+g+h+j+k;
+    log_manager->warn(PSTR(__func__), PSTR("alarm: %d, iface: %d, switch: %d, pzem: %d, bme: %d, control: %d, tb: %d, wifi: %d, wsSensor: %d, wsTele: %d, SUM: %d \n"),
+     a, b, c, d, e, f, g, h, j, k, total);
+  #endif
+
+  vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
 }
 
 void recPowerUsageTR(void *arg){
@@ -150,7 +174,8 @@ void recPowerUsageTR(void *arg){
     #endif
         
     if(tb.connected() && config.provSent){
-      StaticJsonDocument<DOCSIZE_MIN> doc;
+      StaticJsonDocument<128> doc;
+      char buffer[128];
       float ener;
       unsigned long now = millis();
       if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
@@ -162,7 +187,8 @@ void recPowerUsageTR(void *arg){
         doc[PSTR("_pf")] = pf;
         doc[PSTR("_ener")] = ener;
         
-        tbSendAttribute(doc);
+        serializeJson(doc, buffer);
+        tbSendAttribute(buffer);
         doc.clear();
 
         timerCalcPowerUsage = now;
@@ -177,7 +203,8 @@ void recPowerUsageTR(void *arg){
         doc[PSTR("pf")] = _pf_.Get_Average();
         doc[PSTR("ener")] = ener;
 
-        if(tbSendTelemetry(doc)){
+        serializeJson(doc, buffer);
+        if(tbSendTelemetry(buffer)){
           _volt_.Clear(); _amp_.Clear(); _watt_.Clear(); _freq_.Clear(); _pf_.Clear();
         }
         
@@ -270,7 +297,8 @@ void recWeatherDataTR(void *arg){
       #endif
 
       if(config.provSent && tb.connected() && config.fIoT){
-        StaticJsonDocument<DOCSIZE_MIN> doc;
+        StaticJsonDocument<128> doc;
+        char buffer[128];
 
         unsigned long now = millis();
         if( (now - timerCalcWeatherData) > (mySettings.itWc * 1000) ){
@@ -279,7 +307,8 @@ void recWeatherDataTR(void *arg){
           doc[PSTR("_hpa")] = hpa;
           doc[PSTR("_alt")] = alt;
 
-          tbSendAttribute(doc);
+          serializeJson(doc, buffer);
+          tbSendAttribute(buffer);
           doc.clear();
 
           timerCalcWeatherData = now;
@@ -291,7 +320,8 @@ void recWeatherDataTR(void *arg){
           doc[PSTR("hpa")] = _hpa_.Get_Average();
           doc[PSTR("alt")] = _alt_.Get_Average();
 
-          if(tbSendTelemetry(doc)){
+          serializeJson(doc, buffer);
+          if(tbSendTelemetry(buffer)){
             _celc_.Clear(); _rh_.Clear(); _hpa_.Clear(); _alt_.Clear(); 
           }
 
@@ -804,8 +834,6 @@ void onTbDisconnected(){
  
 }
 
-void onReboot(){}
-
 void setPanic(const RPC_Data &data){
     long startMillis = millis();
 
@@ -884,14 +912,16 @@ void stateReset(bool resetOpMode){
 
 void deviceTelemetry(){
     if(config.provSent && tb.connected() && config.fIoT){
-      StaticJsonDocument<DOCSIZE_MIN> doc;
+      StaticJsonDocument<128> doc;
+      char buffer[128];
       
       doc[PSTR("uptime")] = millis(); 
       doc[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT); 
       doc[PSTR("rssi")] = WiFi.RSSI(); 
       doc[PSTR("dt")] = rtc.getEpoch(); 
 
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
     }
 }
 
@@ -907,13 +937,13 @@ void publishSwitchTR(void * arg){
           String chName = "ch" + String(i+1);
           int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
 
-          char buffer[10];
-          StaticJsonDocument<DOCSIZE_MIN> doc;
+          char buffer[12];
+          StaticJsonDocument<12> doc;
           doc[chName.c_str()] = state;
           serializeJson(doc, buffer);
           
           if(config.fIoT && tb.connected() && config.provSent){
-              tbSendTelemetry(doc);
+              tbSendTelemetry(buffer);
           }
 
           #ifdef USE_WEB_IFACE
@@ -939,7 +969,8 @@ void publishSwitchTR(void * arg){
 void onSyncClientAttr(uint8_t direction){
     long startMillis = millis();
 
-    StaticJsonDocument<DOCSIZE_MIN> doc;
+    StaticJsonDocument<1024> doc;
+    char buffer[1024];
     
 
     if(tb.connected() && (direction == 0 || direction == 1)){
@@ -951,7 +982,8 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("cp1B2")] = mySettings.cp1B[1];
       doc[PSTR("cp1B3")] = mySettings.cp1B[2];
       doc[PSTR("cp1B4")] = mySettings.cp1B[3];
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
       doc[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
       doc[PSTR("cp2A2")] = (uint64_t)mySettings.cp2A[1] * 1000;
@@ -961,7 +993,8 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("cp2B2")] = mySettings.cp2B[1];
       doc[PSTR("cp2B3")] = mySettings.cp2B[2];
       doc[PSTR("cp2B4")] = mySettings.cp2B[3];
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
       doc[PSTR("cp4A1")] = mySettings.cp4A[0];
       doc[PSTR("cp4A2")] = mySettings.cp4A[1];
@@ -971,26 +1004,32 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("cp4B2")] = mySettings.cp4B[1];
       doc[PSTR("cp4B3")] = mySettings.cp4B[2];
       doc[PSTR("cp4B4")] = mySettings.cp4B[3];
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
       doc[PSTR("pR1")] = mySettings.pR[0];
       doc[PSTR("pR2")] = mySettings.pR[1];
       doc[PSTR("pR3")] = mySettings.pR[2];
       doc[PSTR("pR4")] = mySettings.pR[3];
       doc[PSTR("ON")] = mySettings.ON;
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
-      doc[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
-      tbSendAttribute(doc);
+      doc[PSTR("cp3A1")] = mySettings.cp3A[0];
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
-      doc[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
-      tbSendAttribute(doc);
+      doc[PSTR("cp3A2")] = mySettings.cp3A[1];
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
-      doc[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
-      tbSendAttribute(doc);
+      doc[PSTR("cp3A3")] = mySettings.cp3A[2];
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
-      doc[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
-      tbSendAttribute(doc);
+      doc[PSTR("cp3A4")] = mySettings.cp3A[3];
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
       doc[PSTR("lbl1")] = mySettings.lbl[0];
       doc[PSTR("lbl2")] = mySettings.lbl[1];
@@ -1001,20 +1040,21 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("itPc")] = mySettings.itPc;
       doc[PSTR("itWc")] = mySettings.itWc;
       doc[PSTR("itD")] = mySettings.itD;
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
       doc[PSTR("cpM1")] = mySettings.cpM[0];
       doc[PSTR("cpM2")] = mySettings.cpM[1];
       doc[PSTR("cpM3")] = mySettings.cpM[2];
       doc[PSTR("cpM4")] = mySettings.cpM[3];
       doc[PSTR("seaHpa")] = mySettings.seaHpa;
-      tbSendAttribute(doc);
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
       doc.clear();
     }
 
     #ifdef USE_WEB_IFACE
     if(config.wsCount > 0 && (direction == 0 || direction == 2)){
-      char buffer[1024];
       JsonObject cp1A = doc.createNestedObject("cp1A");
       cp1A[PSTR("cp1A1")] = mySettings.cp1A[0];
       cp1A[PSTR("cp1A2")] = mySettings.cp1A[1];
@@ -1064,10 +1104,10 @@ void onSyncClientAttr(uint8_t direction){
       ws.broadcastTXT(buffer);
       doc.clear();
       JsonObject cp3A = doc.createNestedObject("cp3A");
-      cp3A[PSTR("cp3A1")] = mySettings.cp3A[0].c_str();
-      cp3A[PSTR("cp3A2")] = mySettings.cp3A[1].c_str();
-      cp3A[PSTR("cp3A3")] = mySettings.cp3A[2].c_str();
-      cp3A[PSTR("cp3A4")] = mySettings.cp3A[3].c_str();
+      cp3A[PSTR("cp3A1")] = mySettings.cp3A[0];
+      cp3A[PSTR("cp3A2")] = mySettings.cp3A[1];
+      cp3A[PSTR("cp3A3")] = mySettings.cp3A[2];
+      cp3A[PSTR("cp3A4")] = mySettings.cp3A[3];
       serializeJson(doc, buffer);
       ws.broadcastTXT(buffer);
       doc.clear();
@@ -1098,59 +1138,55 @@ void onSyncClientAttr(uint8_t direction){
 
 #ifdef USE_WEB_IFACE
 void onWsEvent(const JsonObject &doc){
-    long startMillis = millis();
-
-    if(doc["evType"] == nullptr){
-        log_manager->debug(PSTR(__func__), "Event type not found.\n");
-        return;
-    }
-    int evType = doc["evType"].as<int>();
+  if(doc["evType"] == nullptr){
+    log_manager->debug(PSTR(__func__), "Event type not found.\n");
+    return;
+  }
+  int evType = doc["evType"].as<int>();
 
 
-    if(evType == (int)WStype_CONNECTED){
-      syncClientAttr(2);
-    }
-    if(evType == (int)WStype_DISCONNECTED){
-        if(config.wsCount < 1){
-            log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
-        }
-    }
-    else if(evType == (int)WStype_TEXT){
-        if(doc["cmd"] == nullptr){
-            log_manager->debug(PSTR(__func__), "Command not found.\n");
-            return;
-        }
-        const char* cmd = doc["cmd"].as<const char*>();
-        if(strcmp(cmd, (const char*) "attr") == 0){
-          processSharedAttributeUpdate(doc);
-          syncClientAttr(1);
-        }
-        else if(strcmp(cmd, (const char*) "saveSettings") == 0){
-          saveSettings();
-        }
-        else if(strcmp(cmd, (const char*) "configSave") == 0){
-          configSave();
-        }
-        else if(strcmp(cmd, (const char*) "setPanic") == 0){
-          doc[PSTR("st")] = configcomcu.fP ? "OFF" : "ON";
-          processSetPanic(doc);
-        }
-        else if(strcmp(cmd, (const char*) "reboot") == 0){
-          plannedReboot(5);
-        }
-        else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-          setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
-        }
-    }
-
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+  if(evType == (int)WStype_CONNECTED){
+    FLAG_SYNC_CLIENT_ATTR_2 = true;
+  }
+  if(evType == (int)WStype_DISCONNECTED){
+      if(config.wsCount < 1){
+          log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
+      }
+  }
+  else if(evType == (int)WStype_TEXT){
+      if(doc["cmd"] == nullptr){
+          log_manager->debug(PSTR(__func__), "Command not found.\n");
+          return;
+      }
+      const char* cmd = doc["cmd"].as<const char*>();
+      if(strcmp(cmd, (const char*) "attr") == 0){
+        processSharedAttributeUpdate(doc);
+        FLAG_SYNC_CLIENT_ATTR_1 = true;
+      }
+      else if(strcmp(cmd, (const char*) "saveSettings") == 0){
+        FLAG_SAVE_SETTINGS = true;
+      }
+      else if(strcmp(cmd, (const char*) "configSave") == 0){
+        FLAG_SAVE_CONFIG = true;
+      }
+      else if(strcmp(cmd, (const char*) "setPanic") == 0){
+        doc[PSTR("st")] = configcomcu.fP ? "OFF" : "ON";
+        processSetPanic(doc);
+      }
+      else if(strcmp(cmd, (const char*) "reboot") == 0){
+        reboot();
+      }
+      else if(strcmp(cmd, (const char*) "setSwitch") == 0){
+        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+      }
+  }
 }
 
 void wsSendTelemetryTR(void *arg){
   while(true){
     if(config.fIface && config.wsCount > 0){
-      char buffer[DOCSIZE_MIN];
-      StaticJsonDocument<DOCSIZE_MIN> doc;
+      char buffer[128];
+      StaticJsonDocument<128> doc;
       JsonObject devTel = doc.createNestedObject("devTel");
       devTel[PSTR("heap")] = heap_caps_get_free_size(MALLOC_CAP_8BIT);
       devTel[PSTR("rssi")] = WiFi.RSSI();
@@ -1167,8 +1203,8 @@ void wsSendTelemetryTR(void *arg){
 void wsSendSensorsTR(void *arg){
   while(true){
     if(config.fIface && config.wsCount > 0){
-      char buffer[DOCSIZE_MIN];
-      StaticJsonDocument<DOCSIZE_MIN> doc;
+      char buffer[128];
+      StaticJsonDocument<128> doc;
   
       if( xQueuePZEMMessage != NULL ){
         PZEMMessage PZEMMsg;

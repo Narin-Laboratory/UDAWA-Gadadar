@@ -19,13 +19,36 @@
         [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(cpM)]="cpM"
         [(cp1A)]="cp1A" [(cp1B)]="cp1B" [(cp2A)]="cp2A" [(cp2B)]="cp2B"
         [(cp4A)]="cp4A" [(cp4B)]="cp4B" [(cp3A)]="cp3A" [(lbl)]="lbl" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
-        <article>
-          <ul>
-            <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
-            <li><small>{{deviceTelemetry['dts']}}</small></li>
-            <li><small>{{deviceTelemetry['heap']}}</small></li>
-          </ul>
-        </article>
+        <div class="grid">
+          <article>
+            <div class="grid">
+              <ul>
+                <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
+                <li><small>{{deviceTelemetry['dts']}}</small></li>
+                <li><small>{{cfg['hname']}}</small></li>
+              </ul>
+              <ul>
+                <li><small>{{' Firmware v' + attr['fmVersion'] + ' ' + attr['compdate']}}</small></li>
+                <li><small>IP Address {{attr['ipad']}}</small></li>
+                <li><small>Connected to {{cfg['ap']}}</small></li>
+              </ul>
+            </div>
+          </article>
+          <article>
+            <label for="prog-fs">
+              <progress id="prog-fs" value="{{attr['dUsed']}}" max="{{attr['dSize']}}"></progress>
+              Disk used {{attr['dUsed'] / attr['dSize'] * 100 | number:'1.2-2'}}%
+            </label>
+            <label for="prog-heap">
+              <progress id="prog-heap" value="{{ (320000 - deviceTelemetry['heap']) }}" max="320000"></progress>
+              Memory used {{(320000 - deviceTelemetry['heap']) / 320000 * 100 | number:'1.2-2'}}%
+            </label>
+            <label for="prog-signal">
+              <progress id="prog-signal" value="{{ deviceTelemetry['rssi'] }}" max="100"></progress>
+              Network Signal {{ deviceTelemetry['rssi'] }}%
+            </label>
+          </article>
+        </div>
     </div>
   </div>
 </main>
