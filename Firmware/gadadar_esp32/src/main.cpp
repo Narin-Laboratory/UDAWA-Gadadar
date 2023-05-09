@@ -672,7 +672,7 @@ void attUpdateCb(const Shared_Attribute_Data &data)
       }
       else
       {
-        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
       }
     }
 
@@ -691,7 +691,7 @@ void attUpdateCb(const Shared_Attribute_Data &data)
       }
       else
       {
-        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
       }
     }
     if(data["cp1A2"].as<uint8_t>() == 0)
@@ -709,7 +709,7 @@ void attUpdateCb(const Shared_Attribute_Data &data)
       }
       else
       {
-        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
       }
     }
     if(data["cp1A3"].as<uint8_t>() == 0)
@@ -727,7 +727,7 @@ void attUpdateCb(const Shared_Attribute_Data &data)
       }
       else
       {
-        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
       }
     }
     if(data["cp1A4"].as<uint8_t>() == 0)
@@ -816,7 +816,7 @@ void attUpdateCb(const Shared_Attribute_Data &data)
     }
     else
     {
-      log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n."));
+      log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
     }
   }
 
