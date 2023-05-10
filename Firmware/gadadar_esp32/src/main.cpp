@@ -111,31 +111,6 @@ void setup()
 
 void loop(){
   udawa();
-
-  UBaseType_t a = STACKSIZE_SETALARM - (int)uxTaskGetStackHighWaterMark( xHandleAlarm );
-  UBaseType_t b = STACKSIZE_IFACE - (int)uxTaskGetStackHighWaterMark( xHandleIface );
-  UBaseType_t c = STACKSIZE_PUBLISHSWITCH - (int)uxTaskGetStackHighWaterMark( xHandlePublishSwitch );
-  UBaseType_t d = STACKSIZE_RECPOWERUSAGE - (int)uxTaskGetStackHighWaterMark( xHandleRecPowerUsage );
-  UBaseType_t e = STACKSIZE_RECWEATHERDATA - (int)uxTaskGetStackHighWaterMark( xHandleRecWeatherData );
-  UBaseType_t f = STACKSIZE_RELAYCONTROL - (int)uxTaskGetStackHighWaterMark( xHandleRelayControl );
-  UBaseType_t g = STACKSIZE_TB - (int)uxTaskGetStackHighWaterMark( xHandleTB );
-  UBaseType_t h = STACKSIZE_WIFIKEEPER - (int)uxTaskGetStackHighWaterMark( xHandleWifiKeeper );
-  #ifdef USE_WIFI_OTA
-  UBaseType_t i = STACKSIZE_WIFIOTA - (int)uxTaskGetStackHighWaterMark( xHandleWifiOta );
-  #endif
-  UBaseType_t j = STACKSIZE_WSSENDSENSORS - (int)uxTaskGetStackHighWaterMark( xHandleWsSendSensors );
-  UBaseType_t k = STACKSIZE_WSSENDTELEMETRY - (int)uxTaskGetStackHighWaterMark( xHandleWsSendTelemetry );
-
-  #ifdef USE_WIFI_OTA
-    int total = a+b+c+d+e+f+g+h+i+j+k;
-    log_manager->warn(PSTR(__func__), PSTR("alarm: %d, iface: %d, switch: %d, pzem: %d, bme: %d, control: %d, tb: %d, wifi: %d, ota: %d, wsSensor: %d, wsTele: %d, SUM: %d \n"),
-     a, b, c, d, e, f, g, h, i, j, k, total);
-  #else
-    int total = a+b+c+d+e+f+g+h+j+k;
-    log_manager->warn(PSTR(__func__), PSTR("alarm: %d, iface: %d, switch: %d, pzem: %d, bme: %d, control: %d, tb: %d, wifi: %d, wsSensor: %d, wsTele: %d, SUM: %d \n"),
-     a, b, c, d, e, f, g, h, j, k, total);
-  #endif
-
   vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
 }
 
