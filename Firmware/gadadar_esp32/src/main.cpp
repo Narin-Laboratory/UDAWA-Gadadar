@@ -868,7 +868,8 @@ RPC_Response genericClientRPC(const RPC_Data &data){
                   HardwareSerial PZEMSerial(1);
                   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-                  PZEM.resetEnergy();
+                  uint8_t res = PZEM.resetEnergy();
+                  log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
                   xSemaphoreGive( xSemaphorePZEM );
                 }
                 else
@@ -897,7 +898,8 @@ RPC_Response genericClientRPC(const RPC_Data &data){
                   HardwareSerial PZEMSerial(1);
                   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-                  PZEM.resetEnergy();
+                  uint8_t res = PZEM.resetEnergy();
+                  log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
                   xSemaphoreGive( xSemaphorePZEM );
                 }
                 else
