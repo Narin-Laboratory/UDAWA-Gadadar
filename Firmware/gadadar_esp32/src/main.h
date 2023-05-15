@@ -47,7 +47,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 -----END CERTIFICATE-----
 )EOF";
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.2"
+#define CURRENT_FIRMWARE_VERSION "0.0.6"
 #define DOCSIZE 2048
 #define DOCSIZE_MIN 512
 #define DOCSIZE_SETTINGS 4096
@@ -57,7 +57,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define STACKSIZE_WIFIKEEPER 2000
 #define STACKSIZE_SETALARM 3700
 #define STACKSIZE_WIFIOTA 4096
-#define STACKSIZE_TB 10000
+#define STACKSIZE_TB 12000
 #define STACKSIZE_IFACE 7500
 #define STACKSIZE_RECWEATHERDATA 3100
 #define STACKSIZE_RECPOWERUSAGE 3100
@@ -152,4 +152,6 @@ void wsSendTelemetryTR(void *arg);
 void wsSendSensorsTR(void *arg);
 #endif
 void publishSwitchTR(void * arg);
+void onMQTTUpdateStart();
+void onMQTTUpdateEnd();
 #endif

@@ -27,9 +27,12 @@ TaskHandle_t xHandleRecWeatherData = NULL;
 TaskHandle_t xHandlePublishSwitch = NULL;
 TaskHandle_t xHandleRelayControl = NULL;
 
+SemaphoreHandle_t xSemaphorePZEM = NULL;
+
 void setup()
 {
   long startMillis = millis();
+  if(xSemaphorePZEM == NULL){xSemaphorePZEM = xSemaphoreCreateMutex();}
 
   processSharedAttributeUpdateCb = &attUpdateCb;
   onTbDisconnectedCb = &onTbDisconnected;
@@ -42,6 +45,8 @@ void setup()
   #ifdef USE_WEB_IFACE
   wsEventCb = &onWsEvent;
   #endif
+  onMQTTUpdateStartCb = &onMQTTUpdateStart;
+  onMQTTUpdateEndCb = &onMQTTUpdateEnd;
   startup();
   loadSettings();
   syncConfigCoMCU();
@@ -127,104 +132,114 @@ void recPowerUsageTR(void *arg){
   
   while(true){
    
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-    float volt = PZEM.voltage();
-    float amp = PZEM.current();
-    float watt = PZEM.power();
-    float ener = PZEM.energy();
-    float freq = PZEM.frequency();
-    float pf = PZEM.pf();
-
-    #ifdef USE_WEB_IFACE
-    if( xQueuePZEMMessage != NULL && (config.wsCount > 0)){
-      PZEMMessage PZEMMsg;
-      PZEMMsg.amp = amp; PZEMMsg.watt = watt; PZEMMsg.ener = ener; PZEMMsg.freq = freq; PZEMMsg.pf = pf; PZEMMsg.volt = volt;
-      if( xQueueSend( xQueuePZEMMessage, &PZEMMsg, ( TickType_t ) 1000 ) != pdPASS )
+    if( xSemaphorePZEM != NULL){
+      if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
       {
-          log_manager->debug(PSTR(__func__), PSTR("Failed to fill PZEMMsg. Queue is full. \n"));
-      }
-    }
-    #endif
-        
-    if(tb.connected() && config.provSent){
-      StaticJsonDocument<128> doc;
-      char buffer[128];
-      float ener;
-      unsigned long now = millis();
-      if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
-        
-        doc[PSTR("_volt")] = volt;
-        doc[PSTR("_amp")] = amp;
-        doc[PSTR("_watt")] = watt;
-        doc[PSTR("_freq")] = freq;
-        doc[PSTR("_pf")] = pf;
-        doc[PSTR("_ener")] = ener;
-        
-        serializeJson(doc, buffer);
-        tbSendAttribute(buffer);
-        doc.clear();
+        HardwareSerial PZEMSerial(1);
+        PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-        timerCalcPowerUsage = now;
-      }
+        float volt = PZEM.voltage();
+        float amp = PZEM.current();
+        float watt = PZEM.power();
+        float ener = PZEM.energy();
+        float freq = PZEM.frequency();
+        float pf = PZEM.pf();
+        xSemaphoreGive( xSemaphorePZEM );
 
-      now = millis();
-      if( (now - timerRecPowerUsage) > (mySettings.itP * 1000) ){
-        doc[PSTR("volt")] = _volt_.Get_Average();
-        doc[PSTR("amp")] = _amp_.Get_Average();
-        doc[PSTR("watt")] = _watt_.Get_Average();
-        doc[PSTR("freq")] = _freq_.Get_Average();
-        doc[PSTR("pf")] = _pf_.Get_Average();
-        doc[PSTR("ener")] = ener;
-
-        serializeJson(doc, buffer);
-        if(tbSendTelemetry(buffer)){
-          _volt_.Clear(); _amp_.Clear(); _watt_.Clear(); _freq_.Clear(); _pf_.Clear();
-        }
-        
-        timerRecPowerUsage = now;
-      }
-    }
-
-    unsigned long now = millis();
-    if( (now - timerAlarm) > 30000 ){
-      if(volt <= 0){
-        setAlarm(121, 1, 5, 1000);
-      }
-
-      uint8_t ACTIVE_CH_COUNTER = 0;
-      for(uint8_t i = 0; i < 4; i++){
-        if(mySettings.dutyState[i] == mySettings.ON){
-          ACTIVE_CH_COUNTER++;
-        }
-
-        if(mySettings.stateOnTs[i] > 0){
-          if(millis() - mySettings.stateOnTs[i] > 3000000){
-            if(i = 0){
-              setAlarm(211, 1, 10, 1000);
-            }
-            else if(i = 0){
-              setAlarm(212, 1, 10, 1000);
-            }
-            else if(i = 0){
-              setAlarm(213, 1, 10, 1000);
-            }
-            else if(i = 0){
-              setAlarm(214, 1, 10, 1000);
-            }
+        #ifdef USE_WEB_IFACE
+        if( xQueuePZEMMessage != NULL && (config.wsCount > 0)){
+          PZEMMessage PZEMMsg;
+          PZEMMsg.amp = amp; PZEMMsg.watt = watt; PZEMMsg.ener = ener; PZEMMsg.freq = freq; PZEMMsg.pf = pf; PZEMMsg.volt = volt;
+          if( xQueueSend( xQueuePZEMMessage, &PZEMMsg, ( TickType_t ) 1000 ) != pdPASS )
+          {
+              log_manager->debug(PSTR(__func__), PSTR("Failed to fill PZEMMsg. Queue is full. \n"));
           }
         }
-      }
+        #endif
+            
+        if(tb.connected() && config.provSent){
+          StaticJsonDocument<128> doc;
+          char buffer[128];
+          float ener;
+          unsigned long now = millis();
+          if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
+            
+            doc[PSTR("_volt")] = volt;
+            doc[PSTR("_amp")] = amp;
+            doc[PSTR("_watt")] = watt;
+            doc[PSTR("_freq")] = freq;
+            doc[PSTR("_pf")] = pf;
+            doc[PSTR("_ener")] = ener;
+            
+            serializeJson(doc, buffer);
+            tbSendAttribute(buffer);
+            doc.clear();
 
-      if(ACTIVE_CH_COUNTER > 0 && (int)watt < 10){
-        setAlarm(221, 1, 10, 1000);
-      }
+            timerCalcPowerUsage = now;
+          }
 
-      if(ACTIVE_CH_COUNTER == 0 && (int)watt > 10){
-        setAlarm(222, 1, 10, 1000);
+          now = millis();
+          if( (now - timerRecPowerUsage) > (mySettings.itP * 1000) ){
+            doc[PSTR("volt")] = _volt_.Get_Average();
+            doc[PSTR("amp")] = _amp_.Get_Average();
+            doc[PSTR("watt")] = _watt_.Get_Average();
+            doc[PSTR("freq")] = _freq_.Get_Average();
+            doc[PSTR("pf")] = _pf_.Get_Average();
+            doc[PSTR("ener")] = ener;
+
+            serializeJson(doc, buffer);
+            if(tbSendTelemetry(buffer)){
+              _volt_.Clear(); _amp_.Clear(); _watt_.Clear(); _freq_.Clear(); _pf_.Clear();
+            }
+            
+            timerRecPowerUsage = now;
+          }
+        }
+
+        unsigned long now = millis();
+        if( (now - timerAlarm) > 30000 ){
+          if(volt <= 0){
+            setAlarm(121, 1, 5, 1000);
+          }
+
+          uint8_t ACTIVE_CH_COUNTER = 0;
+          for(uint8_t i = 0; i < 4; i++){
+            if(mySettings.dutyState[i] == mySettings.ON){
+              ACTIVE_CH_COUNTER++;
+            }
+
+            if(mySettings.stateOnTs[i] > 0){
+              if(millis() - mySettings.stateOnTs[i] > 3000000){
+                if(i = 0){
+                  setAlarm(211, 1, 10, 1000);
+                }
+                else if(i = 0){
+                  setAlarm(212, 1, 10, 1000);
+                }
+                else if(i = 0){
+                  setAlarm(213, 1, 10, 1000);
+                }
+                else if(i = 0){
+                  setAlarm(214, 1, 10, 1000);
+                }
+              }
+            }
+          }
+
+          if(ACTIVE_CH_COUNTER > 0 && (int)watt < 10){
+            setAlarm(221, 1, 10, 1000);
+          }
+
+          if(ACTIVE_CH_COUNTER == 0 && (int)watt > 10){
+            setAlarm(222, 1, 10, 1000);
+          }
+          timerAlarm = now;
+        }
       }
-      timerAlarm = now;
+      else
+      {
+        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+      }   
     }
 
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
@@ -846,6 +861,22 @@ RPC_Response genericClientRPC(const RPC_Data &data){
                     setSwitch(payload[PSTR("arg")][PSTR("ch")].as<String>(), payload[PSTR("arg")][PSTR("st")].as<String>());
                 }
             }
+            else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
+              if( xSemaphorePZEM != NULL){
+                if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
+                {
+                  HardwareSerial PZEMSerial(1);
+                  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+                  PZEM.resetEnergy();
+                  xSemaphoreGive( xSemaphorePZEM );
+                }
+                else
+                {
+                  log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+                }   
+              }
+            }
         }   
     }
     else{
@@ -858,6 +889,22 @@ RPC_Response genericClientRPC(const RPC_Data &data){
                 if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
                     setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
                 }
+            }
+            else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
+              if( xSemaphorePZEM != NULL){
+                if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
+                {
+                  HardwareSerial PZEMSerial(1);
+                  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+                  PZEM.resetEnergy();
+                  xSemaphoreGive( xSemaphorePZEM );
+                }
+                else
+                {
+                  log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+                }   
+              }
             }
         }  
     }
@@ -1213,5 +1260,20 @@ void wsSendSensorsTR(void *arg){
     }
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
+}
+
+void onMQTTUpdateStart(){
+  vTaskSuspend(xHandleRelayControl);
+  vTaskSuspend(xHandleRecPowerUsage);
+  vTaskSuspend(xHandleRecWeatherData);
+  vTaskSuspend(xHandleWsSendSensors);
+  vTaskSuspend(xHandleWsSendTelemetry);
+  vTaskSuspend(xHandleIface);
+  vTaskSuspend(xHandleRelayControl);
+  vTaskSuspend(xHandlePublishSwitch);
+}
+
+void onMQTTUpdateEnd(){
+  
 }
 #endif
