@@ -138,12 +138,12 @@ void recPowerUsageTR(void *arg){
         HardwareSerial PZEMSerial(1);
         PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-        float volt = PZEM.voltage();
-        float amp = PZEM.current();
-        float watt = PZEM.power();
-        float ener = PZEM.energy();
-        float freq = PZEM.frequency();
-        float pf = PZEM.pf();
+        float volt = PZEM.voltage() ? PZEM.voltage() : 0;
+        float amp = PZEM.current() ? PZEM.current() : 0;
+        float watt = PZEM.power() ? PZEM.power() : 0;
+        float ener = PZEM.energy() ? PZEM.energy() : 0;
+        float freq = PZEM.frequency() ? PZEM.frequency() : 0;
+        float pf = PZEM.pf() ? PZEM.pf() : 0;
         xSemaphoreGive( xSemaphorePZEM );
 
         _volt_.Add(volt);
@@ -167,7 +167,7 @@ void recPowerUsageTR(void *arg){
           StaticJsonDocument<128> doc;
           char buffer[128];
           unsigned long now = millis();
-          if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
+          if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000) && volt > 0){
             
             doc[PSTR("_volt")] = volt;
             doc[PSTR("_amp")] = amp;
@@ -270,10 +270,10 @@ void recWeatherDataTR(void *arg){
       setAlarm(111, 1, 5, 1000);
     }
     else{      
-      celc = bme.readTemperature();
-      rh = bme.readHumidity();
-      hpa = bme.readPressure() / 100.0F;
-      alt = bme.readAltitude(mySettings.seaHpa);
+      celc = bme.readTemperature() ? bme.readTemperature() : 0;
+      rh = bme.readHumidity() ? bme.readHumidity() : 0;
+      hpa = bme.readPressure() / 100.0F ? bme.readPressure() / 100.0F : 0;
+      alt = bme.readAltitude(mySettings.seaHpa) ? bme.readAltitude(mySettings.seaHpa) : 0;
 
       _celc_.Add(celc);
       _rh_.Add(rh);
@@ -925,7 +925,6 @@ void onAlarm(int code){
   StaticJsonDocument<32> doc;
   doc[PSTR("alarm")] = code;
   serializeJson(doc, buffer);
-  log_manager->verbose(PSTR(__func__), PSTR("emitting to websocket: %d.\n"), code);
   wsBroadcastTXT(buffer);
 }
 
