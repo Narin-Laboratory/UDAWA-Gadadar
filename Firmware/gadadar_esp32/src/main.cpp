@@ -201,7 +201,7 @@ void recPowerUsageTR(void *arg){
             timerRecPowerUsage = now;
           }
         }
-
+        
         unsigned long now = millis();
         if( (now - timerAlarm) > 30000 ){
           if(volt <= 0){
@@ -919,13 +919,12 @@ RPC_Response genericClientRPC(const RPC_Data &data){
               }
           }  
       }
-
+      xSemaphoreGive( xSemaphoreTBSend );
       StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
       doc[PSTR("rpc")] = PSTR("OK");
 
       log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
       return RPC_Response(doc);
-      xSemaphoreGive( xSemaphoreTBSend );
     }
     else
     {
