@@ -20,6 +20,21 @@ export class AppComponent {
   deviceAttributes = {};
   bme280 = {};
   pzem = {};
+  alarmTime = Date();
+  alarmCode = 0;
+  alarmMsg = {
+    "0": "No alarm message.",
+    "999": "The device has rebooted. Please check your device's operation condition to make sure no such problem is causing the reboot.",
+    "111": "There was a problem when initializing the environmental sensor. Any feature that needs environmental data will malfunction.",
+    "121": "There was a problem when initializing the power sensor. Any feature that requires power measurement will malfunction.",
+    "131": "Please check the device's Internet connection so the device can update its internal time to Internet time. Avoid using any feature that requires precision timing.",
+    "211": "The channel 1 switch has been running for nearly an hour. Please check your configuration to prevent resource depletion and instrument overheating.",
+    "212": "The channel 2 switch has been running for nearly an hour. Please check your configuration to prevent resource depletion and instrument overheating.",
+    "213": "The channel 3 switch has been running for nearly an hour. Please check your configuration to prevent resource depletion and instrument overheating.",
+    "214": "The channel 3 switch has been running for nearly an hour. Please check your configuration to prevent resource depletion and instrument overheating.",
+    "221": "The power sensor detects no power utilization, but the number of active switches is greater than zero. Please check all the instruments that are connected to the four channels to prevent instrument failures.",
+    "222": "The channels are switched off, but the power sensor detects abnormal power utilization. Please check the relay module's operation to prevent relay failure."
+  }
 
   selected = 1;
   state = {'ch1': 0, 'ch2': 0, 'ch3': 0, 'ch4': 0};
@@ -36,6 +51,9 @@ export class AppComponent {
   constructor(private WebsocketService: WebsocketService) {
     WebsocketService.messages.subscribe(msg => {
       //console.log(msg);
+      if(msg['alarm'] != null){
+        this.alarmCode = msg['alarm'];
+      }
       if(msg['attr'] != null){
         this.attr = msg['attr'];
       }

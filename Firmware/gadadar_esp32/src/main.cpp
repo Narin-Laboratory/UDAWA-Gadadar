@@ -201,7 +201,7 @@ void recPowerUsageTR(void *arg){
             timerRecPowerUsage = now;
           }
         }
-        
+
         unsigned long now = millis();
         if( (now - timerAlarm) > 30000 ){
           if(volt <= 0){
@@ -965,7 +965,12 @@ void deviceTelemetry(){
 }
 
 void onAlarm(int code){
-
+  char buffer[32];
+  StaticJsonDocument<32> doc;
+  doc[PSTR("alarm")] = code;
+  serializeJson(doc, buffer);
+  log_manager->verbose(PSTR(__func__), PSTR("emitting to websocket: %d.\n"), code);
+  wsBroadcastTXT(buffer);
 }
 
 void publishSwitchTR(void * arg){
@@ -987,7 +992,7 @@ void publishSwitchTR(void * arg){
 
           #ifdef USE_WEB_IFACE
           if(config.fIface && config.wsCount > 0){
-            ws.broadcastTXT(buffer);
+            wsBroadcastTXT(buffer);
           }
           #endif
 
@@ -1100,7 +1105,7 @@ void onSyncClientAttr(uint8_t direction){
       cp1A[PSTR("cp1A3")] = mySettings.cp1A[2];
       cp1A[PSTR("cp1A4")] = mySettings.cp1A[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp1B = doc.createNestedObject("cp1B");
       cp1B[PSTR("cp1B1")] = mySettings.cp1B[0];
@@ -1108,7 +1113,7 @@ void onSyncClientAttr(uint8_t direction){
       cp1B[PSTR("cp1B3")] = mySettings.cp1B[2];
       cp1B[PSTR("cp1B4")] = mySettings.cp1B[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp2A = doc.createNestedObject("cp2A");
       cp2A[PSTR("cp2A1")] = (uint64_t)mySettings.cp2A[0] * 1000;
@@ -1116,7 +1121,7 @@ void onSyncClientAttr(uint8_t direction){
       cp2A[PSTR("cp2A3")] = (uint64_t)mySettings.cp2A[2] * 1000;
       cp2A[PSTR("cp2A4")] = (uint64_t)mySettings.cp2A[3] * 1000;
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp2B = doc.createNestedObject("cp2B");
       cp2B[PSTR("cp2B1")] = mySettings.cp2B[0];
@@ -1124,7 +1129,7 @@ void onSyncClientAttr(uint8_t direction){
       cp2B[PSTR("cp2B3")] = mySettings.cp2B[2];
       cp2B[PSTR("cp2B4")] = mySettings.cp2B[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp4A = doc.createNestedObject("cp4A");
       cp4A[PSTR("cp4A1")] = mySettings.cp4A[0];
@@ -1132,7 +1137,7 @@ void onSyncClientAttr(uint8_t direction){
       cp4A[PSTR("cp4A3")] = mySettings.cp4A[2];
       cp4A[PSTR("cp4A4")] = mySettings.cp4A[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp4B = doc.createNestedObject("cp4B");
       cp4B[PSTR("cp4B1")] = mySettings.cp4B[0];
@@ -1140,7 +1145,7 @@ void onSyncClientAttr(uint8_t direction){
       cp4B[PSTR("cp4B3")] = mySettings.cp4B[2];
       cp4B[PSTR("cp4B4")] = mySettings.cp4B[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp3A = doc.createNestedObject("cp3A");
       cp3A[PSTR("cp3A1")] = mySettings.cp3A[0];
@@ -1148,7 +1153,7 @@ void onSyncClientAttr(uint8_t direction){
       cp3A[PSTR("cp3A3")] = mySettings.cp3A[2];
       cp3A[PSTR("cp3A4")] = mySettings.cp3A[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject lbl = doc.createNestedObject("lbl");
       lbl[PSTR("lbl1")] = mySettings.lbl[0];
@@ -1156,7 +1161,7 @@ void onSyncClientAttr(uint8_t direction){
       lbl[PSTR("lbl3")] = mySettings.lbl[2];
       lbl[PSTR("lbl4")] = mySettings.lbl[3];
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cpM = doc.createNestedObject("cpM");
       cpM[PSTR("cpM1")] = mySettings.cpM[0];
@@ -1168,7 +1173,7 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("ch3")] = (int)mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
       doc[PSTR("ch4")] = (int)mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
     }
     #endif
     
@@ -1233,7 +1238,7 @@ void wsSendTelemetryTR(void *arg){
       devTel[PSTR("dt")] = rtc.getEpoch();
       devTel[PSTR("dts")] = rtc.getDateTime();
       serializeJson(doc, buffer);
-      ws.broadcastTXT(buffer);
+      wsBroadcastTXT(buffer);
     }
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
@@ -1257,7 +1262,7 @@ void wsSendSensorsTR(void *arg){
           pzem[PSTR("freq")] = round2(PZEMMsg.freq);
           pzem[PSTR("pf")] = round2(PZEMMsg.pf)*100;
           serializeJson(doc, buffer);
-          ws.broadcastTXT(buffer);
+          wsBroadcastTXT(buffer);
           doc.clear();
         }
       } 
@@ -1272,7 +1277,7 @@ void wsSendSensorsTR(void *arg){
           bme280[PSTR("hpa")] = round2(BME280Msg.hpa);
           bme280[PSTR("alt")] = round2(BME280Msg.alt);
           serializeJson(doc, buffer);
-          ws.broadcastTXT(buffer);
+          wsBroadcastTXT(buffer);
         }
       } 
     }

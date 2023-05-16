@@ -48,6 +48,14 @@
               Network Signal {{ deviceTelemetry['rssi'] }}%
             </label>
           </article>
+          <article>
+            <blockquote>
+              "{{alarmMsg[alarmCode]}}"
+              <footer>
+                <cite>- Alarm Code: <kbd>{{alarmCode}}</kbd> - {{alarmTime}}</cite>
+              </footer>
+            </blockquote>
+          </article>
         </div>
     </div>
   </div>
