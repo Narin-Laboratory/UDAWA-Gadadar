@@ -17,14 +17,14 @@ BaseType_t xReturnedWsSendTelemetry;
 BaseType_t xReturnedWsSendSensors;
 BaseType_t xReturnedRecPowerUsage;
 BaseType_t xReturnedRecWeatherData;
-BaseType_t xReturnedPublishSwitch;
+BaseType_t xReturnedPublishDevTel;
 BaseType_t xReturnedRelayControl;
 
 TaskHandle_t xHandleWsSendTelemetry = NULL;
 TaskHandle_t xHandleWsSendSensors = NULL;
 TaskHandle_t xHandleRecPowerUsage = NULL;
 TaskHandle_t xHandleRecWeatherData = NULL;
-TaskHandle_t xHandlePublishSwitch = NULL;
+TaskHandle_t xHandlePublishDevTel = NULL;
 TaskHandle_t xHandleRelayControl = NULL;
 
 SemaphoreHandle_t xSemaphorePZEM = NULL;
@@ -81,10 +81,10 @@ void setup()
     }
   }
 
-  if(xHandlePublishSwitch == NULL){
-    xReturnedPublishSwitch = xTaskCreatePinnedToCore(publishSwitchTR, PSTR("publishSwitch"), STACKSIZE_PUBLISHSWITCH, NULL, 1, &xHandlePublishSwitch, 1);
-    if(xReturnedPublishSwitch == pdPASS){
-      log_manager->warn(PSTR(__func__), PSTR("Task publishSwitch has been created.\n"));
+  if(xHandlePublishDevTel == NULL){
+    xReturnedPublishDevTel = xTaskCreatePinnedToCore(publishDeviceTelemetryTR, PSTR("publishDevTel"), STACKSIZE_PUBLISHDEVTEL, NULL, 1, &xHandlePublishDevTel, 1);
+    if(xReturnedPublishDevTel == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task publishDevTel has been created.\n"));
     }
   }
 
@@ -516,7 +516,6 @@ void setSwitch(String ch, String state)
 
   setCoMCUPin(pR, 1, OUTPUT, 0, fState);
   log_manager->warn(PSTR(__func__), "Relay %s was set to %s / %d.\n", ch, state, (int)fState);
-  
   //log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
@@ -852,79 +851,37 @@ void setPanic(const RPC_Data &data){
 }
 
 RPC_Response genericClientRPC(const RPC_Data &data){
-  if( xSemaphoreTBSend != NULL && WiFi.isConnected() && config.provSent && tb.connected()){
-    if( xSemaphoreTake( xSemaphoreTBSend, ( TickType_t ) 1000 ) == pdTRUE )
+  if( xSemaphoreTBSend != NULL){
+    if( xSemaphoreTake( xSemaphoreTBSend, ( TickType_t ) 0 ) == pdTRUE )
     {
-      long startMillis = millis();
+      if(data[PSTR("cmd")] != nullptr){
+          const char * cmd = data["cmd"].as<const char *>();
+          log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
 
-      StaticJsonDocument<DOCSIZE_MIN> payload;    
-      DeserializationError err = deserializeJson(payload, data);
+          if(strcmp(cmd, PSTR("setSwitch")) == 0){
+            if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
+                setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
+            }
+          }
+          else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
+            if( xSemaphorePZEM != NULL){
+              if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
+              {
+                HardwareSerial PZEMSerial(1);
+                PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-      if(err == DeserializationError::Ok){
-          if(payload[PSTR("cmd")] != nullptr){
-              const char * cmd = payload["cmd"].as<const char *>();
-              log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
-
-              if(strcmp(cmd, PSTR("setSwitch")) == 0){
-                  if(payload[PSTR("arg")][PSTR("ch")] != nullptr && payload[PSTR("arg")][PSTR("st")] != nullptr){
-                      setSwitch(payload[PSTR("arg")][PSTR("ch")].as<String>(), payload[PSTR("arg")][PSTR("st")].as<String>());
-                  }
+                uint8_t res = PZEM.resetEnergy();
+                log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
+                xSemaphoreGive( xSemaphorePZEM );
               }
-              else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
-                if( xSemaphorePZEM != NULL){
-                  if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
-                  {
-                    HardwareSerial PZEMSerial(1);
-                    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-                    uint8_t res = PZEM.resetEnergy();
-                    log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
-                    xSemaphoreGive( xSemaphorePZEM );
-                  }
-                  else
-                  {
-                    log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-                  }   
-                }
-              }
-          }   
-      }
-      else{
-          log_manager->verbose(PSTR(__func__), PSTR("Failed to parse JSON: %s\n"), err.c_str());
-          if(data[PSTR("cmd")] != nullptr){
-              const char * cmd = data["cmd"].as<const char *>();
-              log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
-
-              if(strcmp(cmd, PSTR("setSwitch")) == 0){
-                  if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
-                      setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
-                  }
-              }
-              else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
-                if( xSemaphorePZEM != NULL){
-                  if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
-                  {
-                    HardwareSerial PZEMSerial(1);
-                    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-                    uint8_t res = PZEM.resetEnergy();
-                    log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
-                    xSemaphoreGive( xSemaphorePZEM );
-                  }
-                  else
-                  {
-                    log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-                  }   
-                }
-              }
-          }  
-      }
+              else
+              {
+                log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+              }   
+            }
+          }
+      }  
       xSemaphoreGive( xSemaphoreTBSend );
-      StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
-      doc[PSTR("rpc")] = PSTR("OK");
-
-      log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
-      return RPC_Response(doc);
     }
     else
     {
@@ -973,40 +930,44 @@ void onAlarm(int code){
   wsBroadcastTXT(buffer);
 }
 
-void publishSwitchTR(void * arg){
+void publishDeviceTelemetryTR(void * arg){
   unsigned long timerDeviceTelemetry = millis();
   while(true){
-    for (uint8_t i = 0; i < sizeof(mySettings.dutyState); i++){
-      if(mySettings.publishSwitch[i]){
-          String chName = "ch" + String(i+1);
-          int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
-
-          char buffer[64];
-          StaticJsonDocument<64> doc;
-          doc[chName.c_str()] = state;
-          serializeJson(doc, buffer);
-          
-          if(config.fIoT && tb.connected() && config.provSent){
-            tbSendTelemetry(buffer);
-          }
-
-          #ifdef USE_WEB_IFACE
-          if(config.fIface && config.wsCount > 0){
-            wsBroadcastTXT(buffer);
-          }
-          #endif
-
-          mySettings.publishSwitch[i] = false;
-      }
-    }
-
+    publishSwitch();
+    
     unsigned long now = millis();
-    if((now - timerDeviceTelemetry) > (mySettings.itD * 1000)){
+    if( (now - timerDeviceTelemetry) > mySettings.itD * 1000 ){
       deviceTelemetry();
       timerDeviceTelemetry = now;
     }
+    
+    vTaskDelay((const TickType_t) 300 / portTICK_PERIOD_MS);
+  }
+}
 
-    vTaskDelay((const TickType_t) 100 / portTICK_PERIOD_MS);
+void publishSwitch(){
+  for (uint8_t i = 0; i < sizeof(mySettings.dutyState); i++){
+    if(mySettings.publishSwitch[i]){
+        String chName = "ch" + String(i+1);
+        int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
+
+        char buffer[64];
+        StaticJsonDocument<64> doc;
+        doc[chName.c_str()] = state;
+        serializeJson(doc, buffer);
+        
+        if(config.fIoT && tb.connected() && config.provSent){
+          tbSendTelemetry(buffer);
+        }
+
+        #ifdef USE_WEB_IFACE
+        if(config.fIface && config.wsCount > 0){
+          wsBroadcastTXT(buffer);
+        }
+        #endif
+
+        mySettings.publishSwitch[i] = false;
+    }
   }
 }
 
@@ -1293,7 +1254,7 @@ void onMQTTUpdateStart(){
   vTaskSuspend(xHandleWsSendTelemetry);
   vTaskSuspend(xHandleIface);
   vTaskSuspend(xHandleRelayControl);
-  vTaskSuspend(xHandlePublishSwitch);
+  vTaskSuspend(xHandlePublishDevTel);
 }
 
 void onMQTTUpdateEnd(){

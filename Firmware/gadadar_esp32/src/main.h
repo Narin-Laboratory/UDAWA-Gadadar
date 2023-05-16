@@ -61,7 +61,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define STACKSIZE_IFACE 9000
 #define STACKSIZE_RECWEATHERDATA 3100
 #define STACKSIZE_RECPOWERUSAGE 3100
-#define STACKSIZE_PUBLISHSWITCH 6000
+#define STACKSIZE_PUBLISHDEVTEL 6000
 #define STACKSIZE_RELAYCONTROL 9000
 #define STACKSIZE_WSSENDTELEMETRY 2200
 #define STACKSIZE_WSSENDSENSORS 3000
@@ -151,7 +151,8 @@ void onWsEvent(const JsonObject &data);
 void wsSendTelemetryTR(void *arg);
 void wsSendSensorsTR(void *arg);
 #endif
-void publishSwitchTR(void * arg);
+void publishDeviceTelemetryTR(void * arg);
 void onMQTTUpdateStart();
 void onMQTTUpdateEnd();
+void publishSwitch();
 #endif
