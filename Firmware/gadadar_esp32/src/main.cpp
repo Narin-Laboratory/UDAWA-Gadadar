@@ -146,6 +146,12 @@ void recPowerUsageTR(void *arg){
         float pf = PZEM.pf();
         xSemaphoreGive( xSemaphorePZEM );
 
+        _volt_.Add(volt);
+        _amp_.Add(amp);
+        _watt_.Add(watt);
+        _freq_.Add(freq);
+        _pf_.Add(pf);
+
         #ifdef USE_WEB_IFACE
         if( xQueuePZEMMessage != NULL && (config.wsCount > 0)){
           PZEMMessage PZEMMsg;
