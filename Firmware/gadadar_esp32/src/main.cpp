@@ -846,76 +846,87 @@ void setPanic(const RPC_Data &data){
 }
 
 RPC_Response genericClientRPC(const RPC_Data &data){
-    long startMillis = millis();
+  if( xSemaphoreTBSend != NULL && WiFi.isConnected() && config.provSent && tb.connected()){
+    if( xSemaphoreTake( xSemaphoreTBSend, ( TickType_t ) 1000 ) == pdTRUE )
+    {
+      long startMillis = millis();
 
-    StaticJsonDocument<DOCSIZE_MIN> payload;    
-    DeserializationError err = deserializeJson(payload, data);
+      StaticJsonDocument<DOCSIZE_MIN> payload;    
+      DeserializationError err = deserializeJson(payload, data);
 
-    if(err == DeserializationError::Ok){
-        if(payload[PSTR("cmd")] != nullptr){
-            const char * cmd = payload["cmd"].as<const char *>();
-            log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
+      if(err == DeserializationError::Ok){
+          if(payload[PSTR("cmd")] != nullptr){
+              const char * cmd = payload["cmd"].as<const char *>();
+              log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
 
-            if(strcmp(cmd, PSTR("setSwitch")) == 0){
-                if(payload[PSTR("arg")][PSTR("ch")] != nullptr && payload[PSTR("arg")][PSTR("st")] != nullptr){
-                    setSwitch(payload[PSTR("arg")][PSTR("ch")].as<String>(), payload[PSTR("arg")][PSTR("st")].as<String>());
-                }
-            }
-            else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
-              if( xSemaphorePZEM != NULL){
-                if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
-                {
-                  HardwareSerial PZEMSerial(1);
-                  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-                  uint8_t res = PZEM.resetEnergy();
-                  log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
-                  xSemaphoreGive( xSemaphorePZEM );
-                }
-                else
-                {
-                  log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-                }   
+              if(strcmp(cmd, PSTR("setSwitch")) == 0){
+                  if(payload[PSTR("arg")][PSTR("ch")] != nullptr && payload[PSTR("arg")][PSTR("st")] != nullptr){
+                      setSwitch(payload[PSTR("arg")][PSTR("ch")].as<String>(), payload[PSTR("arg")][PSTR("st")].as<String>());
+                  }
               }
-            }
-        }   
-    }
-    else{
-        log_manager->verbose(PSTR(__func__), PSTR("Failed to parse JSON: %s\n"), err.c_str());
-        if(data[PSTR("cmd")] != nullptr){
-            const char * cmd = data["cmd"].as<const char *>();
-            log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
+              else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
+                if( xSemaphorePZEM != NULL){
+                  if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
+                  {
+                    HardwareSerial PZEMSerial(1);
+                    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
-            if(strcmp(cmd, PSTR("setSwitch")) == 0){
-                if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
-                    setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
+                    uint8_t res = PZEM.resetEnergy();
+                    log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
+                    xSemaphoreGive( xSemaphorePZEM );
+                  }
+                  else
+                  {
+                    log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+                  }   
                 }
-            }
-            else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
-              if( xSemaphorePZEM != NULL){
-                if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
-                {
-                  HardwareSerial PZEMSerial(1);
-                  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-                  uint8_t res = PZEM.resetEnergy();
-                  log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
-                  xSemaphoreGive( xSemaphorePZEM );
-                }
-                else
-                {
-                  log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-                }   
               }
-            }
-        }  
+          }   
+      }
+      else{
+          log_manager->verbose(PSTR(__func__), PSTR("Failed to parse JSON: %s\n"), err.c_str());
+          if(data[PSTR("cmd")] != nullptr){
+              const char * cmd = data["cmd"].as<const char *>();
+              log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
+
+              if(strcmp(cmd, PSTR("setSwitch")) == 0){
+                  if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
+                      setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
+                  }
+              }
+              else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
+                if( xSemaphorePZEM != NULL){
+                  if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
+                  {
+                    HardwareSerial PZEMSerial(1);
+                    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+                    uint8_t res = PZEM.resetEnergy();
+                    log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
+                    xSemaphoreGive( xSemaphorePZEM );
+                  }
+                  else
+                  {
+                    log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+                  }   
+                }
+              }
+          }  
+      }
+
+      StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
+      doc[PSTR("rpc")] = PSTR("OK");
+
+      log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+      return RPC_Response(doc);
+      xSemaphoreGive( xSemaphoreTBSend );
     }
-
-    StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
-    doc[PSTR("rpc")] = PSTR("OK");
-
-    log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
-    return RPC_Response(doc);
+    else
+    {
+      log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
+    }
+  }
+  return RPC_Response(PSTR("generic"), 1);
 }
 
 void stateReset(bool resetOpMode){
