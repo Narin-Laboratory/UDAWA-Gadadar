@@ -166,7 +166,6 @@ void recPowerUsageTR(void *arg){
         if(tb.connected() && config.provSent){
           StaticJsonDocument<128> doc;
           char buffer[128];
-          float ener;
           unsigned long now = millis();
           if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000)){
             
