@@ -12,6 +12,8 @@
 using namespace libudawa;
 Settings mySettings;
 Adafruit_BME280 bme;
+HardwareSerial PZEMSerial(1);
+PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
 BaseType_t xReturnedWsSendTelemetry;
 BaseType_t xReturnedWsSendSensors;
@@ -31,7 +33,6 @@ SemaphoreHandle_t xSemaphorePZEM = NULL;
 
 void setup()
 {
-  long startMillis = millis();
   if(xSemaphorePZEM == NULL){xSemaphorePZEM = xSemaphoreCreateMutex();}
 
   processSharedAttributeUpdateCb = &attUpdateCb;
@@ -49,7 +50,9 @@ void setup()
   onMQTTUpdateEndCb = &onMQTTUpdateEnd;
   startup();
   loadSettings();
-  syncConfigCoMCU();
+  if(!config.SM){
+    syncConfigCoMCU();
+  }
   if(String(config.model) == String("Generic")){
     strlcpy(config.model, "Gadadar", sizeof(config.model));
   }
@@ -66,7 +69,7 @@ void setup()
   if(!mySettings.flag_bme280){
     log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
   }else{
-    if(xHandleRecWeatherData == NULL){
+    if(xHandleRecWeatherData == NULL && !config.SM){
       xReturnedRecWeatherData = xTaskCreatePinnedToCore(recWeatherDataTR, PSTR("recWeatherData"), STACKSIZE_RECWEATHERDATA, NULL, 1, &xHandleRecWeatherData, 1);
       if(xReturnedRecWeatherData == pdPASS){
         log_manager->warn(PSTR(__func__), PSTR("Task recWeatherData has been created.\n"));
@@ -74,21 +77,21 @@ void setup()
     }
   }
 
-  if(xHandleRecPowerUsage == NULL){
+  if(xHandleRecPowerUsage == NULL && !config.SM){
     xReturnedRecPowerUsage = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), STACKSIZE_RECPOWERUSAGE, NULL, 1, &xHandleRecPowerUsage, 1);
     if(xReturnedRecPowerUsage == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task recPowerUsage has been created.\n"));
     }
   }
 
-  if(xHandlePublishDevTel == NULL){
+  if(xHandlePublishDevTel == NULL && !config.SM){
     xReturnedPublishDevTel = xTaskCreatePinnedToCore(publishDeviceTelemetryTR, PSTR("publishDevTel"), STACKSIZE_PUBLISHDEVTEL, NULL, 1, &xHandlePublishDevTel, 1);
     if(xReturnedPublishDevTel == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task publishDevTel has been created.\n"));
     }
   }
 
-  if(xHandleRelayControl == NULL){
+  if(xHandleRelayControl == NULL && !config.SM){
     xReturnedRelayControl = xTaskCreatePinnedToCore(relayControlTR, PSTR("relayControl"), STACKSIZE_RELAYCONTROL, NULL, 1, &xHandleRelayControl, 1);
     if(xReturnedRelayControl == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task relayControl has been created.\n"));
@@ -96,22 +99,20 @@ void setup()
   }
 
   #ifdef USE_WEB_IFACE
-  if(xHandleWsSendTelemetry == NULL){
+  if(xHandleWsSendTelemetry == NULL && !config.SM){
     xReturnedWsSendTelemetry = xTaskCreatePinnedToCore(wsSendTelemetryTR, PSTR("wsSendTelemetry"), STACKSIZE_WSSENDTELEMETRY, NULL, 1, &xHandleWsSendTelemetry, 1);
     if(xReturnedWsSendTelemetry == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task wsSendTelemetry has been created.\n"));
     }
   }
 
-  if(xHandleWsSendSensors == NULL){
+  if(xHandleWsSendSensors == NULL && !config.SM){
     xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), STACKSIZE_WSSENDSENSORS, NULL, 1, &xHandleWsSendSensors, 1);
     if(xReturnedWsSendSensors == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task wsSendSensors has been created.\n"));
     }
   }
   #endif
-
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
 }
 
 void loop(){
@@ -135,9 +136,6 @@ void recPowerUsageTR(void *arg){
     if( xSemaphorePZEM != NULL){
       if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
       {
-        HardwareSerial PZEMSerial(1);
-        PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
         float volt = PZEM.voltage() ? PZEM.voltage() : 0;
         float amp = PZEM.current() ? PZEM.current() : 0;
         float watt = PZEM.power() ? PZEM.power() : 0;
@@ -145,6 +143,9 @@ void recPowerUsageTR(void *arg){
         float freq = PZEM.frequency() ? PZEM.frequency() : 0;
         float pf = PZEM.pf() ? PZEM.pf() : 0;
         xSemaphoreGive( xSemaphorePZEM );
+
+        log_manager->verbose(PSTR(__func__), PSTR("Volt: %.2f, Amp: %.2f, Watt: %.2f, Ener: %.2f, Freq.: %.2f, Pf: %.2f\n"),
+          volt, amp, watt, ener, freq, pf);
 
         _volt_.Add(volt);
         _amp_.Add(amp);
@@ -864,11 +865,8 @@ RPC_Response genericClientRPC(const RPC_Data &data){
           }
           else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
             if( xSemaphorePZEM != NULL){
-              if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
+              if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 0 ) == pdTRUE )
               {
-                HardwareSerial PZEMSerial(1);
-                PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
                 uint8_t res = PZEM.resetEnergy();
                 log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
                 xSemaphoreGive( xSemaphorePZEM );
