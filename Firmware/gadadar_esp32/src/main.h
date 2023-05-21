@@ -127,6 +127,8 @@ struct BME280Message
 QueueHandle_t xQueueBME280Message;
 #endif
 
+unsigned long recPowerUsageTR_last_activity = millis();
+
 void loadSettings();
 void saveSettings();
 void relayControlCP1();
