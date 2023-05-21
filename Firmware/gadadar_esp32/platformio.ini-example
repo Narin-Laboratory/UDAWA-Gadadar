@@ -18,10 +18,10 @@ monitor_filters = esp32_exception_decoder
 upload_protocol = esptool
 upload_port = /dev/ttyUSB0
 ;upload_protocol = espota
-;upload_port = pompa.local
+;upload_port = gadadar4.local  ;pompa.local
 ;upload_flags =
 ;	--port=3232
-;	--auth=[password]]
+;	--auth=password
 ;	--host_port=3232
 build_flags =
 	${env.build_flags}
@@ -38,6 +38,5 @@ lib_deps =
 	https://github.com/adafruit/Adafruit_BME280_Library.git
 	https://github.com/Links2004/arduinoWebSockets.git
 	https://github.com/akkoyun/Statistical.git
-	https://github.com/arkhipenko/TaskScheduler.git
 	https://github.com/thingsboard/pubsubclient.git
 	https://github.com/thingsboard/thingsboard-arduino-sdk.git
