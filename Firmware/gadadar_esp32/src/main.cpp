@@ -121,21 +121,8 @@ void loop(){
     if( (millis() - recPowerUsageTR_last_activity) > 30000){
       setAlarm(121, 1, 5, 1000);
       log_manager->warn(PSTR("recPowerUsageTR"), PSTR("Task is not responding for: %d\n"), ((millis() - recPowerUsageTR_last_activity)));
-      PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-      pinMode(S1_RX, OUTPUT);
-      pinMode(S1_TX, OUTPUT);
-      digitalWrite(S1_RX, 0);
-      digitalWrite(S1_TX, 0);
-      Serial1.clearWriteError();
-      Serial1.flush();
-      Serial1.end();
-      if(xHandleRecPowerUsage != NULL){
-        vTaskSuspend(xHandleRecPowerUsage);
-        vTaskDelay((const TickType_t) 3000 / portTICK_PERIOD_MS);
-        vTaskResume(xHandleRecPowerUsage);
-        vTaskDelay((const TickType_t) 3000 / portTICK_PERIOD_MS);
-      }
       recPowerUsageTR_last_activity = millis();
+      reboot();
     }
   }
   vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
@@ -1233,12 +1220,12 @@ void wsSendSensorsTR(void *arg){
         if( xQueueReceive( xQueuePZEMMessage,  &( PZEMMsg ), ( TickType_t ) 1000 ) == pdPASS )
         {
           JsonObject pzem = doc.createNestedObject("pzem");
-          pzem[PSTR("volt")] = round2(PZEMMsg.volt);
-          pzem[PSTR("amp")] = round2(PZEMMsg.amp);
-          pzem[PSTR("watt")] = round2(PZEMMsg.watt);
-          pzem[PSTR("ener")] = round2(PZEMMsg.ener);
-          pzem[PSTR("freq")] = round2(PZEMMsg.freq);
-          pzem[PSTR("pf")] = round2(PZEMMsg.pf)*100;
+          pzem[PSTR("volt")] = round2(PZEMMsg.volt ? PZEMMsg.volt : 0);
+          pzem[PSTR("amp")] = round2(PZEMMsg.amp ? PZEMMsg.amp : 0);
+          pzem[PSTR("watt")] = round2(PZEMMsg.watt ? PZEMMsg.watt : 0);
+          pzem[PSTR("ener")] = round2(PZEMMsg.ener ? PZEMMsg.ener : 0);
+          pzem[PSTR("freq")] = round2(PZEMMsg.freq ? PZEMMsg.freq : 0);
+          pzem[PSTR("pf")] = round2(PZEMMsg.pf ? PZEMMsg.pf : 0)*100;
           serializeJson(doc, buffer);
           wsBroadcastTXT(buffer);
           doc.clear();
@@ -1259,7 +1246,7 @@ void wsSendSensorsTR(void *arg){
         }
       } 
     }
-    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+    vTaskDelay((const TickType_t) 800 / portTICK_PERIOD_MS);
   }
 }
 
