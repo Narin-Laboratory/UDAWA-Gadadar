@@ -129,6 +129,12 @@ void loop(){
       Serial1.clearWriteError();
       Serial1.flush();
       Serial1.end();
+      if(xHandleRecPowerUsage != NULL){
+        vTaskSuspend(xHandleRecPowerUsage);
+        vTaskDelay((const TickType_t) 3000 / portTICK_PERIOD_MS);
+        vTaskResume(xHandleRecPowerUsage);
+        vTaskDelay((const TickType_t) 3000 / portTICK_PERIOD_MS);
+      }
       recPowerUsageTR_last_activity = millis();
     }
   }
