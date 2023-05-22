@@ -1,123 +1,129 @@
 
-<div class="grid">
-    <details>
-        <summary role="button" class="secondary">Monitor</summary>
-        <div class="grid">
-            <app-card-switch [state]="state['ch1']" [switch]="'Switch 1'" [cpM]="cpM['cpM1']" [opMode]="opMode" [lbl]="lbl['lbl1']"></app-card-switch>
-            <app-card-switch [state]="state['ch2']" [switch]="'Switch 2'" [cpM]="cpM['cpM2']" [opMode]="opMode" [lbl]="lbl['lbl2']"></app-card-switch>
-            <app-card-switch [state]="state['ch3']" [switch]="'Switch 3'" [cpM]="cpM['cpM3']" [opMode]="opMode" [lbl]="lbl['lbl3']"></app-card-switch>
-            <app-card-switch [state]="state['ch4']" [switch]="'Switch 4'" [cpM]="cpM['cpM4']" [opMode]="opMode" [lbl]="lbl['lbl4']"></app-card-switch>
-        </div>
-        <div class="grid">
-            <app-card-sensor [header]="'Environment Temperature'" [value]="bme280['celc']" [unit]="'°C'" [icon]="'device_thermostat'"></app-card-sensor>
-            <app-card-sensor [header]="'Air Pressure'" [value]="bme280['hpa']" [unit]="'hpa'" [icon]="'compress'"></app-card-sensor>
-            <app-card-sensor [header]="'Environment Humidity'" [value]="bme280['rh']" [unit]="'%'" [icon]="'humidity_percentage'"></app-card-sensor>
-            <app-card-sensor [header]="'Altitude (Approx.)'" [value]="bme280['alt']" [unit]="'M'" [icon]="'altitude'"></app-card-sensor>
-        </div>
-        <div class="grid">
-            <app-card-sensor [header]="'Voltage'" [value]="pzem['volt']" [unit]="'V'" [icon]="'flash_on'"></app-card-sensor>
-            <app-card-sensor [header]="'Current'" [value]="pzem['amp']" [unit]="'A'" [icon]="'flash_auto'"></app-card-sensor>
-            <app-card-sensor [header]="'Watt'" [value]="pzem['watt']" [unit]="'W'" [icon]="'electric_meter'"></app-card-sensor>
-            <app-card-sensor [header]="'Internal kWH'" [value]="pzem['ener']" [unit]="'kWH'" [icon]="'electric_meter'"></app-card-sensor>
-        </div>
-        <div class="grid">
-            <app-card-sensor [header]="'Freq.'" [value]="pzem['freq']" [unit]="'Hz'" [icon]="'show_chart'"></app-card-sensor>
-            <app-card-sensor [header]="'Power Factor'" [value]="pzem['pf']" [unit]="'%'" [icon]="'show_chart'"></app-card-sensor>
-        </div>
-    </details>
-    <details>
-        <summary role="button"  class="secondary">Control</summary>
-        <div class="grid">
-            <article>
-                <form>
-                    <label for="selector">Select Relay Channel</label>
-                    <select id="selector" name="selector" [(ngModel)]="selected" (change)="changeSelected()">
-                        <option *ngFor="let c of channel" value="{{c}}">Channel {{c}} ({{lbl['lbl'+c]}})</option>
-                    </select>
-        
-                    <label for="cpM">Operation mode</label>
-                    <select id="cpM" name="cpM" [(ngModel)]="cpM['cpM'+selected]" (change)="changeParams()">
-                        <option *ngFor="let mode of opMode; let i = index;" value="{{i}}">{{mode}}</option>
-                    </select>
-        
-                    <div [ngSwitch]="cpM['cpM'+selected]">
-                        <div *ngSwitchCase=0>
-                            <fieldset>
-                                <label for="switch">
-                                <input type="checkbox" id="switchRelay" name="switchRelay" role="switch" [(ngModel)]="state['ch'+selected]" (change)="changeState()">
-                                {{state['ch'+selected] ? 'ON' : 'OFF'}}
+<div class="row">
+    <div class="col-sm-12 col-lg-8">
+        <details>
+            <summary role="button" class="secondary">Monitor</summary>
+            <div class="grid">
+                <app-card-switch [state]="state['ch1']" [switch]="'Switch 1'" [cpM]="cpM['cpM1']" [opMode]="opMode" [lbl]="lbl['lbl1']"></app-card-switch>
+                <app-card-switch [state]="state['ch2']" [switch]="'Switch 2'" [cpM]="cpM['cpM2']" [opMode]="opMode" [lbl]="lbl['lbl2']"></app-card-switch>
+                <app-card-switch [state]="state['ch3']" [switch]="'Switch 3'" [cpM]="cpM['cpM3']" [opMode]="opMode" [lbl]="lbl['lbl3']"></app-card-switch>
+                <app-card-switch [state]="state['ch4']" [switch]="'Switch 4'" [cpM]="cpM['cpM4']" [opMode]="opMode" [lbl]="lbl['lbl4']"></app-card-switch>
+            </div>
+            <div class="grid">
+                <app-card-sensor [header]="'Environment Temperature'" [value]="bme280['celc']" [unit]="'°C'" [icon]="'device_thermostat'"></app-card-sensor>
+                <app-card-sensor [header]="'Air Pressure'" [value]="bme280['hpa']" [unit]="'hpa'" [icon]="'compress'"></app-card-sensor>
+                <app-card-sensor [header]="'Environment Humidity'" [value]="bme280['rh']" [unit]="'%'" [icon]="'humidity_percentage'"></app-card-sensor>
+                <app-card-sensor [header]="'Altitude (Approx.)'" [value]="bme280['alt']" [unit]="'M'" [icon]="'altitude'"></app-card-sensor>
+            </div>
+            <div class="grid">
+                <app-card-sensor [header]="'Voltage'" [value]="pzem['volt']" [unit]="'V'" [icon]="'flash_on'"></app-card-sensor>
+                <app-card-sensor [header]="'Current'" [value]="pzem['amp']" [unit]="'A'" [icon]="'flash_auto'"></app-card-sensor>
+                <app-card-sensor [header]="'Watt'" [value]="pzem['watt']" [unit]="'W'" [icon]="'electric_meter'"></app-card-sensor>
+                <app-card-sensor [header]="'Internal kWH'" [value]="pzem['ener']" [unit]="'kWH'" [icon]="'electric_meter'"></app-card-sensor>
+            </div>
+            <div class="grid">
+                <app-card-sensor [header]="'Freq.'" [value]="pzem['freq']" [unit]="'Hz'" [icon]="'show_chart'"></app-card-sensor>
+                <app-card-sensor [header]="'Power Factor'" [value]="pzem['pf']" [unit]="'%'" [icon]="'show_chart'"></app-card-sensor>
+            </div>
+        </details>        
+    </div>
+    <div class="col-sm-12 col-lg-4">
+        <details>
+            <summary role="button"  class="secondary">Control</summary>
+            <div class="grid">
+                <article>
+                    <form>
+                        <label for="selector">Select Relay Channel</label>
+                        <select id="selector" name="selector" [(ngModel)]="selected" (change)="changeSelected()">
+                            <option *ngFor="let c of channel" value="{{c}}">Channel {{c}} ({{lbl['lbl'+c]}})</option>
+                        </select>
+            
+                        <label for="cpM">Operation mode</label>
+                        <select id="cpM" name="cpM" [(ngModel)]="cpM['cpM'+selected]" (change)="changeParams()">
+                            <option *ngFor="let mode of opMode; let i = index;" value="{{i}}">{{mode}}</option>
+                        </select>
+            
+                        <div [ngSwitch]="cpM['cpM'+selected]">
+                            <div *ngSwitchCase=0>
+                                <fieldset>
+                                    <label for="switch">
+                                    <input type="checkbox" id="switchRelay" name="switchRelay" role="switch" [(ngModel)]="state['ch'+selected]" (change)="changeState()">
+                                    {{state['ch'+selected] ? 'ON' : 'OFF'}}
+                                    </label>
+                                </fieldset>
+                            </div>
+                            <div *ngSwitchCase=1>
+                                <label for="cp1A">
+                                    Duty Cycle {{cp1A['cp1A'+selected]}}%
+                                    <input min="0" max="100" type="range" id="cp1A" name="cp1A" placeholder="Duty Cycle" [(ngModel)]="cp1A['cp1A'+selected]" (change)="changeParams()">
                                 </label>
-                            </fieldset>
+                                <label for="cp1B">
+                                    Duty Range (in Seconds)
+                                    <input type="text" id="cp1B" name="cp1B" placeholder="Duty Range" [(ngModel)]="cp1B['cp1B'+selected]" (change)="changeParams()">
+                                </label>
+                            </div>
+                            <div *ngSwitchCase=2>
+                                <label for="cp2A">Datetime (YYYY-MM-DD HH:II:SS)
+                                    <input type="text" id="cp2A" name="cp1A" [(ngModel)]="cp2A['cp2A'+selected]" (change)="changeParams()">
+                                </label>
+                                <label for="cp2B">On duration (in Seconds)
+                                    <input type="text" id="date" name="cp2B" [(ngModel)]="cp2B['cp2B'+selected]" (change)="changeParams()">
+                                </label>
+                            </div>
+                            <div *ngSwitchCase=3>
+                                <label for="cp3A">Multiple Time Daily (H:I:S-D,H:I:S-D...)
+                                    <input type="text" id="cp3A" name="cp3A" [(ngModel)]="cp3A['cp3A'+selected]" (change)="changeParams()">
+                                </label>
+                                <p><small>H = hour in 0-24 format. I = minute in 0-60 format. S = second in 0-60 format. D = ON Duration in second. <strong>E.g: 8:0:0-3600,18:0:0-7200</strong> will turns ON at 8 AM for 1 hour and 6 PM for 2 hours.</small></p>
+                            </div>
+                            <div *ngSwitchCase=4>
+                                <label for="cp4A">Interval (in Seconds)
+                                    <input type="text" id="cp4A" name="cp4A" [(ngModel)]="cp4A['cp4A'+selected]" (change)="changeParams()">
+                                </label>
+                                <label for="cp4B">On duration (in Seconds)
+                                    <input type="text" id="cp4B" name="cp4B" [(ngModel)]="cp4B['cp4B'+selected]" (change)="changeParams()">
+                                </label>
+                            </div>
+                            <div *ngSwitchCase=5>
+                                Unavailable
+                            </div>
+                            <div *ngSwitchDefault>
+                                Undefined
+                            </div>
+                            <hr>
+                            <button type="button" class="secondary outline" (click)="savePermanentClick()">Save Permanent</button>
                         </div>
-                        <div *ngSwitchCase=1>
-                            <label for="cp1A">
-                                Duty Cycle {{cp1A['cp1A'+selected]}}%
-                                <input min="0" max="100" type="range" id="cp1A" name="cp1A" placeholder="Duty Cycle" [(ngModel)]="cp1A['cp1A'+selected]" (change)="changeParams()">
-                            </label>
-                            <label for="cp1B">
-                                Duty Range (in Seconds)
-                                <input type="text" id="cp1B" name="cp1B" placeholder="Duty Range" [(ngModel)]="cp1B['cp1B'+selected]" (change)="changeParams()">
-                            </label>
-                        </div>
-                        <div *ngSwitchCase=2>
-                            <label for="cp2A">Datetime (YYYY-MM-DD HH:II:SS)
-                                <input type="text" id="cp2A" name="cp1A" [(ngModel)]="cp2A['cp2A'+selected]" (change)="changeParams()">
-                            </label>
-                            <label for="cp2B">On duration (in Seconds)
-                                <input type="text" id="date" name="cp2B" [(ngModel)]="cp2B['cp2B'+selected]" (change)="changeParams()">
-                            </label>
-                        </div>
-                        <div *ngSwitchCase=3>
-                            <label for="cp3A">Multiple Time Daily (H:I:S-D,H:I:S-D...)
-                                <input type="text" id="cp3A" name="cp3A" [(ngModel)]="cp3A['cp3A'+selected]" (change)="changeParams()">
-                            </label>
-                            <p><small>H = hour in 0-24 format. I = minute in 0-60 format. S = second in 0-60 format. D = ON Duration in second. <strong>E.g: 8:0:0-3600,18:0:0-7200</strong> will turns ON at 8 AM for 1 hour and 6 PM for 2 hours.</small></p>
-                        </div>
-                        <div *ngSwitchCase=4>
-                            <label for="cp4A">Interval (in Seconds)
-                                <input type="text" id="cp4A" name="cp4A" [(ngModel)]="cp4A['cp4A'+selected]" (change)="changeParams()">
-                            </label>
-                            <label for="cp4B">On duration (in Seconds)
-                                <input type="text" id="cp4B" name="cp4B" [(ngModel)]="cp4B['cp4B'+selected]" (change)="changeParams()">
-                            </label>
-                        </div>
-                        <div *ngSwitchCase=5>
-                            Unavailable
-                        </div>
-                        <div *ngSwitchDefault>
-                            Undefined
-                        </div>
-                        <hr>
-                        <button type="button" class="secondary outline" (click)="savePermanentClick()">Save Permanent</button>
-                    </div>
-                </form>
-            </article>
-            <article>
-                <head><h1>Relay Control Highlight</h1></head>
-    
-                <p>Currently, UDAWA Gadadar supports five modes of control operation. Here is the detail:</p>
-                <ol>
-                    <li>Manual Switch: You can switch the relay manually via the switch button.</li>
-                    <li>Duty Cycle: You can switch the relay by using a time range and duty cycle. For example, a 50% duty cycle over a 10 minute time range would give you 5 minutes on and 5 minutes off.</li>
-                    <li>Date Time: You can switch the relay precisely at the selected datetime and adjust the on duration.</li>
-                    <li>Multiple-time Daily: You can switch the relay on more than one daily and adjust the on duration.</li>
-                    <li>Interval: You can switch the relay to on by interval and adjust the on duration.</li>
-                    <li>Environmental Condition: You can use the environmental data as a parameter to adjust when to turn on the switch and for how long it stays on.</li>
-                    <li><strong>Use the panic button to disable the device in emergency.</strong></li>
-                    <li>Use the reboot button to restart the device.</li>
-                </ol>
-                <hr>
-                <footer>
-                    <button type="button" class="contrast outline" (click)="rebootClick()">
-                        <span class="material-symbols-outlined">restart_alt</span> Reboot
-                    </button>
-                    <button type="button" class="primary outline" (click)="panicClick()">
-                        <span class="material-symbols-outlined">warning</span> Panic Button
-                    </button>
-                </footer>
-            </article>
-        </div>
-    </details>    
+                    </form>
+                </article>
+            </div>
+            <div class="grid">
+                <article>
+                    <head><h1>Relay Control Highlight</h1></head>
+        
+                    <p>Currently, UDAWA Gadadar supports five modes of control operation. Here is the detail:</p>
+                    <ol>
+                        <li>Manual Switch: You can switch the relay manually via the switch button.</li>
+                        <li>Duty Cycle: You can switch the relay by using a time range and duty cycle. For example, a 50% duty cycle over a 10 minute time range would give you 5 minutes on and 5 minutes off.</li>
+                        <li>Date Time: You can switch the relay precisely at the selected datetime and adjust the on duration.</li>
+                        <li>Multiple-time Daily: You can switch the relay on more than one daily and adjust the on duration.</li>
+                        <li>Interval: You can switch the relay to on by interval and adjust the on duration.</li>
+                        <li>Environmental Condition: You can use the environmental data as a parameter to adjust when to turn on the switch and for how long it stays on.</li>
+                        <li><strong>Use the panic button to disable the device in emergency.</strong></li>
+                        <li>Use the reboot button to restart the device.</li>
+                    </ol>
+                    <hr>
+                    <footer>
+                        <button type="button" class="contrast outline" (click)="rebootClick()">
+                            <span class="material-symbols-outlined">restart_alt</span> Reboot
+                        </button>
+                        <button type="button" class="primary outline" (click)="panicClick()">
+                            <span class="material-symbols-outlined">warning</span> Panic Button
+                        </button>
+                    </footer>
+                </article>
+            </div>
+        </details>
+    </div>    
 </div>
 <details>
     <summary role="button"  class="secondary">Config</summary>
