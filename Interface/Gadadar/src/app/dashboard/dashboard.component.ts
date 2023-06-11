@@ -23,6 +23,9 @@ export class DashboardComponent {
   @Output() cpMChange = new EventEmitter<any>();
   @Input() cpM: object;
 
+  @Output() cp0BChange = new EventEmitter<any>();
+  @Input() cp0B: object;
+
   @Output() cp1AChange = new EventEmitter<any>();
   @Input() cp1A: object;
 

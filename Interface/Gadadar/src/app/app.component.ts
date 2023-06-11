@@ -39,6 +39,7 @@ export class AppComponent {
   selected = 1;
   state = {'ch1': 0, 'ch2': 0, 'ch3': 0, 'ch4': 0};
   cpM = {"cpM1":0,"cpM2":0,"cpM3":0,"cpM4":0};
+  cp0B = {"cp0B1":0,"cp0B2":0,"cp0B3":0,"cp0B4":0};
   cp1A = {"cp1A1":0,"cp1A2":0,"cp1A3":0,"cp1A4":0};
   cp1B = {"cp1B1":2,"cp1B2":2,"cp1B3":2,"cp1B4":2};
   cp2A = {"cp2A1":0,"cp2A2":0,"cp2A3":0,"cp2A4":0};
@@ -73,6 +74,9 @@ export class AppComponent {
       }
       if(msg['pzem'] != null){
         this.pzem = msg['pzem'];
+      }
+      if(msg['cp0B'] != null){
+        this.cp0B = msg['cp0B'];
       }
       if(msg['cp1A'] != null){
         this.cp1A = msg['cp1A'];
@@ -168,6 +172,7 @@ export class AppComponent {
 
     data['cpM'+this.selected] = this.cpM['cpM'+this.selected];
     
+    data['cp0B'+this.selected] = this.cp0B['cp0B'+this.selected];
     data['cp1A'+this.selected] = this.cp1A['cp1A'+this.selected];
     data['cp1B'+this.selected] = this.cp1B['cp1B'+this.selected];
     let ts = new Date(this.cp2A['cp2A'+this.selected]);

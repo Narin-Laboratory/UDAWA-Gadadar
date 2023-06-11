@@ -154,11 +154,19 @@ void recPowerUsageTR(void *arg){
         //log_manager->verbose(PSTR(__func__), PSTR("Volt: %.2f, Amp: %.2f, Watt: %.2f, Ener: %.2f, Freq.: %.2f, Pf: %.2f\n"),
         // volt, amp, watt, ener, freq, pf);
 
-        _volt_.Add(volt);
-        _amp_.Add(amp);
-        _watt_.Add(watt);
-        _freq_.Add(freq);
-        _pf_.Add(pf);
+        bool flag_failure_readings = false;
+        if(volt > 1000 || amp > 100 || watt > 10000 || freq > 100 || pf > 100 || ener > 10000){
+          flag_failure_readings = true;
+        }
+
+        if(!flag_failure_readings)
+        {
+          _volt_.Add(volt);
+          _amp_.Add(amp);
+          _watt_.Add(watt);
+          _freq_.Add(freq);
+          _pf_.Add(pf);
+        }
 
         #ifdef USE_WEB_IFACE
         if( xQueuePZEMMessage != NULL && (config.wsCount > 0)){
@@ -171,7 +179,7 @@ void recPowerUsageTR(void *arg){
         }
         #endif
             
-        if(tb.connected() && config.provSent){
+        if(tb.connected() && config.provSent && !flag_failure_readings){
           StaticJsonDocument<128> doc;
           char buffer[128];
           unsigned long now = millis();
@@ -284,10 +292,18 @@ void recWeatherDataTR(void *arg){
       hpa = bme.readPressure() / 100.0F ? bme.readPressure() / 100.0F : 0;
       alt = bme.readAltitude(mySettings.seaHpa) ? bme.readAltitude(mySettings.seaHpa) : 0;
 
-      _celc_.Add(celc);
-      _rh_.Add(rh);
-      _hpa_.Add(hpa);
-      _alt_.Add(alt);
+      bool flag_failure_readings = false;
+      if(celc > 300 || rh > 100 || hpa > 100000 || alt > 1000000){
+        flag_failure_readings = true;
+      }
+
+      if(!flag_failure_readings){
+        _celc_.Add(celc);
+        _rh_.Add(rh);
+        _hpa_.Add(hpa);
+        _alt_.Add(alt);
+      }
+      
       
       #ifdef USE_WEB_IFACE
       if( xQueueBME280Message != NULL && (config.wsCount > 0) ){
@@ -300,7 +316,7 @@ void recWeatherDataTR(void *arg){
       }
       #endif
 
-      if(config.provSent && tb.connected() && config.fIoT){
+      if(config.provSent && tb.connected() && config.fIoT && !flag_failure_readings){
         StaticJsonDocument<128> doc;
         char buffer[128];
 
@@ -344,8 +360,16 @@ void loadSettings()
   StaticJsonDocument<DOCSIZE_SETTINGS> doc;
   readSettings(doc, settingsPath);
 
+  if(doc["ON"] != nullptr) { mySettings.ON = doc["ON"].as<uint8_t>(); } else { mySettings.ON = 1; }
+
   if(doc["cpM"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cpM"].as<JsonArray>()) { mySettings.cpM[index] = v.as<uint8_t>(); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.cpM); i++) { mySettings.cpM[i] = 0; } }
+
+  if(doc["cp0A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0A"].as<JsonArray>()) { mySettings.cp0A[index] = v.as<uint8_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp0A); i++) { mySettings.cp0A[i] = 0; } }
+
+  if(doc["cp0B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0B"].as<JsonArray>()) { mySettings.cp0B[index] = v.as<uint32_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.cp0B); i++) { mySettings.cp0B[i] = 0; } }
 
   if(doc["cp1A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp1A"].as<JsonArray>()) { mySettings.cp1A[index] = v.as<uint8_t>(); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.cp1A); i++) { mySettings.cp1A[i] = 0; } }
@@ -382,8 +406,6 @@ void loadSettings()
   if(doc["pR"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["pR"].as<JsonArray>()) { mySettings.pR[index] = v.as<uint8_t>(); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.pR); i++) { mySettings.pR[i] = 7+i; } }
 
-  if(doc["ON"] != nullptr) { mySettings.ON = doc["ON"].as<uint8_t>(); } else { mySettings.ON = 1; }
-
   if(doc["itP"] != nullptr){mySettings.itP = doc["itP"].as<uint16_t>();}
   else{mySettings.itP = 900;}
 
@@ -416,6 +438,18 @@ void saveSettings()
   long startMillis = millis();
 
   StaticJsonDocument<DOCSIZE_SETTINGS> doc;
+
+  JsonArray cp0A = doc.createNestedArray("cp0A");
+  for(uint8_t i=0; i<countof(mySettings.cp0A); i++)
+  {
+    cp0A.add(mySettings.cp0A[i]);
+  }
+
+  JsonArray cp0B = doc.createNestedArray("cp0B");
+  for(uint8_t i=0; i<countof(mySettings.cp0B); i++)
+  {
+    cp0B.add(mySettings.cp0B[i]);
+  }
 
   JsonArray cp1A = doc.createNestedArray("cp1A");
   for(uint8_t i=0; i<countof(mySettings.cp1A); i++)
@@ -515,11 +549,19 @@ void setSwitch(String ch, String state)
   {
     fState = mySettings.ON;
     mySettings.stateOnTs[itD] = millis();
+
+    if(mySettings.cpM[itD] == 0){
+      mySettings.cp0A[itD] = mySettings.ON;
+    }
   }
   else
   {
     fState = 1 - mySettings.ON;
     mySettings.stateOnTs[itD] = 0;
+
+    if(mySettings.cpM[itD] == 0){
+      mySettings.cp0A[itD] = 1 - mySettings.ON;
+    }
   }
 
   setCoMCUPin(pR, 1, OUTPUT, 0, fState);
@@ -529,12 +571,33 @@ void setSwitch(String ch, String state)
 
 void relayControlTR(void *arg){
   while(true){
+    relayControlCP0();
     relayControlCP1();
     relayControlCP2();
     relayControlCP3();
     relayControlCP4();
 
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+  }
+}
+
+void relayControlCP0(){
+  uint8_t activeCounter = 0;
+  for(uint8_t i = 0; i < countof(mySettings.pR); i++)
+  {
+    if(mySettings.cpM[i] == 0 && mySettings.cp0B[i] != 0)
+    {
+      unsigned long now = millis();
+      if( (now - mySettings.stateOnTs[i]) >= ( mySettings.cp0B[i] * 1000 ) && mySettings.cp0A[i] == mySettings.ON)
+      {
+        String ch = "ch" + String(i + 1);
+        setSwitch(ch, "OFF");
+        activeCounter++;
+      }
+    }
+  }
+  if(activeCounter > 1){
+    FLAG_SAVE_SETTINGS = 1;
   }
 }
 
@@ -741,6 +804,11 @@ void attUpdateCb(const Shared_Attribute_Data &data)
   if( xSemaphoreSettings != NULL ){
     if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
     {
+      if(data["cp0B1"] != nullptr){mySettings.cp0B[0] = data["cp0B1"].as<unsigned long>();}
+      if(data["cp0B2"] != nullptr){mySettings.cp0B[1] = data["cp0B2"].as<unsigned long>();}
+      if(data["cp0B3"] != nullptr){mySettings.cp0B[2] = data["cp0B3"].as<unsigned long>();}
+      if(data["cp0B4"] != nullptr){mySettings.cp0B[3] = data["cp0B4"].as<unsigned long>();}
+
       if(data["cp1B1"] != nullptr){mySettings.cp1B[0] = data["cp1B1"].as<unsigned long>();}
       if(data["cp1B2"] != nullptr){mySettings.cp1B[1] = data["cp1B2"].as<unsigned long>();}
       if(data["cp1B3"] != nullptr){mySettings.cp1B[2] = data["cp1B3"].as<unsigned long>();}
@@ -904,11 +972,22 @@ void stateReset(bool resetOpMode){
         mySettings.cpM[3] = 0;
         log_manager->verbose(PSTR(__func__), PSTR("Relay operations are changed to manual.\n"));
     }
-    setSwitch("ch1", "OFF");
-    setSwitch("ch2", "OFF");
-    setSwitch("ch3", "OFF");
-    setSwitch("ch4", "OFF");
-    log_manager->verbose(PSTR(__func__), PSTR("Relay operations are disabled.\n"));
+    for(uint8_t i = 0; i < countof(mySettings.pR); i++)
+    {
+      if(mySettings.cpM[i] == 0)
+      {
+        String ch = "ch" + String(i + 1);
+        String state = mySettings.cp0A[i] == mySettings.ON ? "ON" : "OFF";
+        setSwitch(ch, state);
+        log_manager->verbose(PSTR(__func__), PSTR("%s operation are %s.\n"), ch.c_str(), state.c_str());
+      }
+      else
+      {
+        String ch = "ch" + String(i + 1);
+        setSwitch(ch, "OFF");
+        log_manager->verbose(PSTR(__func__), PSTR("%s operation are disabled.\n"), ch.c_str());
+      }
+    }
 }
 
 void deviceTelemetry(){
@@ -983,6 +1062,17 @@ void onSyncClientAttr(uint8_t direction){
     
 
     if(tb.connected() && (direction == 0 || direction == 1)){
+      doc[PSTR("cp0A1")] = mySettings.cp0A[0];
+      doc[PSTR("cp0A2")] = mySettings.cp0A[1];
+      doc[PSTR("cp0A3")] = mySettings.cp0A[2];
+      doc[PSTR("cp0A4")] = mySettings.cp0A[3];
+      doc[PSTR("cp0B1")] = mySettings.cp0B[0];
+      doc[PSTR("cp0B2")] = mySettings.cp0B[1];
+      doc[PSTR("cp0B3")] = mySettings.cp0B[2];
+      doc[PSTR("cp0B4")] = mySettings.cp0B[3];
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
+      doc.clear();
       doc[PSTR("cp1A1")] = mySettings.cp1A[0];
       doc[PSTR("cp1A2")] = mySettings.cp1A[1];
       doc[PSTR("cp1A3")] = mySettings.cp1A[2];
@@ -1064,6 +1154,22 @@ void onSyncClientAttr(uint8_t direction){
 
     #ifdef USE_WEB_IFACE
     if(config.wsCount > 0 && (direction == 0 || direction == 2)){
+      JsonObject cp0A = doc.createNestedObject("cp0A");
+      cp0A[PSTR("cp0A1")] = mySettings.cp0A[0];
+      cp0A[PSTR("cp0A2")] = mySettings.cp0A[1];
+      cp0A[PSTR("cp0A3")] = mySettings.cp0A[2];
+      cp0A[PSTR("cp0A4")] = mySettings.cp0A[3];
+      serializeJson(doc, buffer);
+      wsBroadcastTXT(buffer);
+      doc.clear();
+      JsonObject cp0B = doc.createNestedObject("cp0B");
+      cp0B[PSTR("cp0B1")] = mySettings.cp0B[0];
+      cp0B[PSTR("cp0B2")] = mySettings.cp0B[1];
+      cp0B[PSTR("cp0B3")] = mySettings.cp0B[2];
+      cp0B[PSTR("cp0B4")] = mySettings.cp0B[3];
+      serializeJson(doc, buffer);
+      wsBroadcastTXT(buffer);
+      doc.clear();
       JsonObject cp1A = doc.createNestedObject("cp1A");
       cp1A[PSTR("cp1A1")] = mySettings.cp1A[0];
       cp1A[PSTR("cp1A2")] = mySettings.cp1A[1];

@@ -92,6 +92,8 @@ struct Settings
     uint16_t itPc = 1;
     uint16_t itWc = 1;
     uint16_t itDc = 1;
+    uint8_t cp0A[4];
+    uint32_t cp0B[4];
     uint32_t cp2A[4];
     unsigned long cp2B[4];
     uint32_t cp4A[4];
@@ -131,6 +133,7 @@ unsigned long recPowerUsageTR_last_activity = millis();
 
 void loadSettings();
 void saveSettings();
+void relayControlCP0();
 void relayControlCP1();
 void relayControlCP2();
 void relayControlCP3();

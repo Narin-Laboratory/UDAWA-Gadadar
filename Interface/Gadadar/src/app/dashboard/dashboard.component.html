@@ -46,9 +46,13 @@
                         <div [ngSwitch]="cpM['cpM'+selected]">
                             <div *ngSwitchCase=0>
                                 <fieldset>
-                                    <label for="switch">
-                                    <input type="checkbox" id="switchRelay" name="switchRelay" role="switch" [(ngModel)]="state['ch'+selected]" (change)="changeState()">
+                                    <label for="cp0A">
+                                    <input type="checkbox" id="cp0A" name="cp0A" role="switch" [(ngModel)]="state['ch'+selected]" (change)="changeState()">
                                     {{state['ch'+selected] ? 'ON' : 'OFF'}}
+                                    </label>
+                                    <label for="cp0B">
+                                        Auto Off (in Seconds)
+                                        <input type="text" id="cp0B" name="cp0B" placeholder="Auto Off" [(ngModel)]="cp0B['cp0B'+selected]" (change)="changeParams()">
                                     </label>
                                 </fieldset>
                             </div>

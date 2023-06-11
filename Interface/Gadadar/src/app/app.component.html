@@ -16,7 +16,7 @@
       <app-dashboard (panic)="panic()" (reboot)="reboot()" (saveConfig)="saveConfig()" (savePermanent)="savePermanent()"
         (chParamsChange)="chParamsChange()" (attrChange)="attrChange()"
         (stateChange)="stateChange()" [(selected)]="selected"
-        [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(cpM)]="cpM"
+        [deviceTelemetry]="deviceTelemetry" [bme280]="bme280" [pzem]="pzem" [(state)]="state" [(cpM)]="cpM" [(cp0B)]="cp0B"
         [(cp1A)]="cp1A" [(cp1B)]="cp1B" [(cp2A)]="cp2A" [(cp2B)]="cp2B"
         [(cp4A)]="cp4A" [(cp4B)]="cp4B" [(cp3A)]="cp3A" [(lbl)]="lbl" [(cfg)]="cfg" [(attr)]="attr"></app-dashboard>
         <div class="grid">
@@ -25,7 +25,7 @@
               <ul>
                 <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
                 <li><small>{{deviceTelemetry['dts']}}</small></li>
-                <li><small>{{cfg['hname']}}</small></li>
+                <li><small>{{cfg['hname']}}.local</small></li>
               </ul>
               <ul>
                 <li><small>{{' Firmware v' + attr['fmVersion'] + ' ' + attr['compdate']}}</small></li>
