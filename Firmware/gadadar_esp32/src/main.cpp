@@ -6,30 +6,6 @@
  * prita.undiknas.ac.itD | narin.co.itD
 **/
 #include "main.h"
-#define S1_TX 32
-#define S1_RX 4
-
-using namespace libudawa;
-Settings mySettings;
-Adafruit_BME280 bme;
-HardwareSerial PZEMSerial(1);
-PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-
-BaseType_t xReturnedWsSendTelemetry;
-BaseType_t xReturnedWsSendSensors;
-BaseType_t xReturnedRecPowerUsage;
-BaseType_t xReturnedRecWeatherData;
-BaseType_t xReturnedPublishDevTel;
-BaseType_t xReturnedRelayControl;
-
-TaskHandle_t xHandleWsSendTelemetry = NULL;
-TaskHandle_t xHandleWsSendSensors = NULL;
-TaskHandle_t xHandleRecPowerUsage = NULL;
-TaskHandle_t xHandleRecWeatherData = NULL;
-TaskHandle_t xHandlePublishDevTel = NULL;
-TaskHandle_t xHandleRelayControl = NULL;
-
-SemaphoreHandle_t xSemaphorePZEM = NULL;
 
 void setup()
 {
@@ -77,9 +53,9 @@ void setup()
     }
   }
 
-  if(xHandleRecPowerUsage == NULL && !config.SM){
-    xReturnedRecPowerUsage = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), STACKSIZE_RECPOWERUSAGE, NULL, 1, &xHandleRecPowerUsage, 1);
-    if(xReturnedRecPowerUsage == pdPASS){
+  if(xHandleWeatherSensor == NULL && !config.SM){
+    xReturnedWeatherSensor = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), STACKSIZE_RECPOWERUSAGE, NULL, 1, &xHandleWeatherSensor, 1);
+    if(xReturnedWeatherSensor == pdPASS){
       log_manager->warn(PSTR(__func__), PSTR("Task recPowerUsage has been created.\n"));
     }
   }
@@ -128,230 +104,132 @@ void loop(){
   vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
 }
 
-void recPowerUsageTR(void *arg){
-  Stream_Stats<float> _volt_;
-  Stream_Stats<float> _amp_;
-  Stream_Stats<float> _watt_;
-  Stream_Stats<float> _freq_;
-  Stream_Stats<float> _pf_;
+void weatherSensorTR(void *arg){
+  BME280I2C weatherSensor;
+  mySettings.flag_weatherSensor = weatherSensor.begin();
+  if(!mySettings.flag_weatherSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize weatherSensor!\n"));}
 
-  unsigned long timerCalcPowerUsage = millis();
-  unsigned long timerRecPowerUsage = millis();
-  unsigned long timerAlarm = millis();
-  
-  while(true){
-    if( xSemaphorePZEM != NULL){
-      if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 1000 ) == pdTRUE )
-      {
-        float volt = PZEM.voltage() ? PZEM.voltage() : 0;
-        float amp = PZEM.current() ? PZEM.current() : 0;
-        float watt = PZEM.power() ? PZEM.power() : 0;
-        float ener = PZEM.energy() ? PZEM.energy() : 0;
-        float freq = PZEM.frequency() ? PZEM.frequency() : 0;
-        float pf = PZEM.pf() ? PZEM.pf() : 0;
-        xSemaphoreGive( xSemaphorePZEM );
-
-        //log_manager->verbose(PSTR(__func__), PSTR("Volt: %.2f, Amp: %.2f, Watt: %.2f, Ener: %.2f, Freq.: %.2f, Pf: %.2f\n"),
-        // volt, amp, watt, ener, freq, pf);
-
-        bool flag_failure_readings = false;
-        if(volt > 1000 || amp > 100 || watt > 10000 || freq > 100 || pf > 100 || ener > 10000){
-          flag_failure_readings = true;
-        }
-
-        if(!flag_failure_readings)
-        {
-          _volt_.Add(volt);
-          _amp_.Add(amp);
-          _watt_.Add(watt);
-          _freq_.Add(freq);
-          _pf_.Add(pf);
-        }
-
-        #ifdef USE_WEB_IFACE
-        if( xQueuePZEMMessage != NULL && (config.wsCount > 0)){
-          PZEMMessage PZEMMsg;
-          PZEMMsg.amp = amp; PZEMMsg.watt = watt; PZEMMsg.ener = ener; PZEMMsg.freq = freq; PZEMMsg.pf = pf; PZEMMsg.volt = volt;
-          if( xQueueSend( xQueuePZEMMessage, &PZEMMsg, ( TickType_t ) 1000 ) != pdPASS )
-          {
-              log_manager->debug(PSTR(__func__), PSTR("Failed to fill PZEMMsg. Queue is full. \n"));
-          }
-        }
-        #endif
-            
-        if(tb.connected() && config.provSent && !flag_failure_readings){
-          StaticJsonDocument<128> doc;
-          char buffer[128];
-          unsigned long now = millis();
-          if( (now - timerCalcPowerUsage) > (mySettings.itPc * 1000) && volt > 0){
-            
-            doc[PSTR("_volt")] = volt;
-            doc[PSTR("_amp")] = amp;
-            doc[PSTR("_watt")] = watt;
-            doc[PSTR("_freq")] = freq;
-            doc[PSTR("_pf")] = pf;
-            doc[PSTR("_ener")] = ener;
-            
-            serializeJson(doc, buffer);
-            tbSendAttribute(buffer);
-            doc.clear();
-
-            timerCalcPowerUsage = now;
-          }
-
-          now = millis();
-          if( (now - timerRecPowerUsage) > (mySettings.itP * 1000) ){
-            doc[PSTR("volt")] = _volt_.Get_Average();
-            doc[PSTR("amp")] = _amp_.Get_Average();
-            doc[PSTR("watt")] = _watt_.Get_Average();
-            doc[PSTR("freq")] = _freq_.Get_Average();
-            doc[PSTR("pf")] = _pf_.Get_Average();
-            doc[PSTR("ener")] = ener;
-
-            serializeJson(doc, buffer);
-            if(tbSendTelemetry(buffer)){
-              _volt_.Clear(); _amp_.Clear(); _watt_.Clear(); _freq_.Clear(); _pf_.Clear();
-            }
-            
-            timerRecPowerUsage = now;
-          }
-        }
-
-        unsigned long now = millis();
-        if( (now - timerAlarm) > 30000 ){
-          if(volt <= 0){
-            setAlarm(121, 1, 5, 1000);
-          }
-
-          uint8_t ACTIVE_CH_COUNTER = 0;
-          for(uint8_t i = 0; i < 4; i++){
-            if(mySettings.dutyState[i] == mySettings.ON){
-              ACTIVE_CH_COUNTER++;
-            }
-
-            if(mySettings.stateOnTs[i] > 0){
-              if(millis() - mySettings.stateOnTs[i] > 3000000){
-                if(i = 0){
-                  setAlarm(211, 1, 10, 1000);
-                }
-                else if(i = 0){
-                  setAlarm(212, 1, 10, 1000);
-                }
-                else if(i = 0){
-                  setAlarm(213, 1, 10, 1000);
-                }
-                else if(i = 0){
-                  setAlarm(214, 1, 10, 1000);
-                }
-              }
-            }
-          }
-
-          if(ACTIVE_CH_COUNTER > 0 && (int)watt < 10){
-            setAlarm(221, 1, 10, 1000);
-          }
-
-          if(ACTIVE_CH_COUNTER == 0 && (int)watt > 10){
-            setAlarm(222, 1, 10, 1000);
-          }
-          timerAlarm = now;
-        }
-      }
-      else
-      {
-        log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-      }   
-    }
-
-    recPowerUsageTR_last_activity = millis();    
-    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
-  }
-}
-
-void recWeatherDataTR(void *arg){
   Stream_Stats<float> _celc_;
   Stream_Stats<float> _rh_;
   Stream_Stats<float> _hpa_;
   Stream_Stats<float> _alt_;
-  
-  unsigned long timerCalcWeatherData = millis();
-  unsigned long timerRecWeatherData = millis();
 
-  while(true){
-    float celc = 0.0;
-    float rh = 0.0;
-    float hpa = 0.0;
-    float alt = 0.0;
+  float celc; float rh; float hpa; float alt;  
 
-    if(!mySettings.flag_bme280){
-      setAlarm(111, 1, 5, 1000);
+  unsigned long timerTelemetry = millis();
+  unsigned long timerAttribute = millis();
+  unsigned long timerAlarm = millis();
+
+  while (true)
+  {
+    bool flag_failure_readings = false;
+    if(mySettings.flag_weatherSensor){
+      BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
+      BME280::PresUnit presUnit(BME280::PresUnit_Pa);
+
+      weatherSensor.read(hpa, celc, rh, tempUnit, presUnit);
+      alt = hpa / mySettings.seaHpa;
+      hpa = hpa / 100.0F;
     }
-    else{      
-      celc = bme.readTemperature() ? bme.readTemperature() : 0;
-      rh = bme.readHumidity() ? bme.readHumidity() : 0;
-      hpa = bme.readPressure() / 100.0F ? bme.readPressure() / 100.0F : 0;
-      alt = bme.readAltitude(mySettings.seaHpa) ? bme.readAltitude(mySettings.seaHpa) : 0;
 
-      bool flag_failure_readings = false;
-      if(celc > 300 || rh > 100 || hpa > 100000 || alt > 1000000){
-        flag_failure_readings = true;
-      }
+    if(isnan(celc) || isnan(rh) || isnan(hpa) || celc < -80.0 || celc > 300.0 || rh < 0.0 || rh > 100.0 || hpa < 700.0 || 
+    hpa > 1100.0 || alt < 0.0 || alt > 10000.0){
+      flag_failure_readings = true;
+      //log_manager->debug(PSTR(__func__), PSTR("Weather sensor abnormal reading: %.2f, %.2f, %.2f, %.2f\n"), celc, rh, hpa, alt);
+    }
 
-      if(!flag_failure_readings){
-        _celc_.Add(celc);
-        _rh_.Add(rh);
-        _hpa_.Add(hpa);
-        _alt_.Add(alt);
-      }
+    if(mySettings.flag_weatherSensor && !flag_failure_readings)
+    {
+      _celc_.Add(celc);
+      _rh_.Add(rh);
+      _hpa_.Add(hpa);
+      _alt_.Add(alt);
+    }
+
+    unsigned long now = millis();
+    if(mySettings.flag_weatherSensor && !flag_failure_readings)
+    {
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      char buffer[DOCSIZE_MIN];
       
-      
-      #ifdef USE_WEB_IFACE
-      if( xQueueBME280Message != NULL && (config.wsCount > 0) ){
-        BME280Message BME280Msg;
-        BME280Msg.celc = celc; BME280Msg.rh = rh; BME280Msg.hpa = hpa; BME280Msg.alt = alt;
-        if( xQueueSend( xQueueBME280Message, &BME280Msg, ( TickType_t ) 1000 ) != pdPASS )
-        {
-            log_manager->debug(PSTR(__func__), PSTR("Failed to fill BME280Msg. Queue is full. \n"));
-        }
+      if( (now - timerAttribute) > (mySettings.itWc * 1000) && tb.connected() && config.provSent)
+      {
+        doc[PSTR("_celc")] = celc;
+        doc[PSTR("_rh")] = rh;
+        doc[PSTR("_hpa")] = hpa;
+        doc[PSTR("_alt")] = alt;
+        serializeJson(doc, buffer);
+        tbSendAttribute(buffer);
+        doc.clear();
+
+        timerAttribute = now;
       }
-      #endif
 
-      if(config.provSent && tb.connected() && config.fIoT && !flag_failure_readings){
-        StaticJsonDocument<128> doc;
-        char buffer[128];
-
-        unsigned long now = millis();
-        if( (now - timerCalcWeatherData) > (mySettings.itWc * 1000) ){
-          doc[PSTR("_celc")] = celc;
-          doc[PSTR("_rh")] = rh;
-          doc[PSTR("_hpa")] = hpa;
-          doc[PSTR("_alt")] = alt;
-
-          serializeJson(doc, buffer);
-          tbSendAttribute(buffer);
-          doc.clear();
-
-          timerCalcWeatherData = now;
-        }
-
-        if( (now - timerRecWeatherData) > (mySettings.itW * 1000) ){
-          doc[PSTR("celc")] = _celc_.Get_Average();
-          doc[PSTR("rh")] = _rh_.Get_Average();
-          doc[PSTR("hpa")] = _hpa_.Get_Average();
-          doc[PSTR("alt")] = _alt_.Get_Average();
-
-          serializeJson(doc, buffer);
-          if(tbSendTelemetry(buffer)){
-            _celc_.Clear(); _rh_.Clear(); _hpa_.Clear(); _alt_.Clear(); 
+      if( (now - timerTelemetry) > (mySettings.itW * 1000) )
+      {
+        float a = _celc_.Get_Average();
+        float b = _rh_.Get_Average();
+        float c = _hpa_.Get_Average();
+        float d = _alt_.Get_Average();
+        if(!isnan(a) && a > -80.0 && a < 300.0 && !isnan(b) && b >=0 && b <= 100 && !isnan(c) && c > 0 && c < 1015){
+          doc[PSTR("celc")] = a;  
+          doc[PSTR("rh")] = b; 
+          doc[PSTR("hpa")] = c;
+          doc[PSTR("alt")] = d; 
+          writeCardLogger(doc);
+          if(tb.connected() && config.provSent)
+          {
+            serializeJson(doc, buffer);
+            if(tbSendTelemetry(buffer)){
+              
+            }
           }
-
-          timerRecWeatherData = now;
+          _celc_.Clear(); _rh_.Clear(); _hpa_.Clear(); _alt_.Clear();
+          doc.clear();
         }
+
+        timerTelemetry = now;
+      }
+
+    }
+  
+    if( (now - timerAlarm) > 10000 )
+    {
+      if(!mySettings.flag_weatherSensor){setAlarm(120, 1, 5, 1000);}
+      else{
+        if(celc < -80 || celc > 80){setAlarm(121, 1, 5, 1000);}
+        if(celc > 45){setAlarm(122, 1, 5, 1000);}
+        if(celc < 17){setAlarm(123, 1, 5, 1000);}
+        if(rh < 1 || rh > 100){setAlarm(124, 1, 5, 1000);}
+        if(rh >= 99){setAlarm(125, 1, 5, 1000);}
+        if(rh <= 20){setAlarm(126, 1, 5, 1000);}
+        if(hpa < 700 || hpa > 1013){setAlarm(124, 1, 5, 1000);}
+        if(hpa <= 750){setAlarm(125, 1, 5, 1000);}
+        if(hpa >= 1010){setAlarm(126, 1, 5, 1000);}
+      }
+
+      
+      timerAlarm = now;
+    }
+
+    #ifdef USE_WEB_IFACE
+    if( xQueueWsPayloadWeatherSensor != NULL && (config.wsCount > 0) && mySettings.flag_weatherSensor && !flag_failure_readings)
+    {
+      WSPayloadWeatherSensor payload;
+      payload.celc = celc;
+      payload.hpa = hpa;
+      payload.rh = rh;
+      payload.alt = alt;
+      if( xQueueSend( xQueueWsPayloadWeatherSensor, &payload, ( TickType_t ) 1000 ) != pdPASS )
+      {
+        log_manager->debug(PSTR(__func__), PSTR("Failed to fill WSPayloadWeatherSensor. Queue is full. \n"));
       }
     }
+    #endif
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
 }
+
 
 void loadSettings()
 {
@@ -1315,54 +1193,14 @@ void wsSendTelemetryTR(void *arg){
   }
 }
 
-void wsSendSensorsTR(void *arg){
-  while(true){
-    if(config.fIface && config.wsCount > 0){
-      char buffer[128];
-      StaticJsonDocument<128> doc;
-  
-      if( xQueuePZEMMessage != NULL ){
-        PZEMMessage PZEMMsg;
-        if( xQueueReceive( xQueuePZEMMessage,  &( PZEMMsg ), ( TickType_t ) 1000 ) == pdPASS )
-        {
-          JsonObject pzem = doc.createNestedObject("pzem");
-          pzem[PSTR("volt")] = round2(PZEMMsg.volt ? PZEMMsg.volt : 0);
-          pzem[PSTR("amp")] = round2(PZEMMsg.amp ? PZEMMsg.amp : 0);
-          pzem[PSTR("watt")] = round2(PZEMMsg.watt ? PZEMMsg.watt : 0);
-          pzem[PSTR("ener")] = round2(PZEMMsg.ener ? PZEMMsg.ener : 0);
-          pzem[PSTR("freq")] = round2(PZEMMsg.freq ? PZEMMsg.freq : 0);
-          pzem[PSTR("pf")] = round2(PZEMMsg.pf ? PZEMMsg.pf : 0)*100;
-          serializeJson(doc, buffer);
-          wsBroadcastTXT(buffer);
-          doc.clear();
-        }
-      } 
-
-      if( xQueueBME280Message != NULL ){
-        BME280Message BME280Msg;
-        if( xQueueReceive( xQueueBME280Message,  &( BME280Msg ), ( TickType_t ) 1000 ) == pdPASS )
-        {
-          JsonObject bme280 = doc.createNestedObject("bme280");
-          bme280[PSTR("celc")] = round2(BME280Msg.celc);
-          bme280[PSTR("rh")] = round2(BME280Msg.rh);
-          bme280[PSTR("hpa")] = round2(BME280Msg.hpa);
-          bme280[PSTR("alt")] = round2(BME280Msg.alt);
-          serializeJson(doc, buffer);
-          wsBroadcastTXT(buffer);
-        }
-      } 
-    }
-    vTaskDelay((const TickType_t) 800 / portTICK_PERIOD_MS);
-  }
-}
-
 void onMQTTUpdateStart(){
   vTaskSuspend(xHandleRelayControl);
-  vTaskSuspend(xHandleRecPowerUsage);
-  vTaskSuspend(xHandleRecWeatherData);
-  vTaskSuspend(xHandleWsSendSensors);
+  vTaskSuspend(xHandleWeatherSensor);
   vTaskSuspend(xHandleWsSendTelemetry);
-  vTaskSuspend(xHandleIface);
+  #ifdef USE_WEB_IFACE
+  if(xHandleWsSendTelemetry != NULL){vTaskSuspend(xHandleWsSendTelemetry);}
+  if(xHandleIface != NULL){vTaskSuspend(xHandleIface);}
+  #endif
   vTaskSuspend(xHandleRelayControl);
   vTaskSuspend(xHandlePublishDevTel);
 }

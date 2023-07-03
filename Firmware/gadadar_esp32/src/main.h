@@ -53,25 +53,25 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define DOCSIZE_SETTINGS 4096
 #define USE_SERIAL2
 #define USE_WEB_IFACE
+#define USE_ASYNC_WEB
 #define USE_WIFI_OTA
+//#define USE_SDCARD_LOG
+#define USE_SPIFFS_LOG
 #define STACKSIZE_WIFIKEEPER 3000
 #define STACKSIZE_SETALARM 3700
 #define STACKSIZE_WIFIOTA 4096
 #define STACKSIZE_TB 12000
-#define STACKSIZE_IFACE 9000
-#define STACKSIZE_RECWEATHERDATA 4500
-#define STACKSIZE_RECPOWERUSAGE 4500
+#define STACKSIZE_IFACE 3000
+#define STACKSIZE_LIGHTSENSOR 4500
+#define STACKSIZE_WEATHERSENSOR 4500
 #define STACKSIZE_PUBLISHDEVTEL 6000
-#define STACKSIZE_RELAYCONTROL 9000
-#define STACKSIZE_WSSENDTELEMETRY 2200
-#define STACKSIZE_WSSENDSENSORS 3000
+#define STACKSIZE_WSSENDTELEMETRY 6000
 
 #include <libudawa.h>
 #include <TimeLib.h>
 #include <PZEM004Tv30.h>
 #include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
+#include <BME280I2C.h>
 #include <Statistical.h>
 
 const char* settingsPath = "/settings.json";
@@ -108,7 +108,7 @@ struct Settings
 };
 
 #ifdef USE_WEB_IFACE
-struct PZEMMessage
+struct WSPayloadPowerSensor
 {
     float volt;
     float amp;
@@ -117,19 +117,43 @@ struct PZEMMessage
     float freq;
     float pf;
 };
-QueueHandle_t xQueuePZEMMessage;
+QueueHandle_t xQueueWsPayloadPowerSensor;
 
-struct BME280Message
+struct WSPayloadWeatherSensor
 {
     float celc;
     float rh;
-    float hpa;
     float alt;
+    float hpa;
 };
-QueueHandle_t xQueueBME280Message;
+QueueHandle_t xQueueWsPayloadWeatherSensor;
 #endif
 
-unsigned long recPowerUsageTR_last_activity = millis();
+#define S1_TX 32
+#define S1_RX 4
+
+using namespace libudawa;
+Settings mySettings;
+Adafruit_BME280 bme;
+HardwareSerial PZEMSerial(1);
+PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+
+BaseType_t xReturnedWsSendTelemetry;
+BaseType_t xReturnedWsSendSensors;
+BaseType_t xReturnedPowerSensor;
+BaseType_t xReturnedWeatherSensor;
+BaseType_t xReturnedPublishDevTel;
+BaseType_t xReturnedRelayControl;
+
+TaskHandle_t xHandleWsSendTelemetry = NULL;
+TaskHandle_t xHandleWeatherSensor = NULL;
+TaskHandle_t xHandlePowerSensor = NULL;
+TaskHandle_t xHandlePublishDevTel = NULL;
+TaskHandle_t xHandleRelayControl = NULL;
+
+SemaphoreHandle_t xSemaphorePZEM = NULL;
+
+unsigned long powerSensorTR_last_activity = millis();
 
 void loadSettings();
 void saveSettings();
@@ -140,8 +164,8 @@ void relayControlCP3();
 void relayControlCP4();
 void relayControlTR(void *arg);
 void setSwitch(String  ch, String state);
-void recPowerUsageTR(void *arg);
-void recWeatherDataTR(void *arg);
+void powerSensorTR(void *arg);
+void weatherSensorTR(void *arg);
 void attUpdateCb(const Shared_Attribute_Data &data);
 void onTbConnected();
 void onTbDisconnected();
@@ -154,7 +178,6 @@ void onSyncClientAttr(uint8_t direction);
 #ifdef USE_WEB_IFACE
 void onWsEvent(const JsonObject &data);
 void wsSendTelemetryTR(void *arg);
-void wsSendSensorsTR(void *arg);
 #endif
 void publishDeviceTelemetryTR(void * arg);
 void onMQTTUpdateStart();
