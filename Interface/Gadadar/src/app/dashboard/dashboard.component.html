@@ -1,204 +1,179 @@
-
-<div class="row">
-    <div class="col-sm-12 col-lg-8">
-        <details>
-            <summary role="button" class="secondary">Monitor</summary>
-            <div class="grid">
-                <app-card-switch [state]="state['ch1']" [switch]="'Switch 1'" [cpM]="cpM['cpM1']" [opMode]="opMode" [lbl]="lbl['lbl1']"></app-card-switch>
-                <app-card-switch [state]="state['ch2']" [switch]="'Switch 2'" [cpM]="cpM['cpM2']" [opMode]="opMode" [lbl]="lbl['lbl2']"></app-card-switch>
-                <app-card-switch [state]="state['ch3']" [switch]="'Switch 3'" [cpM]="cpM['cpM3']" [opMode]="opMode" [lbl]="lbl['lbl3']"></app-card-switch>
-                <app-card-switch [state]="state['ch4']" [switch]="'Switch 4'" [cpM]="cpM['cpM4']" [opMode]="opMode" [lbl]="lbl['lbl4']"></app-card-switch>
-            </div>
-            <div class="grid">
-                <app-card-sensor [header]="'Environment Temperature'" [value]="bme280['celc']" [unit]="'°C'" [icon]="'device_thermostat'"></app-card-sensor>
-                <app-card-sensor [header]="'Air Pressure'" [value]="bme280['hpa']" [unit]="'hpa'" [icon]="'compress'"></app-card-sensor>
-                <app-card-sensor [header]="'Environment Humidity'" [value]="bme280['rh']" [unit]="'%'" [icon]="'humidity_percentage'"></app-card-sensor>
-                <app-card-sensor [header]="'Altitude (Approx.)'" [value]="bme280['alt']" [unit]="'M'" [icon]="'altitude'"></app-card-sensor>
-            </div>
-            <div class="grid">
-                <app-card-sensor [header]="'Voltage'" [value]="pzem['volt']" [unit]="'V'" [icon]="'flash_on'"></app-card-sensor>
-                <app-card-sensor [header]="'Current'" [value]="pzem['amp']" [unit]="'A'" [icon]="'flash_auto'"></app-card-sensor>
-                <app-card-sensor [header]="'Watt'" [value]="pzem['watt']" [unit]="'W'" [icon]="'electric_meter'"></app-card-sensor>
-                <app-card-sensor [header]="'Internal kWH'" [value]="pzem['ener']" [unit]="'kWH'" [icon]="'electric_meter'"></app-card-sensor>
-            </div>
-            <div class="grid">
-                <app-card-sensor [header]="'Freq.'" [value]="pzem['freq']" [unit]="'Hz'" [icon]="'show_chart'"></app-card-sensor>
-                <app-card-sensor [header]="'Power Factor'" [value]="pzem['pf']" [unit]="'%'" [icon]="'show_chart'"></app-card-sensor>
-            </div>
-        </details>        
-    </div>
-    <div class="col-sm-12 col-lg-4">
-        <details>
-            <summary role="button"  class="secondary">Control</summary>
-            <div class="grid">
-                <article>
-                    <form>
-                        <label for="selector">Select Relay Channel</label>
-                        <select id="selector" name="selector" [(ngModel)]="selected" (change)="changeSelected()">
-                            <option *ngFor="let c of channel" value="{{c}}">Channel {{c}} ({{lbl['lbl'+c]}})</option>
-                        </select>
+<header class="container-fluid">
+    <nav>
+        <ul>
+        <li><img src="assets/img/logo.svg" alt="VAYUS" width="40" height="40"></li>
+        <li><strong>VAYUS - Versatile Ambient Sampling Unit</strong></li>
+        </ul>
+        <ul>
+        <li><small>UT {{deviceTelemetry['uptime']}}</small></li>
+        </ul>
+    </nav>
             
-                        <label for="cpM">Operation mode</label>
-                        <select id="cpM" name="cpM" [(ngModel)]="cpM['cpM'+selected]" (change)="changeParams()">
-                            <option *ngFor="let mode of opMode; let i = index;" value="{{i}}">{{mode}}</option>
-                        </select>
-            
-                        <div [ngSwitch]="cpM['cpM'+selected]">
-                            <div *ngSwitchCase=0>
-                                <fieldset>
-                                    <label for="cp0A">
-                                    <input type="checkbox" id="cp0A" name="cp0A" role="switch" [(ngModel)]="state['ch'+selected]" (change)="changeState()">
-                                    {{state['ch'+selected] ? 'ON' : 'OFF'}}
-                                    </label>
-                                    <label for="cp0B">
-                                        Auto Off (in Seconds)
-                                        <input type="text" id="cp0B" name="cp0B" placeholder="Auto Off" [(ngModel)]="cp0B['cp0B'+selected]" (change)="changeParams()">
-                                    </label>
-                                </fieldset>
-                            </div>
-                            <div *ngSwitchCase=1>
-                                <label for="cp1A">
-                                    Duty Cycle {{cp1A['cp1A'+selected]}}%
-                                    <input min="0" max="100" type="range" id="cp1A" name="cp1A" placeholder="Duty Cycle" [(ngModel)]="cp1A['cp1A'+selected]" (change)="changeParams()">
-                                </label>
-                                <label for="cp1B">
-                                    Duty Range (in Seconds)
-                                    <input type="text" id="cp1B" name="cp1B" placeholder="Duty Range" [(ngModel)]="cp1B['cp1B'+selected]" (change)="changeParams()">
-                                </label>
-                            </div>
-                            <div *ngSwitchCase=2>
-                                <label for="cp2A">Datetime (YYYY-MM-DD HH:II:SS)
-                                    <input type="text" id="cp2A" name="cp1A" [(ngModel)]="cp2A['cp2A'+selected]" (change)="changeParams()">
-                                </label>
-                                <label for="cp2B">On duration (in Seconds)
-                                    <input type="text" id="date" name="cp2B" [(ngModel)]="cp2B['cp2B'+selected]" (change)="changeParams()">
-                                </label>
-                            </div>
-                            <div *ngSwitchCase=3>
-                                <label for="cp3A">Multiple Time Daily (H:I:S-D,H:I:S-D...)
-                                    <input type="text" id="cp3A" name="cp3A" [(ngModel)]="cp3A['cp3A'+selected]" (change)="changeParams()">
-                                </label>
-                                <p><small>H = hour in 0-24 format. I = minute in 0-60 format. S = second in 0-60 format. D = ON Duration in second. <strong>E.g: 8:0:0-3600,18:0:0-7200</strong> will turns ON at 8 AM for 1 hour and 6 PM for 2 hours.</small></p>
-                            </div>
-                            <div *ngSwitchCase=4>
-                                <label for="cp4A">Interval (in Seconds)
-                                    <input type="text" id="cp4A" name="cp4A" [(ngModel)]="cp4A['cp4A'+selected]" (change)="changeParams()">
-                                </label>
-                                <label for="cp4B">On duration (in Seconds)
-                                    <input type="text" id="cp4B" name="cp4B" [(ngModel)]="cp4B['cp4B'+selected]" (change)="changeParams()">
-                                </label>
-                            </div>
-                            <div *ngSwitchCase=5>
-                                Unavailable
-                            </div>
-                            <div *ngSwitchDefault>
-                                Undefined
-                            </div>
-                            <hr>
-                            <button type="button" class="secondary outline" (click)="savePermanentClick()">Save Permanent</button>
-                        </div>
-                    </form>
-                </article>
+    </header>
+    <main class="container-fluid">
+    <div class="row">
+        <div class="col-sm-12">
+            <div class="row">
+                <div class="col-sm-12 col-lg-12">
+                    <div class="grid">
+                        <app-card-sensor [header]="'Ambient Light'" [value]="lightSensor['lux']" [unit]="'lux'" [icon]="'brightness_high'"></app-card-sensor>
+                        <app-card-sensor [header]="'Ambient Temperature'" [value]="weatherSensor['celc']" [unit]="'°C'" [icon]="'device_thermostat'"></app-card-sensor>
+                        <app-card-sensor [header]="'Ambient Humidity'" [value]="weatherSensor['rh']" [unit]="'%'" [icon]="'humidity_percentage'"></app-card-sensor>
+                        <app-card-sensor [header]="'Air Pressure'" [value]="weatherSensor['hpa']" [unit]="'hPa'" [icon]="'tire_repair'"></app-card-sensor>
+                        <app-card-sensor [header]="'Altitude Approx.'" [value]="weatherSensor['alt']" [unit]="'M'" [icon]="'altitude'"></app-card-sensor>
+                    </div>
+                </div>
             </div>
-            <div class="grid">
-                <article>
-                    <head><h1>Relay Control Highlight</h1></head>
-        
-                    <p>Currently, UDAWA Gadadar supports five modes of control operation. Here is the detail:</p>
-                    <ol>
-                        <li>Manual Switch: You can switch the relay manually via the switch button.</li>
-                        <li>Duty Cycle: You can switch the relay by using a time range and duty cycle. For example, a 50% duty cycle over a 10 minute time range would give you 5 minutes on and 5 minutes off.</li>
-                        <li>Date Time: You can switch the relay precisely at the selected datetime and adjust the on duration.</li>
-                        <li>Multiple-time Daily: You can switch the relay on more than one daily and adjust the on duration.</li>
-                        <li>Interval: You can switch the relay to on by interval and adjust the on duration.</li>
-                        <li>Environmental Condition: You can use the environmental data as a parameter to adjust when to turn on the switch and for how long it stays on.</li>
-                        <li><strong>Use the panic button to disable the device in emergency.</strong></li>
-                        <li>Use the reboot button to restart the device.</li>
-                    </ol>
+            <article>
+            <div class="row">
+                <div class="col-sm-12 col-lg-7">
+                    <div class="grid">
+                        <div class="">Log Analyzer Progress {{logFileName}} / {{logLoadTS}}: {{logLoadProgress | number:'1.2-2'}}%</div>
+                        <div class="" style="text-align: right;"><a href="http://{{server}}/log/{{logFileName}}.json" target="_blank"><span class="material-symbols-outlined">download</span> Download</a></div>
+                    </div>
+                    <div class="progressbar-border">
+                        <div class="progressbar-color" style="height:24px;width:{{logLoadProgress | number:'1.2-2'}}%"></div>
+                    </div>
+                </div>
+                <div class="col-sm-12 col-lg-3">
+                    <input type="text" id="logFileName" name="logFileName" [(ngModel)]="logFileName">
+                </div>
+                <div class="col-sm-12 col-lg-2">
+                    <button type="button" class="secondary outline" (click)="wsStreamSDCard()"><span class="material-symbols-outlined">sync</span> Load Log</button>
+                </div>
+            </div>
+            <div class="row m-5">
+                <div class="col-sm-12 col-lg-12">
+                    <app-chart-line [chartTitle]="lightSensorChartTitle" [chartQuery]="lightSensorChartQuery" [chartData]="lightSensorChartData"></app-chart-line>
+                    <div class="grid">
+                        <div style="color: #00a79d; padding: 2px 5px;">Illuminance (Lux)</div>
+                    </div>
                     <hr>
-                    <footer>
-                        <button type="button" class="contrast outline" (click)="rebootClick()">
-                            <span class="material-symbols-outlined">restart_alt</span> Reboot
-                        </button>
-                        <button type="button" class="primary outline" (click)="panicClick()">
-                            <span class="material-symbols-outlined">warning</span> Panic Button
-                        </button>
-                    </footer>
-                </article>
+                </div>
             </div>
-        </details>
-    </div>    
-</div>
-<details>
-    <summary role="button"  class="secondary">Config</summary>
-    <div class="grid">
-        <article>
-            <form>
-                <fieldset>
-                    <p><small> web interface can be accessed from <br>
-                        <a href="http://{{cfg['hname']}}.local">http://{{cfg['hname']}}.local</a> or <a href="http://{{attr['ipad']}}">http://{{attr['ipad']}}</a>
-                    </small></p>
-                    <label for="htU">Built-in Interface Username
-                        <input type="text" id="htU" name="htU" [(ngModel)]="cfg['htU']" (change)="changeAttr()">
-                    </label>
-
-                    <label for="htP">Built-in Interface Password
-                        <input type="password" id="htP" name="htP" [(ngModel)]="cfg['htP']" (change)="changeAttr()">
-                    </label>
-
-                    <label for="hname">Local Domain Access
-                        <input type="hname" id="hname" name="hname" [(ngModel)]="cfg['hname']" (change)="changeAttr()">
-                    </label>
-                </fieldset>
+            <div class="row m-5">
+                <div class="col-sm-12 col-lg-12">
+                    <app-chart-line [chartTitle]="weatherSensorChartTitle" [chartQuery]="weatherSensorChartQuery" [chartData]="weatherSensorChartData"></app-chart-line>
+                    <div class="grid">
+                        <div style="color: #1c75bc; padding: 2px 5px;">Humidity (% rH)</div>
+                        <div style="color: #00a79d; padding: 2px 5px;">Temperature (°C)</div>
+                    </div>
+                    <hr>
+                </div>
+            </div>
+            </article>
+            <details>
+                <summary role="button"  class="secondary">Config</summary>
+                <div class="grid">
+                    <article>
+                        <form>
+                            <fieldset>
+                                <p><small> web interface can be accessed from <br>
+                                    <a href="http://{{cfg['hname']}}.local">http://{{cfg['hname']}}.local</a> or <a href="http://{{attr['ipad']}}">http://{{attr['ipad']}}</a>
+                                </small></p>
+                                <label for="htU">Built-in Interface Username
+                                    <input type="text" id="htU" name="htU" [(ngModel)]="cfg['htU']" (change)="changeAttr()">
+                                </label>
+            
+                                <label for="htP">Built-in Interface Password
+                                    <input type="password" id="htP" name="htP" [(ngModel)]="cfg['htP']" (change)="changeAttr()">
+                                </label>
+            
+                                <label for="hname">Local Domain Access
+                                    <input type="text" id="hname" name="hname" [(ngModel)]="cfg['hname']" (change)="changeAttr()">
+                                </label>
+                            </fieldset>
+                            <hr>
+                            <fieldset>
+                                <p><small> connected to {{cfg['ap']}}, IP Address {{attr['ipad']}}</small></p>
+                                <label for="wssid">Network SSID
+                                    <input type="text" id="wssid" name="wssid" [(ngModel)]="cfg['wssid']" (change)="changeAttr()">
+                                </label>
+                    
+                                <label for="wpass">Network Password
+                                    <input type="password" id="wpass" name="wpass" [(ngModel)]="cfg['wpass']" (change)="changeAttr()">
+                                </label>
+            
+                                <p><small>Use MADAVA Cloud Plus (requres an active subscription).</small></p>
+                                <label class="form-check-label" for="udawa-cfg-usecloud">{{cfg['fIoT'] ? 'ON' : 'OFF'}}
+                                    <input type="checkbox" role="switch" id="fIoT" name="fIoT" ng-true-value="1" ng-false-value="0" [(ngModel)]="cfg['fIoT']" (change)="changeAttr()">
+                                </label>
+                            </fieldset>
+                            
+                            <button type="button" class="secondary outline" (click)="saveConfig()">Save Config</button>
+                            <hr>
+                            <fieldset>
+                                <label for="itW">Weather Sensor Recording Interval
+                                    <input type="text" id="itW" name="itW" [(ngModel)]="stg['itW']" (change)="changeAttr()">
+                                </label>
+            
+                                <label for="itL">Light Sensor Recording Interval
+                                    <input type="text" id="itL" name="itL" [(ngModel)]="stg['itL']" (change)="changeAttr()">
+                                </label>
+                            </fieldset>
+                            <button type="button" class="secondary outline" (click)="saveSettings()">Save Settings</button>
+                            <hr>
+                        </form>
+                    </article>
+                    <article>
+                        <head><h1>Configuration Highlight</h1></head>
+                        <p>Here you can change the basic device configuration. Please read the notes below to avoid losing access to your device.</p>
+                        <ol>
+                            <li>Use a strong but memorable username and password for the built-in web interface. For security reasons, there is no mechanism to reset or recover the password manually. The password must be reset or viewed via cloud solutions or a serial debugger.</li>
+                            <li>The device is supposed to be connected to the Internet for the timing function to work properly. Please provide your WiFi SSID and password correctly. If you mistakenly input the wrong WiFi credential, the device will fail to connect, and you will lose access. The solution is that you can turn on WiFi tethering on your phone with <strong><i>UDAWA</i></strong> and <strong><i>defaultkey</i></strong> as the WiFi SSID and password. The device will auto-reconnect to that emergency network, and you can reset the access from there.</li>
+                            <li>If your network connection is unreliable, please consider to add an RTC module to your device by contacting your reseller or assembler.</li>
+                            <li>Some changes need reboot to take effect. Use the reboot button on the control tab.</li>
+                            <li>The MADAVA Cloud Plus feature requires an active subscription. Please contact your assembler or retailer to set up your cloud account. MADAVA Cloud Plus enables you to access the system anywhere and anytime via the Internet and provides you with mobile notification and extensive data logging and reporting.</li>
+                        </ol>
+                        <button type="button" class="secondary outline" (click)="reboot()"><span class="material-symbols-outlined">restart_alt</span> Reboot</button>
+                    </article>
+                </div>
+            </details>
+            <div class="grid">
+            <article>
+                <div class="grid">
+                <ul>
+                    <li><small>{{cfg['name'] + ' (' + cfg['model'] + ') '}}</small></li>
+                    <li><small>{{deviceTelemetry['dts']}}</small></li>
+                    <li><small>{{cfg['hname']}}.local</small></li>
+                </ul>
+                <ul>
+                    <li><small>{{' Firmware v' + attr['fmVersion'] + ' ' + attr['compdate']}}</small></li>
+                    <li><small>IP Address {{attr['ipad']}}</small></li>
+                    <li><small>Connected to {{cfg['ap']}}</small></li>
+                </ul>
+                </div>
+            </article>
+            <article>
+                <label for="prog-fs">
+                <progress id="prog-fs" value="{{attr['dUsed']}}" max="{{attr['dSize']}}"></progress>
+                Internal disk used {{attr['dUsed'] / attr['dSize'] * 100 | number:'1.2-2'}}% {{attr['dSize'] / 1024 | number:'1.2-2'}} KB
+                </label>
                 <hr>
-                <fieldset>
-                    <p><small> connected to {{cfg['ap']}}, IP Address {{attr['ipad']}}</small></p>
-                    <label for="wssid">Network SSID
-                        <input type="text" id="wssid" name="wssid" [(ngModel)]="cfg['wssid']" (change)="changeAttr()">
-                    </label>
-        
-                    <label for="wpass">Network Password
-                        <input type="password" id="wpass" name="wpass" [(ngModel)]="cfg['wpass']" (change)="changeAttr()">
-                    </label>
-
-                    <p><small>Use MADAVA Cloud Plus (requres an active subscription).</small></p>
-                    <label class="form-check-label" for="udawa-cfg-usecloud">{{cfg['fIoT'] ? 'ON' : 'OFF'}}
-                        <input type="checkbox" role="switch" id="fIoT" name="fIoT" ng-true-value="1" ng-false-value="0" [(ngModel)]="cfg['fIoT']" (change)="changeAttr()">
-                    </label>
-                </fieldset>
-                
-                <button type="button" class="secondary outline" (click)="saveConfigClick()">Save Config</button>
+                <label for="sd-fs">
+                <progress id="sd-fs" value="{{attr['crUsed']}}" max="{{attr['crByte']}}"></progress>
+                External disk used {{attr['crUsed'] / attr['crByte'] * 100 | number:'1.2-2'}}% {{attr['crSize']}} MB
+                </label>
                 <hr>
-
-                <fieldset>
-                    <label for="lbl1">Label 1
-                        <input type="text" id="lbl1" name="lbl1" [(ngModel)]="lbl['lbl1']" (change)="changeAttr()">
-                    </label>
-                    <label for="lbl2">Label 2
-                        <input type="text" id="lbl2" name="lbl2" [(ngModel)]="lbl['lbl2']" (change)="changeAttr()">
-                    </label>
-                    <label for="lbl3">Label 3
-                        <input type="text" id="lbl3" name="lbl3" [(ngModel)]="lbl['lbl3']" (change)="changeAttr()">
-                    </label>
-                    <label for="lbl4">Label 4
-                        <input type="text" id="lbl4" name="lbl4" [(ngModel)]="lbl['lbl4']" (change)="changeAttr()">
-                    </label>
-                </fieldset>
-
-                <button type="button" class="secondary outline" (click)="savePermanentClick()">Save Setting</button>
+                <label for="prog-heap">
+                <progress id="prog-heap" value="{{ (320000 - deviceTelemetry['heap']) }}" max="320000"></progress>
+                Memory used {{(320000 - deviceTelemetry['heap']) / 320000 * 100 | number:'1.2-2'}}%
+                </label>
                 <hr>
-            </form>
-        </article>
-        <article>
-            <head><h1>Configuration Highlight</h1></head>
-            <p>Here you can change the basic device configuration. Please read the notes below to avoid losing access to your device.</p>
-            <ol>
-                <li>Use a strong but memorable username and password for the built-in web interface. For security reasons, there is no mechanism to reset or recover the password manually. The password must be reset or viewed via cloud solutions or a serial debugger.</li>
-                <li>The device is supposed to be connected to the Internet for the timing function to work properly. Please provide your WiFi SSID and password correctly. If you mistakenly input the wrong WiFi credential, the device will fail to connect, and you will lose access. The solution is that you can turn on WiFi tethering on your phone with UDAWA and defaultkey as the SSID and password. The device will auto-reconnect to that emergency network, and you can reset the access from there.</li>
-                <li>If your network connection is unreliable, please avoid using any feature that requires a timing function, such as the Datetime and Time Daily channel control modes.</li>
-                <li>Some changes need reboot to take effect. Use the reboot button on the control tab.</li>
-                <li>The MADAVA Cloud Plus feature requires an active subscription. Please contact your assembler or retailer to set up your cloud account. MADAVA Cloud Plus enables you to access the system anywhere and anytime via the Internet and provides you with mobile notification and extensive data logging and reporting.</li>
-            </ol>
-        </article>
+                <label for="prog-signal">
+                <progress id="prog-signal" value="{{ deviceTelemetry['rssi'] }}" max="100"></progress>
+                Network Signal {{ deviceTelemetry['rssi'] }}%
+                </label>
+            </article>
+            <article>
+                <blockquote>
+                "{{alarmMsg[alarmCode]}}"
+                <footer>
+                    <cite>- Alarm Code: <kbd>{{alarmCode}}</kbd> - {{alarmTime}}</cite>
+                </footer>
+                </blockquote>
+            </article>
+            </div>
+        </div>
     </div>
-</details>
+    </main>
