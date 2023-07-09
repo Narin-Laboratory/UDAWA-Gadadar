@@ -9,8 +9,6 @@
 
 void setup()
 {
-  if(xSemaphorePZEM == NULL){xSemaphorePZEM = xSemaphoreCreateMutex();}
-
   processSharedAttributeUpdateCb = &attUpdateCb;
   onTbDisconnectedCb = &onTbDisconnected;
   onTbConnectedCb = &onTbConnected;
@@ -19,6 +17,7 @@ void setup()
   emitAlarmCb = &onAlarm;
   onSyncClientAttrCb = &onSyncClientAttr;
   onSaveSettings = &saveSettings;
+  onSaveStates = &saveStates;
   #ifdef USE_WEB_IFACE
   wsEventCb = &onWsEvent;
   #endif
@@ -26,6 +25,7 @@ void setup()
   onMQTTUpdateEndCb = &onMQTTUpdateEnd;
   startup();
   loadSettings();
+  loadStates();
   if(!config.SM){
     syncConfigCoMCU();
   }
@@ -37,26 +37,22 @@ void setup()
   tb.setBufferSize(1024);
 
   #ifdef USE_WEB_IFACE
-  xQueuePZEMMessage = xQueueCreate( 1, sizeof( struct PZEMMessage ) );
-  xQueueBME280Message = xQueueCreate( 1, sizeof( struct BME280Message ) );
+  xQueueWsPayloadPowerSensor = xQueueCreate( 1, sizeof( struct WSPayloadPowerSensor ) );
+  xQueueWsPayloadWeatherSensor = xQueueCreate( 1, sizeof( struct WSPayloadWeatherSensor ) );
+  if(xSemaphorePowerSensor == NULL){xSemaphorePowerSensor = xSemaphoreCreateMutex();}
   #endif
 
-  mySettings.flag_bme280 = bme.begin(0x76);
-  if(!mySettings.flag_bme280){
-    log_manager->warn(PSTR(__func__),PSTR("BME weather sensor failed to initialize!\n"));
-  }else{
-    if(xHandleRecWeatherData == NULL && !config.SM){
-      xReturnedRecWeatherData = xTaskCreatePinnedToCore(recWeatherDataTR, PSTR("recWeatherData"), STACKSIZE_RECWEATHERDATA, NULL, 1, &xHandleRecWeatherData, 1);
-      if(xReturnedRecWeatherData == pdPASS){
-        log_manager->warn(PSTR(__func__), PSTR("Task recWeatherData has been created.\n"));
-      }
+  if(xHandleWeatherSensor == NULL && !config.SM){
+    xReturnedWeatherSensor = xTaskCreatePinnedToCore(weatherSensorTR, PSTR("weatherSensor"), STACKSIZE_WEATHERSENSOR, NULL, 1, &xHandleWeatherSensor, 1);
+    if(xReturnedWeatherSensor == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task weatherSensor has been created.\n"));
     }
   }
 
-  if(xHandleWeatherSensor == NULL && !config.SM){
-    xReturnedWeatherSensor = xTaskCreatePinnedToCore(recPowerUsageTR, PSTR("recPowerUsage"), STACKSIZE_RECPOWERUSAGE, NULL, 1, &xHandleWeatherSensor, 1);
-    if(xReturnedWeatherSensor == pdPASS){
-      log_manager->warn(PSTR(__func__), PSTR("Task recPowerUsage has been created.\n"));
+  if(xHandlePowerSensor == NULL && !config.SM){
+    xReturnedPowerSensor = xTaskCreatePinnedToCore(powerSensorTR, PSTR("powerSensor"), STACKSIZE_POWERSENSOR, NULL, 1, &xHandlePowerSensor, 1);
+    if(xReturnedPowerSensor == pdPASS){
+      log_manager->warn(PSTR(__func__), PSTR("Task powerSensor has been created.\n"));
     }
   }
 
@@ -81,33 +77,187 @@ void setup()
       log_manager->warn(PSTR(__func__), PSTR("Task wsSendTelemetry has been created.\n"));
     }
   }
-
-  if(xHandleWsSendSensors == NULL && !config.SM){
-    xReturnedWsSendSensors = xTaskCreatePinnedToCore(wsSendSensorsTR, PSTR("wsSendSensors"), STACKSIZE_WSSENDSENSORS, NULL, 1, &xHandleWsSendSensors, 1);
-    if(xReturnedWsSendSensors == pdPASS){
-      log_manager->warn(PSTR(__func__), PSTR("Task wsSendSensors has been created.\n"));
-    }
-  }
   #endif
 }
 
 void loop(){
   udawa();
   if(!config.SM){
-    if( (millis() - recPowerUsageTR_last_activity) > 30000){
+    if( (millis() - powerSensorTR_last_activity) > 30000){
       setAlarm(121, 1, 5, 1000);
-      log_manager->warn(PSTR("recPowerUsageTR"), PSTR("Task is not responding for: %d\n"), ((millis() - recPowerUsageTR_last_activity)));
-      recPowerUsageTR_last_activity = millis();
+      log_manager->warn(PSTR("powerSensorTR"), PSTR("Task is not responding for: %d\n"), ((millis() - powerSensorTR_last_activity)));
+      powerSensorTR_last_activity = millis();
       reboot();
     }
   }
   vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
 }
 
+void powerSensorTR(void *arg){
+  HardwareSerial PZEMSerial(1);
+  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+  myStates.flag_powerSensor = !isnan(PZEM.voltage());
+  if(!myStates.flag_powerSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize powerSensor!\n"));}
+
+  Stream_Stats<float> _volt_;
+  Stream_Stats<float> _amp_;
+  Stream_Stats<float> _watt_;
+  Stream_Stats<float> _freq_;
+  Stream_Stats<float> _pf_;
+
+  float volt; float amp; float watt; float freq; float pf; float ener;  
+
+  unsigned long timerTelemetry = millis();
+  unsigned long timerAttribute = millis();
+  unsigned long timerAlarm = millis();
+
+  while (true)
+  {
+    bool flag_failure_readings = false;
+    if(myStates.flag_powerSensor){
+      volt = PZEM.voltage();
+      amp = PZEM.current();
+      watt = PZEM.power();
+      freq = PZEM.frequency();
+      pf = PZEM.pf();
+      ener = PZEM.energy();
+    }
+
+    if(isnan(volt) || isnan(amp) || isnan(watt) || isnan(freq) || isnan(pf) ||
+    isnan(ener) || volt < 0.0 || volt > 1000.0 || amp < 0.0 || amp > 100.0 || watt < .0 || 
+    watt > 22000.0 || freq < 0.0 || freq > 100.0 || ener > 9999.0 ){
+      flag_failure_readings = true;
+      //log_manager->debug(PSTR(__func__), PSTR("Weather sensor abnormal reading: %.2f, %.2f, %.2f, %.2f\n"), celc, rh, hpa, alt);
+    }
+
+    if(myStates.flag_powerSensor && !flag_failure_readings)
+    {
+      _volt_.Add(volt);
+      _amp_.Add(amp);
+      _watt_.Add(watt);
+      _freq_.Add(freq);
+      _pf_.Add(pf);
+    }
+
+    unsigned long now = millis();
+    if(myStates.flag_powerSensor && !flag_failure_readings)
+    {
+      StaticJsonDocument<DOCSIZE_MIN> doc;
+      char buffer[DOCSIZE_MIN];
+      
+      if( (now - timerAttribute) > (mySettings.itPc * 1000) && tb.connected() && config.provSent)
+      {
+        doc[PSTR("_volt")] = volt;
+        doc[PSTR("_amp")] = amp;
+        doc[PSTR("_watt")] = watt;
+        doc[PSTR("_freq")] = freq;
+        doc[PSTR("_pf")] = pf;
+        doc[PSTR("_ener")] = ener;
+        serializeJson(doc, buffer);
+        tbSendAttribute(buffer);
+        doc.clear();
+
+        timerAttribute = now;
+      }
+
+      if( (now - timerTelemetry) > (mySettings.itP * 1000) )
+      {
+        float a = _volt_.Get_Average();
+        float b = _amp_.Get_Average();
+        float c = _watt_.Get_Average();
+        float d = _pf_.Get_Average();
+        float e = _freq_.Get_Average();
+        if(!isnan(a) && a > 0.0 && a < 1000.0 && !isnan(b) && b >=0 && 
+          b <= 100.0 && !isnan(c) && c >= 0 && c <= 22000.0 &&
+          d > 0 && d < 100 && e > 0 && e < 100){
+          doc[PSTR("volt")] = a;  
+          doc[PSTR("amp")] = b; 
+          doc[PSTR("watt")] = c;
+          doc[PSTR("pf")] = d; 
+          doc[PSTR("freq")] = e; 
+          writeCardLogger(doc);
+          if(tb.connected() && config.provSent)
+          {
+            serializeJson(doc, buffer);
+            if(tbSendTelemetry(buffer)){
+              
+            }
+          }
+          _volt_.Clear(); _amp_.Clear(); _watt_.Clear(); 
+          _freq_.Clear(); _pf_.Clear();
+          doc.clear();
+        }
+
+        timerTelemetry = now;
+      }
+
+    }
+  
+    if( (now - timerAlarm) > 10000 )
+    {
+      if(!myStates.flag_powerSensor){setAlarm(140, 1, 5, 1000);}
+      else{
+        if(volt < 0 || volt > 1000){setAlarm(141, 1, 5, 1000);}
+        if(amp < 0 || amp > 100){setAlarm(142, 1, 5, 1000);}
+        if(watt < 0 || watt > 22000){setAlarm(143, 1, 5, 1000);}
+        if(pf < 0 || pf > 100){setAlarm(144, 1, 5, 1000);}
+        if(freq < 0 || freq > 100){setAlarm(144, 1, 5, 1000);}
+        if(watt > 2000 || volt > 275){setAlarm(145, 1, 5, 1000);}
+
+        uint8_t activeRelayCounter = 0;
+        for(uint8_t i = 0; i < 4; i++){
+          if(myStates.dutyState[i] == mySettings.ON &&
+          watt < 6.0){setAlarm(210+i, 1, 5, 1000);}
+
+          if(myStates.dutyState[i] == mySettings.ON){activeRelayCounter++;}
+
+          if( myStates.dutyState[i] == mySettings.ON && 
+            (millis() - myStates.stateOnTs[i]) > 3600000){
+              setAlarm(215+1, 1, 5, 1000);
+            }
+        }
+
+        if(activeRelayCounter == 0 && watt > 6){setAlarm(215, 1, 5, 1000);}
+        
+    
+      }
+
+      
+      timerAlarm = now;
+    }
+
+    #ifdef USE_WEB_IFACE
+    if( xQueueWsPayloadPowerSensor != NULL && (config.wsCount > 0) && myStates.flag_powerSensor && !flag_failure_readings)
+    {
+      WSPayloadPowerSensor payload;
+      payload.volt = volt;
+      payload.amp = amp;
+      payload.watt = watt;
+      payload.freq = freq;
+      payload.pf = pf;
+      payload.ener = ener;
+      if( xQueueSend( xQueueWsPayloadPowerSensor, &payload, ( TickType_t ) 1000 ) != pdPASS )
+      {
+        log_manager->debug(PSTR(__func__), PSTR("Failed to fill WSPayloadPowerSensor. Queue is full. \n"));
+      }
+    }
+    #endif
+
+    if(myStates.flag_resetPowerSensor){
+      myStates.flag_resetPowerSensor = 0;
+      PZEM.resetEnergy();
+    }
+
+    powerSensorTR_last_activity = millis();
+    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
+  }
+}
+
+
 void weatherSensorTR(void *arg){
   BME280I2C weatherSensor;
-  mySettings.flag_weatherSensor = weatherSensor.begin();
-  if(!mySettings.flag_weatherSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize weatherSensor!\n"));}
+  myStates.flag_weatherSensor = weatherSensor.begin();
+  if(!myStates.flag_weatherSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize weatherSensor!\n"));}
 
   Stream_Stats<float> _celc_;
   Stream_Stats<float> _rh_;
@@ -123,7 +273,7 @@ void weatherSensorTR(void *arg){
   while (true)
   {
     bool flag_failure_readings = false;
-    if(mySettings.flag_weatherSensor){
+    if(myStates.flag_weatherSensor){
       BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
       BME280::PresUnit presUnit(BME280::PresUnit_Pa);
 
@@ -138,7 +288,7 @@ void weatherSensorTR(void *arg){
       //log_manager->debug(PSTR(__func__), PSTR("Weather sensor abnormal reading: %.2f, %.2f, %.2f, %.2f\n"), celc, rh, hpa, alt);
     }
 
-    if(mySettings.flag_weatherSensor && !flag_failure_readings)
+    if(myStates.flag_weatherSensor && !flag_failure_readings)
     {
       _celc_.Add(celc);
       _rh_.Add(rh);
@@ -147,7 +297,7 @@ void weatherSensorTR(void *arg){
     }
 
     unsigned long now = millis();
-    if(mySettings.flag_weatherSensor && !flag_failure_readings)
+    if(myStates.flag_weatherSensor && !flag_failure_readings)
     {
       StaticJsonDocument<DOCSIZE_MIN> doc;
       char buffer[DOCSIZE_MIN];
@@ -195,7 +345,7 @@ void weatherSensorTR(void *arg){
   
     if( (now - timerAlarm) > 10000 )
     {
-      if(!mySettings.flag_weatherSensor){setAlarm(120, 1, 5, 1000);}
+      if(!myStates.flag_weatherSensor){setAlarm(120, 1, 5, 1000);}
       else{
         if(celc < -80 || celc > 80){setAlarm(121, 1, 5, 1000);}
         if(celc > 45){setAlarm(122, 1, 5, 1000);}
@@ -213,7 +363,7 @@ void weatherSensorTR(void *arg){
     }
 
     #ifdef USE_WEB_IFACE
-    if( xQueueWsPayloadWeatherSensor != NULL && (config.wsCount > 0) && mySettings.flag_weatherSensor && !flag_failure_readings)
+    if( xQueueWsPayloadWeatherSensor != NULL && (config.wsCount > 0) && myStates.flag_weatherSensor && !flag_failure_readings)
     {
       WSPayloadWeatherSensor payload;
       payload.celc = celc;
@@ -233,8 +383,6 @@ void weatherSensorTR(void *arg){
 
 void loadSettings()
 {
-  long startMillis = millis();
-
   StaticJsonDocument<DOCSIZE_SETTINGS> doc;
   readSettings(doc, settingsPath);
 
@@ -242,12 +390,6 @@ void loadSettings()
 
   if(doc["cpM"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cpM"].as<JsonArray>()) { mySettings.cpM[index] = v.as<uint8_t>(); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.cpM); i++) { mySettings.cpM[i] = 0; } }
-
-  if(doc["cp0A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0A"].as<JsonArray>()) { mySettings.cp0A[index] = v.as<uint8_t>(); index++; } } 
-  else { for(uint8_t i = 0; i < countof(mySettings.cp0A); i++) { mySettings.cp0A[i] = 0; } }
-
-  if(doc["cp0B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0B"].as<JsonArray>()) { mySettings.cp0B[index] = v.as<uint32_t>(); index++; } } 
-  else { for(uint8_t i = 0; i < countof(mySettings.cp0B); i++) { mySettings.cp0B[i] = 0; } }
 
   if(doc["cp1A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp1A"].as<JsonArray>()) { mySettings.cp1A[index] = v.as<uint8_t>(); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.cp1A); i++) { mySettings.cp1A[i] = 0; } }
@@ -299,35 +441,29 @@ void loadSettings()
   if(doc["itWc"] != nullptr){mySettings.itWc = doc["itWc"].as<uint16_t>();}
   else{mySettings.itWc = 3;}
 
-
-  for(uint8_t i = 0; i < countof(mySettings.dutyCounter); i++) { mySettings.dutyCounter[i] = 86400; }
+  for(uint8_t i = 0; i < countof(myStates.dutyCounter); i++) { myStates.dutyCounter[i] = 86400; }
 
   if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
   else{mySettings.seaHpa = 1019.00;}
 
   if(doc["lbl"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbl"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.lbl); i++) { strlcpy(mySettings.lbl[i], "unnamed", sizeof(mySettings.lbl[i])); } }
+}
 
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+void loadStates()
+{
+  StaticJsonDocument<DOCSIZE_SETTINGS> doc;
+  readSettings(doc, statesPath);
+  if(doc["cp0A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0A"].as<JsonArray>()) { myStates.cp0A[index] = v.as<uint8_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(myStates.cp0A); i++) { myStates.cp0A[i] = 0; } }
+
+  if(doc["cp0B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0B"].as<JsonArray>()) { myStates.cp0B[index] = v.as<uint32_t>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(myStates.cp0B); i++) { myStates.cp0B[i] = 0; } }
 }
 
 void saveSettings()
 {
-  long startMillis = millis();
-
   StaticJsonDocument<DOCSIZE_SETTINGS> doc;
-
-  JsonArray cp0A = doc.createNestedArray("cp0A");
-  for(uint8_t i=0; i<countof(mySettings.cp0A); i++)
-  {
-    cp0A.add(mySettings.cp0A[i]);
-  }
-
-  JsonArray cp0B = doc.createNestedArray("cp0B");
-  for(uint8_t i=0; i<countof(mySettings.cp0B); i++)
-  {
-    cp0B.add(mySettings.cp0B[i]);
-  }
 
   JsonArray cp1A = doc.createNestedArray("cp1A");
   for(uint8_t i=0; i<countof(mySettings.cp1A); i++)
@@ -406,8 +542,28 @@ void saveSettings()
   doc["seaHpa"] = mySettings.seaHpa;
 
   writeSettings(doc, settingsPath);
+}
 
-  log_manager->verbose(PSTR(__func__), PSTR("Executed (%dms).\n"), millis() - startMillis);
+void saveStates()
+{
+  if( xSemaphoreStates != NULL && xSemaphoreTake( xSemaphoreStates, ( TickType_t ) 0 ) == pdTRUE ){
+    StaticJsonDocument<DOCSIZE_SETTINGS> doc;
+
+    JsonArray cp0A = doc.createNestedArray("cp0A");
+    for(uint8_t i=0; i<countof(myStates.cp0A); i++)
+    {
+      cp0A.add(myStates.cp0A[i]);
+    }
+
+    JsonArray cp0B = doc.createNestedArray("cp0B");
+    for(uint8_t i=0; i<countof(myStates.cp0B); i++)
+    {
+      cp0B.add(myStates.cp0B[i]);
+    }
+
+    writeSettings(doc, statesPath);
+    xSemaphoreGive(xSemaphoreStates);
+  }
 }
 
 void setSwitch(String ch, String state)
@@ -416,29 +572,31 @@ void setSwitch(String ch, String state)
 
   bool fState = 0;
   uint8_t pR = 0;
-  uint8_t itD = 0;
+  uint8_t idx = 0;
 
-  if(ch == String("ch1")){itD = 0; pR = mySettings.pR[0]; mySettings.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[0] = true;}
-  else if(ch == String("ch2")){itD = 1; pR = mySettings.pR[1]; mySettings.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[1] = true;}
-  else if(ch == String("ch3")){itD = 2; pR = mySettings.pR[2]; mySettings.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[2] = true;}
-  else if(ch == String("ch4")){itD = 3; pR = mySettings.pR[3]; mySettings.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; mySettings.publishSwitch[3] = true;}
+  if(ch == String("ch1")){idx = 0; pR = mySettings.pR[0]; myStates.dutyState[0] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; myStates.publishSwitch[0] = true;}
+  else if(ch == String("ch2")){idx = 1; pR = mySettings.pR[1]; myStates.dutyState[1] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; myStates.publishSwitch[1] = true;}
+  else if(ch == String("ch3")){idx = 2; pR = mySettings.pR[2]; myStates.dutyState[2] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; myStates.publishSwitch[2] = true;}
+  else if(ch == String("ch4")){idx = 3; pR = mySettings.pR[3]; myStates.dutyState[3] = (state == String("ON")) ? mySettings.ON : 1 - mySettings.ON; myStates.publishSwitch[3] = true;}
 
   if(state == String("ON"))
   {
     fState = mySettings.ON;
-    mySettings.stateOnTs[itD] = millis();
+    myStates.stateOnTs[idx] = millis();
 
-    if(mySettings.cpM[itD] == 0){
-      mySettings.cp0A[itD] = mySettings.ON;
+    if(mySettings.cpM[idx] == 0){
+      myStates.cp0A[idx] = mySettings.ON;
+      FLAG_SAVE_STATES = 1;
     }
   }
   else
   {
     fState = 1 - mySettings.ON;
-    mySettings.stateOnTs[itD] = 0;
+    myStates.stateOnTs[idx] = 0;
 
-    if(mySettings.cpM[itD] == 0){
-      mySettings.cp0A[itD] = 1 - mySettings.ON;
+    if(mySettings.cpM[idx] == 0){
+      myStates.cp0A[idx] = 1 - mySettings.ON;
+      FLAG_SAVE_STATES = 1;
     }
   }
 
@@ -463,10 +621,10 @@ void relayControlCP0(){
   uint8_t activeCounter = 0;
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
-    if(mySettings.cpM[i] == 0 && mySettings.cp0B[i] != 0)
+    if(mySettings.cpM[i] == 0 && myStates.cp0B[i] != 0)
     {
       unsigned long now = millis();
-      if( (now - mySettings.stateOnTs[i]) >= ( mySettings.cp0B[i] * 1000 ) && mySettings.cp0A[i] == mySettings.ON)
+      if( (now - myStates.stateOnTs[i]) >= ( myStates.cp0B[i] * 1000 ) && myStates.cp0A[i] == mySettings.ON)
       {
         String ch = "ch" + String(i + 1);
         setSwitch(ch, "OFF");
@@ -474,8 +632,9 @@ void relayControlCP0(){
       }
     }
   }
-  if(activeCounter > 1){
-    FLAG_SAVE_SETTINGS = 1;
+  if(activeCounter >= 1)
+  {
+    FLAG_SAVE_STATES = 1;
   }
 }
 
@@ -485,24 +644,24 @@ void relayControlCP1(){
     if (mySettings.cp1B[i] < 2){mySettings.cp1B[i] = 2;} //safenet
     if(mySettings.cp1A[i] != 0 && mySettings.cpM[i] == 1)
     {
-      if( mySettings.dutyState[i] == mySettings.ON )
+      if( myStates.dutyState[i] == mySettings.ON )
       {
-        if( mySettings.cp1A[i] != 100 && (millis() - mySettings.dutyCounter[i] ) >= (float)(( ((float)mySettings.cp1A[i] / 100) * (float)mySettings.cp1B[i]) * 1000))
+        if( mySettings.cp1A[i] != 100 && (millis() - myStates.dutyCounter[i] ) >= (float)(( ((float)mySettings.cp1A[i] / 100) * (float)mySettings.cp1B[i]) * 1000))
         {
-          mySettings.dutyState[i] = 1 - mySettings.ON;
+          myStates.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
-          mySettings.dutyCounter[i] = millis();
+          myStates.dutyCounter[i] = millis();
         }
       }
       else
       {
-        if( mySettings.cp1A[i] != 0 && (millis() - mySettings.dutyCounter[i] ) >= (float) ( ((100 - (float) mySettings.cp1A[i]) / 100) * (float) mySettings.cp1B[i]) * 1000)
+        if( mySettings.cp1A[i] != 0 && (millis() - myStates.dutyCounter[i] ) >= (float) ( ((100 - (float) mySettings.cp1A[i]) / 100) * (float) mySettings.cp1B[i]) * 1000)
         {
-          mySettings.dutyState[i] = mySettings.ON;
+          myStates.dutyState[i] = mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "ON");
-          mySettings.dutyCounter[i] = millis();
+          myStates.dutyCounter[i] = millis();
         }
       }
     }
@@ -514,14 +673,14 @@ void relayControlCP2(){
   {
     if(mySettings.cp2B[i] > 0 && mySettings.cpM[i] == 2){
       if(mySettings.cp2A[i] <= (rtc.getEpoch()) && (mySettings.cp2B[i]) >=
-        (rtc.getEpoch() - mySettings.cp2A[i]) && mySettings.dutyState[i] != mySettings.ON){
-          mySettings.dutyState[i] = mySettings.ON;
+        (rtc.getEpoch() - mySettings.cp2A[i]) && myStates.dutyState[i] != mySettings.ON){
+          myStates.dutyState[i] = mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "ON");
       }
-      else if(mySettings.dutyState[i] == mySettings.ON && (mySettings.cp2B[i]) <=
+      else if(myStates.dutyState[i] == mySettings.ON && (mySettings.cp2B[i]) <=
         (rtc.getEpoch() - mySettings.cp2A[i])){
-          mySettings.dutyState[i] = 1 - mySettings.ON;
+          myStates.dutyState[i] = 1 - mySettings.ON;
           String ch = "ch" + String(i+1);
           setSwitch(ch, "OFF");
       }
@@ -569,12 +728,12 @@ void relayControlCP3(){
           activeTimeWindowCounter++;
         }
       }
-      if (mySettings.dutyState[i] != mySettings.ON && activeTimeWindowCounter > 0){
-        mySettings.dutyState[i] = mySettings.ON;
+      if (myStates.dutyState[i] != mySettings.ON && activeTimeWindowCounter > 0){
+        myStates.dutyState[i] = mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "ON");
-      }else if(mySettings.dutyState[i] == mySettings.ON && activeTimeWindowCounter < 1) {
-        mySettings.dutyState[i] = 1 - mySettings.ON;
+      }else if(myStates.dutyState[i] == mySettings.ON && activeTimeWindowCounter < 1) {
+        myStates.dutyState[i] = 1 - mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "OFF");
       }
@@ -587,14 +746,14 @@ void relayControlCP4(){
   {
     if(mySettings.cp4A[i] != 0 && mySettings.cp4B[i] != 0 && mySettings.cpM[i] == 4)
     {
-      if( mySettings.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4A[i] * 1000) ){
-        mySettings.dutyState[i] = mySettings.ON;
+      if( myStates.dutyState[i] == 1 - mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4A[i] * 1000) ){
+        myStates.dutyState[i] = mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "ON");
         mySettings.cp4BTs[i] = millis();
       }
-      if( mySettings.dutyState[i] == mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4B[i] * 1000) ){
-        mySettings.dutyState[i] = 1 - mySettings.ON;
+      if( myStates.dutyState[i] == mySettings.ON && (millis() - mySettings.cp4BTs[i]) > (mySettings.cp4B[i] * 1000) ){
+        myStates.dutyState[i] = 1 - mySettings.ON;
         String ch = "ch" + String(i+1);
         setSwitch(ch, "OFF");
       }
@@ -682,10 +841,10 @@ void attUpdateCb(const Shared_Attribute_Data &data)
   if( xSemaphoreSettings != NULL ){
     if( xSemaphoreTake( xSemaphoreSettings, ( TickType_t ) 1000 ) == pdTRUE )
     {
-      if(data["cp0B1"] != nullptr){mySettings.cp0B[0] = data["cp0B1"].as<unsigned long>();}
-      if(data["cp0B2"] != nullptr){mySettings.cp0B[1] = data["cp0B2"].as<unsigned long>();}
-      if(data["cp0B3"] != nullptr){mySettings.cp0B[2] = data["cp0B3"].as<unsigned long>();}
-      if(data["cp0B4"] != nullptr){mySettings.cp0B[3] = data["cp0B4"].as<unsigned long>();}
+      if(data["cp0B1"] != nullptr){myStates.cp0B[0] = data["cp0B1"].as<unsigned long>();}
+      if(data["cp0B2"] != nullptr){myStates.cp0B[1] = data["cp0B2"].as<unsigned long>();}
+      if(data["cp0B3"] != nullptr){myStates.cp0B[2] = data["cp0B3"].as<unsigned long>();}
+      if(data["cp0B4"] != nullptr){myStates.cp0B[3] = data["cp0B4"].as<unsigned long>();}
 
       if(data["cp1B1"] != nullptr){mySettings.cp1B[0] = data["cp1B1"].as<unsigned long>();}
       if(data["cp1B2"] != nullptr){mySettings.cp1B[1] = data["cp1B2"].as<unsigned long>();}
@@ -772,10 +931,10 @@ void attUpdateCb(const Shared_Attribute_Data &data)
 }
 
 void onTbConnected(){
-  mySettings.publishSwitch[0] = 1;
-  mySettings.publishSwitch[1] = 1;
-  mySettings.publishSwitch[2] = 1;
-  mySettings.publishSwitch[3] = 1;
+  myStates.publishSwitch[0] = 1;
+  myStates.publishSwitch[1] = 1;
+  myStates.publishSwitch[2] = 1;
+  myStates.publishSwitch[3] = 1;
 }
 
 void onTbDisconnected(){
@@ -818,18 +977,7 @@ RPC_Response genericClientRPC(const RPC_Data &data){
             }
           }
           else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
-            if( xSemaphorePZEM != NULL){
-              if( xSemaphoreTake( xSemaphorePZEM, ( TickType_t ) 0 ) == pdTRUE )
-              {
-                uint8_t res = PZEM.resetEnergy();
-                log_manager->verbose(PSTR(__func__), PSTR("PZEM reset status: %d\n"), res);
-                xSemaphoreGive( xSemaphorePZEM );
-              }
-              else
-              {
-                log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-              }   
-            }
+            myStates.flag_resetPowerSensor = 1;
           }
       }  
       xSemaphoreGive( xSemaphoreTBSend );
@@ -855,7 +1003,7 @@ void stateReset(bool resetOpMode){
       if(mySettings.cpM[i] == 0)
       {
         String ch = "ch" + String(i + 1);
-        String state = mySettings.cp0A[i] == mySettings.ON ? "ON" : "OFF";
+        String state = myStates.cp0A[i] == mySettings.ON ? "ON" : "OFF";
         setSwitch(ch, state);
         log_manager->verbose(PSTR(__func__), PSTR("%s operation are %s.\n"), ch.c_str(), state.c_str());
       }
@@ -907,10 +1055,10 @@ void publishDeviceTelemetryTR(void * arg){
 }
 
 void publishSwitch(){
-  for (uint8_t i = 0; i < sizeof(mySettings.dutyState); i++){
-    if(mySettings.publishSwitch[i]){
+  for (uint8_t i = 0; i < sizeof(myStates.dutyState); i++){
+    if(myStates.publishSwitch[i]){
         String chName = "ch" + String(i+1);
-        int state = (int)mySettings.dutyState[i] == mySettings.ON ? 1 : 0;
+        int state = (int)myStates.dutyState[i] == mySettings.ON ? 1 : 0;
 
         char buffer[64];
         StaticJsonDocument<64> doc;
@@ -927,7 +1075,7 @@ void publishSwitch(){
         }
         #endif
 
-        mySettings.publishSwitch[i] = false;
+        myStates.publishSwitch[i] = false;
     }
   }
 }
@@ -940,14 +1088,14 @@ void onSyncClientAttr(uint8_t direction){
     
 
     if(tb.connected() && (direction == 0 || direction == 1)){
-      doc[PSTR("cp0A1")] = mySettings.cp0A[0];
-      doc[PSTR("cp0A2")] = mySettings.cp0A[1];
-      doc[PSTR("cp0A3")] = mySettings.cp0A[2];
-      doc[PSTR("cp0A4")] = mySettings.cp0A[3];
-      doc[PSTR("cp0B1")] = mySettings.cp0B[0];
-      doc[PSTR("cp0B2")] = mySettings.cp0B[1];
-      doc[PSTR("cp0B3")] = mySettings.cp0B[2];
-      doc[PSTR("cp0B4")] = mySettings.cp0B[3];
+      doc[PSTR("cp0A1")] = myStates.cp0A[0];
+      doc[PSTR("cp0A2")] = myStates.cp0A[1];
+      doc[PSTR("cp0A3")] = myStates.cp0A[2];
+      doc[PSTR("cp0A4")] = myStates.cp0A[3];
+      doc[PSTR("cp0B1")] = myStates.cp0B[0];
+      doc[PSTR("cp0B2")] = myStates.cp0B[1];
+      doc[PSTR("cp0B3")] = myStates.cp0B[2];
+      doc[PSTR("cp0B4")] = myStates.cp0B[3];
       serializeJson(doc, buffer);
       tbSendAttribute(buffer);
       doc.clear();
@@ -1033,18 +1181,18 @@ void onSyncClientAttr(uint8_t direction){
     #ifdef USE_WEB_IFACE
     if(config.wsCount > 0 && (direction == 0 || direction == 2)){
       JsonObject cp0A = doc.createNestedObject("cp0A");
-      cp0A[PSTR("cp0A1")] = mySettings.cp0A[0];
-      cp0A[PSTR("cp0A2")] = mySettings.cp0A[1];
-      cp0A[PSTR("cp0A3")] = mySettings.cp0A[2];
-      cp0A[PSTR("cp0A4")] = mySettings.cp0A[3];
+      cp0A[PSTR("cp0A1")] = myStates.cp0A[0];
+      cp0A[PSTR("cp0A2")] = myStates.cp0A[1];
+      cp0A[PSTR("cp0A3")] = myStates.cp0A[2];
+      cp0A[PSTR("cp0A4")] = myStates.cp0A[3];
       serializeJson(doc, buffer);
       wsBroadcastTXT(buffer);
       doc.clear();
       JsonObject cp0B = doc.createNestedObject("cp0B");
-      cp0B[PSTR("cp0B1")] = mySettings.cp0B[0];
-      cp0B[PSTR("cp0B2")] = mySettings.cp0B[1];
-      cp0B[PSTR("cp0B3")] = mySettings.cp0B[2];
-      cp0B[PSTR("cp0B4")] = mySettings.cp0B[3];
+      cp0B[PSTR("cp0B1")] = myStates.cp0B[0];
+      cp0B[PSTR("cp0B2")] = myStates.cp0B[1];
+      cp0B[PSTR("cp0B3")] = myStates.cp0B[2];
+      cp0B[PSTR("cp0B4")] = myStates.cp0B[3];
       serializeJson(doc, buffer);
       wsBroadcastTXT(buffer);
       doc.clear();
@@ -1117,10 +1265,10 @@ void onSyncClientAttr(uint8_t direction){
       cpM[PSTR("cpM2")] = mySettings.cpM[1];
       cpM[PSTR("cpM3")] = mySettings.cpM[2];
       cpM[PSTR("cpM4")] = mySettings.cpM[3];
-      doc[PSTR("ch1")] = (int)mySettings.dutyState[0] == mySettings.ON ? 1 : 0;
-      doc[PSTR("ch2")] = (int)mySettings.dutyState[1] == mySettings.ON ? 1 : 0;
-      doc[PSTR("ch3")] = (int)mySettings.dutyState[2] == mySettings.ON ? 1 : 0;
-      doc[PSTR("ch4")] = (int)mySettings.dutyState[3] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch1")] = (int)myStates.dutyState[0] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch2")] = (int)myStates.dutyState[1] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch3")] = (int)myStates.dutyState[2] == mySettings.ON ? 1 : 0;
+      doc[PSTR("ch4")] = (int)myStates.dutyState[3] == mySettings.ON ? 1 : 0;
       serializeJson(doc, buffer);
       wsBroadcastTXT(buffer);
     }
@@ -1132,46 +1280,66 @@ void onSyncClientAttr(uint8_t direction){
 #ifdef USE_WEB_IFACE
 void onWsEvent(const JsonObject &doc){
   if(doc["evType"] == nullptr){
-    log_manager->debug(PSTR(__func__), "Event type not found.\n");
+    log_manager->debug(PSTR(__func__), PSTR("Event type not found.\n"));
     return;
   }
   int evType = doc["evType"].as<int>();
 
 
+  #ifdef USE_ASYNC_WEB
+  if(evType == (int)WS_EVT_CONNECT){
+  #endif
+  #ifndef USE_ASYNC_WEB
   if(evType == (int)WStype_CONNECTED){
+  #endif
     FLAG_SYNC_CLIENT_ATTR_2 = true;
   }
-  if(evType == (int)WStype_DISCONNECTED){
+  #ifdef USE_ASYNC_WEB
+  if(evType == (int)WS_EVT_DISCONNECT){
+  #endif
+  #ifndef USE_ASYNC_WEB
+  else if(evType == (int)WStype_DISCONNECTED){
+  #endif
       if(config.wsCount < 1){
           log_manager->debug(PSTR(__func__),PSTR("No WS client is active. \n"));
       }
   }
+  #ifdef USE_ASYNC_WEB
+  if(evType == (int)WS_EVT_DATA){
+  #endif
+  #ifndef USE_ASYNC_WEB
   else if(evType == (int)WStype_TEXT){
-      if(doc["cmd"] == nullptr){
-          log_manager->debug(PSTR(__func__), "Command not found.\n");
-          return;
-      }
-      const char* cmd = doc["cmd"].as<const char*>();
-      if(strcmp(cmd, (const char*) "attr") == 0){
-        processSharedAttributeUpdate(doc);
-        FLAG_SYNC_CLIENT_ATTR_1 = true;
-      }
-      else if(strcmp(cmd, (const char*) "saveSettings") == 0){
-        FLAG_SAVE_SETTINGS = true;
-      }
-      else if(strcmp(cmd, (const char*) "configSave") == 0){
-        FLAG_SAVE_CONFIG = true;
-      }
-      else if(strcmp(cmd, (const char*) "setPanic") == 0){
-        doc[PSTR("st")] = configcomcu.fP ? "OFF" : "ON";
-        processSetPanic(doc);
-      }
-      else if(strcmp(cmd, (const char*) "reboot") == 0){
-        reboot();
-      }
-      else if(strcmp(cmd, (const char*) "setSwitch") == 0){
-        setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
-      }
+  #endif
+    if(doc["cmd"] == nullptr){
+        log_manager->debug(PSTR(__func__), "Command not found.\n");
+        return;
+    }
+    const char* cmd = doc["cmd"].as<const char*>();
+    if(strcmp(cmd, (const char*) "attr") == 0){
+      processSharedAttributeUpdate(doc);
+      FLAG_SYNC_CLIENT_ATTR_1 = true;
+    }
+    else if(strcmp(cmd, (const char*) "saveSettings") == 0){
+      FLAG_SAVE_SETTINGS = true;
+    }
+    else if(strcmp(cmd, (const char*) "configSave") == 0){
+      FLAG_SAVE_CONFIG = true;
+    }
+    else if(strcmp(cmd, (const char*) "setPanic") == 0){
+      doc[PSTR("st")] = configcomcu.fP ? "OFF" : "ON";
+      processSetPanic(doc);
+    }
+    else if(strcmp(cmd, (const char*) "reboot") == 0){
+      reboot();
+    }
+    else if(strcmp(cmd, (const char*) "setSwitch") == 0){
+      setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
+    }
+    else if(strcmp(cmd, (const char*) PSTR("wsStreamCardLogger")) == 0){
+      GLOBAL_TARGET_CLIENT_ID = doc[PSTR("num")].as<uint32_t>(); 
+      GLOBAL_LOG_FILE_NAME = doc[PSTR("fileName")].as<String>();
+      FLAG_WS_STREAM_SDCARD = true;
+    }
   }
 }
 
@@ -1188,21 +1356,61 @@ void wsSendTelemetryTR(void *arg){
       devTel[PSTR("dts")] = rtc.getDateTime();
       serializeJson(doc, buffer);
       wsBroadcastTXT(buffer);
+      doc.clear();
+  
+      if( xQueueWsPayloadPowerSensor != NULL ){
+        WSPayloadPowerSensor payload;
+        if( xQueueReceive( xQueueWsPayloadPowerSensor,  &( payload ), ( TickType_t ) 0 ) == pdPASS )
+        {
+          JsonObject powerSensor = doc.createNestedObject("powerSensor");
+          powerSensor[PSTR("volt")] = payload.volt;
+          powerSensor[PSTR("amp")] = payload.amp;
+          powerSensor[PSTR("watt")] = payload.watt;
+          powerSensor[PSTR("freq")] = payload.freq;
+          powerSensor[PSTR("pf")] = payload.pf;
+          powerSensor[PSTR("ener")] = payload.ener;
+          serializeJson(doc, buffer);
+          wsBroadcastTXT(buffer);
+          doc.clear();
+        }
+      }
+
+      if( xQueueWsPayloadWeatherSensor != NULL ){
+        WSPayloadWeatherSensor payload;
+        if( xQueueReceive( xQueueWsPayloadWeatherSensor,  &( payload ), ( TickType_t ) 0 ) == pdPASS )
+        {
+          JsonObject weatherSensor = doc.createNestedObject("weatherSensor");
+          weatherSensor[PSTR("celc")] = payload.celc;
+          weatherSensor[PSTR("rh")] = payload.rh;
+          weatherSensor[PSTR("alt")] = payload.alt;
+          weatherSensor[PSTR("hpa")] = payload.hpa;
+          serializeJson(doc, buffer);
+          wsBroadcastTXT(buffer);
+          doc.clear();
+        }
+      }
+
+      if(FLAG_WS_STREAM_SDCARD)
+      {
+        wsStreamCardLogger(GLOBAL_TARGET_CLIENT_ID, GLOBAL_LOG_FILE_NAME);
+        FLAG_WS_STREAM_SDCARD = false;
+        GLOBAL_TARGET_CLIENT_ID = 0;
+        GLOBAL_LOG_FILE_NAME = "";
+      }
     }
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
 }
 
 void onMQTTUpdateStart(){
-  vTaskSuspend(xHandleRelayControl);
-  vTaskSuspend(xHandleWeatherSensor);
-  vTaskSuspend(xHandleWsSendTelemetry);
+  if(xHandleWeatherSensor != NULL){vTaskSuspend(xHandleWeatherSensor);}
+  if(xHandlePowerSensor != NULL){vTaskSuspend(xHandlePowerSensor);}
+  if(xHandleRelayControl != NULL){vTaskSuspend(xHandleRelayControl);}
   #ifdef USE_WEB_IFACE
   if(xHandleWsSendTelemetry != NULL){vTaskSuspend(xHandleWsSendTelemetry);}
   if(xHandleIface != NULL){vTaskSuspend(xHandleIface);}
   #endif
-  vTaskSuspend(xHandleRelayControl);
-  vTaskSuspend(xHandlePublishDevTel);
+  if(xHandlePublishDevTel != NULL){vTaskSuspend(xHandlePublishDevTel);}
 }
 
 void onMQTTUpdateEnd(){

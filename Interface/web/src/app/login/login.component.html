@@ -1,0 +1,25 @@
+<header class="container-fluid">
+    <nav>
+        <ul>
+        <li><img src="assets/img/logo.svg" alt="UDAWA" width="40" height="40"></li>
+        <li><strong>UDAWA Smart System</strong></li>
+        </ul>
+        <ul>
+        <li><small></small></li>
+        </ul>
+    </nav>       
+</header>
+<main class="container-fluid">
+    <form (submit)="login()">
+    <label>
+        Server Address:
+        <input [(ngModel)]="serverAddress" name="serverAddress">
+    </label>
+    <label>
+        API Key:
+        <input [(ngModel)]="apiKey" name="apiKey">
+    </label>
+    <button type="submit">Login</button>
+    </form>
+    <p>{{message['code']}}: {{message['msg']}}</p>
+</main>

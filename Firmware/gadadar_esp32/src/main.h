@@ -47,7 +47,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 -----END CERTIFICATE-----
 )EOF";
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.8"
+#define CURRENT_FIRMWARE_VERSION "0.0.9"
 #define DOCSIZE 2048
 #define DOCSIZE_MIN 512
 #define DOCSIZE_SETTINGS 4096
@@ -62,10 +62,11 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define STACKSIZE_WIFIOTA 4096
 #define STACKSIZE_TB 12000
 #define STACKSIZE_IFACE 3000
-#define STACKSIZE_LIGHTSENSOR 4500
+#define STACKSIZE_POWERSENSOR 4500
 #define STACKSIZE_WEATHERSENSOR 4500
 #define STACKSIZE_PUBLISHDEVTEL 6000
 #define STACKSIZE_WSSENDTELEMETRY 6000
+#define STACKSIZE_RELAYCONTROL 4500
 
 #include <libudawa.h>
 #include <TimeLib.h>
@@ -74,38 +75,48 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #include <BME280I2C.h>
 #include <Statistical.h>
 
-const char* settingsPath = "/settings.json";
+const char* settingsPath = PSTR("/settings.json");
+const char* statesPath = PSTR("/states.json");
 struct Settings
 {
-    uint8_t cpM[4];
-    uint8_t cp1A[4];
-    unsigned long cp1B[4];
     uint8_t pR[4];
-    String cp3A[4];
     uint8_t ON;
-    bool dutyState[4];
-    unsigned long stateOnTs[4];
-    unsigned long dutyCounter[4];
     uint16_t itP = 900;
     uint16_t itW = 300;
     uint16_t itD = 60;
     uint16_t itPc = 1;
     uint16_t itWc = 1;
     uint16_t itDc = 1;
-    uint8_t cp0A[4];
-    uint32_t cp0B[4];
+    uint8_t cpM[4];
+    uint8_t cp1A[4];
+    unsigned long cp1B[4];
     uint32_t cp2A[4];
     unsigned long cp2B[4];
+    String cp3A[4];
     uint32_t cp4A[4];
     unsigned long cp4B[4];
     unsigned long cp4BTs[4];
-    bool publishSwitch[4] = {true, true, true, true};
 
-    bool flag_bme280 = false;
     float seaHpa = 1019.00;
 
     char lbl[4][16];
 };
+
+struct States
+{
+    uint8_t cp0A[4];
+    uint32_t cp0B[4];
+    bool dutyState[4];
+    unsigned long stateOnTs[4];
+    unsigned long dutyCounter[4];
+
+    bool publishSwitch[4] = {true, true, true, true};
+
+    bool flag_weatherSensor = false;
+    bool flag_powerSensor = false;
+    bool flag_resetPowerSensor = false;
+};
+States myStates;
 
 #ifdef USE_WEB_IFACE
 struct WSPayloadPowerSensor
@@ -134,12 +145,8 @@ QueueHandle_t xQueueWsPayloadWeatherSensor;
 
 using namespace libudawa;
 Settings mySettings;
-Adafruit_BME280 bme;
-HardwareSerial PZEMSerial(1);
-PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
 
 BaseType_t xReturnedWsSendTelemetry;
-BaseType_t xReturnedWsSendSensors;
 BaseType_t xReturnedPowerSensor;
 BaseType_t xReturnedWeatherSensor;
 BaseType_t xReturnedPublishDevTel;
@@ -151,12 +158,15 @@ TaskHandle_t xHandlePowerSensor = NULL;
 TaskHandle_t xHandlePublishDevTel = NULL;
 TaskHandle_t xHandleRelayControl = NULL;
 
-SemaphoreHandle_t xSemaphorePZEM = NULL;
+SemaphoreHandle_t xSemaphorePowerSensor = NULL;
+SemaphoreHandle_t xSemaphoreStates = NULL;
 
 unsigned long powerSensorTR_last_activity = millis();
 
 void loadSettings();
 void saveSettings();
+void loadStates();
+void saveStates();
 void relayControlCP0();
 void relayControlCP1();
 void relayControlCP2();
@@ -183,4 +193,53 @@ void publishDeviceTelemetryTR(void * arg);
 void onMQTTUpdateStart();
 void onMQTTUpdateEnd();
 void publishSwitch();
+
+/**
+ * @brief UDAWA Common Alarm Code Definition
+ *   110 Light sensor
+ *      110 = The light sensor failed to initialize; please check the module integration and wiring.
+ *      111 = The light sensor measurement is abnormal; please check the module integrity.
+ *      112 = The light sensor measurement is showing an extreme value; please monitor the device's operation closely.
+ *
+ *   120 Weather sensor
+ *      120 = The weather sensor failed to initialize; please check the module integration and wiring.
+ *      121 = The weather sensor measurement is abnormal; The ambient temperature is out of range.
+ *      122 = The weather sensor measurement is showing an extreme value; The ambient temperature is exceeding 40°C; please monitor the device's operation closely.
+ *      123 = The weather sensor measurement is showing an extreme value; The ambient temperature is less than 17°C; please monitor the device's operation closely.
+ *      124 = The weather sensor measurement is abnormal; The ambient humidity is out of range.
+ *      125 = The weather sensor measurement is showing an extreme value; The ambient humidity is nearly 100%; please monitor the device's operation closely.
+ *      126 = The weather sensor measurement is showing an extreme value; The ambient humidity is below 20%; please monitor the device's operation closely.
+ *      127 = The weather sensor measurement is abnormal; The barometric pressure is out of range.
+ *      128 = The weather sensor measurement is showing an extreme value; The barometric pressure is more than 1010hPa; please monitor the device's operation closely.
+ *      129 = The weather sensor measurement is showing an extreme value; The barometric pressure is less than 100hPa; please monitor the device's operation closely.
+ *
+ *   130 SD Card
+ *      130 = The SD Card failed to initialize; please check the module integration and wiring.
+ *      131 = The SD Card failed to attatch; please check if the card is inserted properly.
+ *      132 = The SD Card failed to create log file; please check if the card is ok.
+ *      133 = The SD Card failed to write to the log file; please check if the card is ok.
+ * 
+ *   140 AC Power sensor
+ *      140 = The power sensor failed to initialize; please check the module integration and wiring.
+ *      141 = The power sensor measurement is abnormal; The voltage reading is out of range.
+ *      142 = The power sensor measurement is abnormal; The current reading is out of range.
+ *      143 = The power sensor measurement is abnormal; The power reading is out of range.
+ *      144 = The power sensor measurement is abnormal; The power factor and frequency reading is out of range.
+ *      145 = The power sensor measurement is showing an overlimit; Please check the connected instruments.
+ * 
+ *   150 Real Time Clock
+ *      150 = The device timing information is incorrect; please update the device time manually. Any function that requires precise timing will malfunction!
+ * 
+ *   210 Switch Relay
+ *      211 = Switch number one is active, but the power sensor detects no power utilization. Please check the connected instrument to prevent failures.
+ *      212 = Switch number two is active, but the power sensor detects no power utilization. Please check the connected instrument to prevent failures.
+ *      213 = Switch number three is active, but the power sensor detects no power utilization. Please check the connected instrument to prevent failures.
+ *      214 = Switch number four is active, but the power sensor detects no power utilization. Please check the connected instrument to prevent failures.
+ *      215 = All switches are inactive, but the power sensor detects large power utilization. Please check the device relay module to prevent relay malfunction.
+ *      216 = Switch numner one is active for more than one hour!
+ *      217 = Switch number two is active for more than one hour!
+ *      218 = Switch number three is active for more than one hour!
+ *      219 = Switch number four is active for more than one hour! 
+ * 
+ */
 #endif
