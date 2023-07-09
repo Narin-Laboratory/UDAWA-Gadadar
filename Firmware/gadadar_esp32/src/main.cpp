@@ -23,10 +23,12 @@ void setup()
   #endif
   onMQTTUpdateStartCb = &onMQTTUpdateStart;
   onMQTTUpdateEndCb = &onMQTTUpdateEnd;
+  if(xSemaphorePowerSensor == NULL){xSemaphorePowerSensor = xSemaphoreCreateMutex();}
+  if(xSemaphoreStates == NULL){xSemaphoreStates = xSemaphoreCreateMutex();}
   startup();
-  loadSettings();
-  loadStates();
   if(!config.SM){
+    loadSettings();
+    loadStates();
     syncConfigCoMCU();
   }
   if(String(config.model) == String("Generic")){
@@ -36,10 +38,11 @@ void setup()
 
   tb.setBufferSize(1024);
 
+  Wire.begin();
+
   #ifdef USE_WEB_IFACE
   xQueueWsPayloadPowerSensor = xQueueCreate( 1, sizeof( struct WSPayloadPowerSensor ) );
   xQueueWsPayloadWeatherSensor = xQueueCreate( 1, sizeof( struct WSPayloadWeatherSensor ) );
-  if(xSemaphorePowerSensor == NULL){xSemaphorePowerSensor = xSemaphoreCreateMutex();}
   #endif
 
   if(xHandleWeatherSensor == NULL && !config.SM){
@@ -96,7 +99,7 @@ void loop(){
 void powerSensorTR(void *arg){
   HardwareSerial PZEMSerial(1);
   PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-  myStates.flag_powerSensor = !isnan(PZEM.voltage());
+  myStates.flag_powerSensor = true;
   if(!myStates.flag_powerSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize powerSensor!\n"));}
 
   Stream_Stats<float> _volt_;
@@ -122,6 +125,7 @@ void powerSensorTR(void *arg){
       pf = PZEM.pf();
       ener = PZEM.energy();
     }
+    myStates.flag_powerSensor = !isnan(PZEM.voltage());
 
     if(isnan(volt) || isnan(amp) || isnan(watt) || isnan(freq) || isnan(pf) ||
     isnan(ener) || volt < 0.0 || volt > 1000.0 || amp < 0.0 || amp > 100.0 || watt < .0 || 
@@ -207,13 +211,13 @@ void powerSensorTR(void *arg){
         uint8_t activeRelayCounter = 0;
         for(uint8_t i = 0; i < 4; i++){
           if(myStates.dutyState[i] == mySettings.ON &&
-          watt < 6.0){setAlarm(210+i, 1, 5, 1000);}
+          watt < 6.0){setAlarm(211+i, 1, 5, 1000);}
 
           if(myStates.dutyState[i] == mySettings.ON){activeRelayCounter++;}
 
           if( myStates.dutyState[i] == mySettings.ON && 
             (millis() - myStates.stateOnTs[i]) > 3600000){
-              setAlarm(215+1, 1, 5, 1000);
+              setAlarm(216+i, 1, 5, 1000);
             }
         }
 
@@ -452,13 +456,20 @@ void loadSettings()
 
 void loadStates()
 {
-  StaticJsonDocument<DOCSIZE_SETTINGS> doc;
-  readSettings(doc, statesPath);
-  if(doc["cp0A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0A"].as<JsonArray>()) { myStates.cp0A[index] = v.as<uint8_t>(); index++; } } 
-  else { for(uint8_t i = 0; i < countof(myStates.cp0A); i++) { myStates.cp0A[i] = 0; } }
+  if( xSemaphoreStates != NULL && xSemaphoreTake( xSemaphoreStates, ( TickType_t ) 3000 ) == pdTRUE ){
+    StaticJsonDocument<DOCSIZE_SETTINGS> doc;
+    readSettings(doc, statesPath);
+    if(doc["cp0A"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0A"].as<JsonArray>()) { myStates.cp0A[index] = v.as<uint8_t>(); index++; } } 
+    else { for(uint8_t i = 0; i < countof(myStates.cp0A); i++) { myStates.cp0A[i] = 0; } }
 
-  if(doc["cp0B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0B"].as<JsonArray>()) { myStates.cp0B[index] = v.as<uint32_t>(); index++; } } 
-  else { for(uint8_t i = 0; i < countof(myStates.cp0B); i++) { myStates.cp0B[i] = 0; } }
+    if(doc["cp0B"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["cp0B"].as<JsonArray>()) { myStates.cp0B[index] = v.as<uint32_t>(); index++; } } 
+    else { for(uint8_t i = 0; i < countof(myStates.cp0B); i++) { myStates.cp0B[i] = 0; } }
+    
+    xSemaphoreGive(xSemaphoreStates);
+    log_manager->verbose(PSTR(__func__), PSTR("State loaded.\n"));
+  }else{
+    log_manager->verbose(PSTR(__func__), PSTR("State failed to load.\n"));
+  }
 }
 
 void saveSettings()
@@ -546,7 +557,7 @@ void saveSettings()
 
 void saveStates()
 {
-  if( xSemaphoreStates != NULL && xSemaphoreTake( xSemaphoreStates, ( TickType_t ) 0 ) == pdTRUE ){
+  if( xSemaphoreStates != NULL && xSemaphoreTake( xSemaphoreStates, ( TickType_t ) 3000 ) == pdTRUE ){
     StaticJsonDocument<DOCSIZE_SETTINGS> doc;
 
     JsonArray cp0A = doc.createNestedArray("cp0A");
@@ -563,6 +574,10 @@ void saveStates()
 
     writeSettings(doc, statesPath);
     xSemaphoreGive(xSemaphoreStates);
+    log_manager->verbose(PSTR(__func__), PSTR("State saved.\n"));
+  }
+  else{
+    log_manager->verbose(PSTR(__func__), PSTR("State failed to save.\n"));
   }
 }
 
@@ -1260,6 +1275,12 @@ void onSyncClientAttr(uint8_t direction){
       serializeJson(doc, buffer);
       wsBroadcastTXT(buffer);
       doc.clear();
+      JsonObject stg = doc.createNestedObject("stg");
+      stg[PSTR("itP")] = mySettings.itP;
+      stg[PSTR("itW")] = mySettings.itW;
+      serializeJson(doc, buffer);
+      wsBroadcastTXT(buffer);
+      doc.clear();
       JsonObject cpM = doc.createNestedObject("cpM");
       cpM[PSTR("cpM1")] = mySettings.cpM[0];
       cpM[PSTR("cpM2")] = mySettings.cpM[1];
@@ -1324,6 +1345,10 @@ void onWsEvent(const JsonObject &doc){
     }
     else if(strcmp(cmd, (const char*) "configSave") == 0){
       FLAG_SAVE_CONFIG = true;
+    }
+    else if(strcmp(cmd, (const char*) "saveState") == 0){
+      FLAG_SAVE_STATES = true;
+      log_manager->debug(PSTR(__func__), PSTR("FLAG_SAVE_STATES set to TRUE\n"));
     }
     else if(strcmp(cmd, (const char*) "setPanic") == 0){
       doc[PSTR("st")] = configcomcu.fP ? "OFF" : "ON";
