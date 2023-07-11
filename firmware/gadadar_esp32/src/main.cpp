@@ -97,11 +97,6 @@ void loop(){
 }
 
 void powerSensorTR(void *arg){
-  HardwareSerial PZEMSerial(1);
-  PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
-  myStates.flag_powerSensor = true;
-  if(!myStates.flag_powerSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize powerSensor!\n"));}
-
   Stream_Stats<float> _volt_;
   Stream_Stats<float> _amp_;
   Stream_Stats<float> _watt_;
@@ -116,6 +111,11 @@ void powerSensorTR(void *arg){
 
   while (true)
   {
+    HardwareSerial PZEMSerial(1);
+    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+    myStates.flag_powerSensor = !isnan(PZEM.voltage());
+    if(!myStates.flag_powerSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize powerSensor!\n"));}
+
     bool flag_failure_readings = false;
     if(myStates.flag_powerSensor){
       volt = PZEM.voltage();
@@ -125,7 +125,6 @@ void powerSensorTR(void *arg){
       pf = PZEM.pf();
       ener = PZEM.energy();
     }
-    myStates.flag_powerSensor = !isnan(PZEM.voltage());
 
     if(isnan(volt) || isnan(amp) || isnan(watt) || isnan(freq) || isnan(pf) ||
     isnan(ener) || volt < 0.0 || volt > 1000.0 || amp < 0.0 || amp > 100.0 || watt < .0 || 
@@ -351,15 +350,15 @@ void weatherSensorTR(void *arg){
     {
       if(!myStates.flag_weatherSensor){setAlarm(120, 1, 5, 1000);}
       else{
-        if(celc < -80 || celc > 80){setAlarm(121, 1, 5, 1000);}
-        if(celc > 45){setAlarm(122, 1, 5, 1000);}
-        if(celc < 17){setAlarm(123, 1, 5, 1000);}
-        if(rh < 1 || rh > 100){setAlarm(124, 1, 5, 1000);}
-        if(rh >= 99){setAlarm(125, 1, 5, 1000);}
-        if(rh <= 20){setAlarm(126, 1, 5, 1000);}
-        if(hpa < 700 || hpa > 1013){setAlarm(124, 1, 5, 1000);}
-        if(hpa <= 750){setAlarm(125, 1, 5, 1000);}
-        if(hpa >= 1010){setAlarm(126, 1, 5, 1000);}
+        if(celc < -80.0 || celc > 80.0){setAlarm(121, 1, 5, 1000);}
+        if(celc > 45.0){setAlarm(122, 1, 5, 1000);}
+        if(celc < 17.0){setAlarm(123, 1, 5, 1000);}
+        if(rh < 1.0 || rh > 100.0){setAlarm(124, 1, 5, 1000);}
+        if(rh >= 99.0){setAlarm(125, 1, 5, 1000);}
+        if(rh <= 20.0){setAlarm(126, 1, 5, 1000);}
+        if(hpa < 700.0 || hpa > 1013){setAlarm(125, 1, 5, 1000);}
+        if(hpa <= 750.0){setAlarm(126, 1, 5, 1000);}
+        if(hpa >= 1015.0){setAlarm(127, 1, 5, 1000);}
       }
 
       
