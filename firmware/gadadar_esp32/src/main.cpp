@@ -177,8 +177,10 @@ void powerSensorTR(void *arg){
           doc[PSTR("amp")] = b; 
           doc[PSTR("watt")] = c;
           doc[PSTR("pf")] = d; 
-          doc[PSTR("freq")] = e; 
+          doc[PSTR("freq")] = e;
+          #ifdef USE_DISK_LOG  
           writeCardLogger(doc);
+          #endif
           if(tb.connected() && config.provSent)
           {
             serializeJson(doc, buffer);
@@ -328,8 +330,10 @@ void weatherSensorTR(void *arg){
           doc[PSTR("celc")] = a;  
           doc[PSTR("rh")] = b; 
           doc[PSTR("hpa")] = c;
-          doc[PSTR("alt")] = d; 
+          doc[PSTR("alt")] = d;
+          #ifdef USE_DISK_LOG 
           writeCardLogger(doc);
+          #endif
           if(tb.connected() && config.provSent)
           {
             serializeJson(doc, buffer);
@@ -1014,7 +1018,12 @@ void stateReset(bool resetOpMode){
     }
     for(uint8_t i = 0; i < countof(mySettings.pR); i++)
     {
-      if(mySettings.cpM[i] == 0)
+      if(configcomcu.fP){
+        String ch = "ch" + String(i + 1);
+        setSwitch(ch, "OFF");
+        log_manager->verbose(PSTR(__func__), PSTR("%s operation are disabled in panic mode.\n"), ch.c_str());
+      }
+      else if(mySettings.cpM[i] == 0)
       {
         String ch = "ch" + String(i + 1);
         String state = myStates.cp0A[i] == mySettings.ON ? "ON" : "OFF";
@@ -1359,11 +1368,13 @@ void onWsEvent(const JsonObject &doc){
     else if(strcmp(cmd, (const char*) "setSwitch") == 0){
       setSwitch(doc["ch"].as<String>(), doc["state"].as<int>() == 1 ? "ON" : "OFF");
     }
+    #ifdef USE_DISK_LOG
     else if(strcmp(cmd, (const char*) PSTR("wsStreamCardLogger")) == 0){
       GLOBAL_TARGET_CLIENT_ID = doc[PSTR("num")].as<uint32_t>(); 
       GLOBAL_LOG_FILE_NAME = doc[PSTR("fileName")].as<String>();
       FLAG_WS_STREAM_SDCARD = true;
     }
+    #endif
   }
 }
 
@@ -1414,6 +1425,7 @@ void wsSendTelemetryTR(void *arg){
         }
       }
 
+      #ifdef USE_DISK_LOG
       if(FLAG_WS_STREAM_SDCARD)
       {
         wsStreamCardLogger(GLOBAL_TARGET_CLIENT_ID, GLOBAL_LOG_FILE_NAME);
@@ -1421,6 +1433,7 @@ void wsSendTelemetryTR(void *arg){
         GLOBAL_TARGET_CLIENT_ID = 0;
         GLOBAL_LOG_FILE_NAME = "";
       }
+      #endif
     }
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
   }
