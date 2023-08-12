@@ -183,7 +183,7 @@ void onTbDisconnected();
 void setPanic(const RPC_Data &data);
 RPC_Response genericClientRPC(const RPC_Data &data);
 void onReboot();
-void stateReset(bool resetOpMode);
+void stateReset(uint8_t level);
 void onAlarm(int code);
 void onSyncClientAttr(uint8_t direction);
 #ifdef USE_WEB_IFACE

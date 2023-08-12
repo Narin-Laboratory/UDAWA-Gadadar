@@ -556,6 +556,7 @@ void saveSettings()
   doc["seaHpa"] = mySettings.seaHpa;
 
   writeSettings(doc, settingsPath);
+  log_manager->verbose(PSTR(__func__), PSTR("Settings saved.\n"));
 }
 
 void saveStates()
@@ -636,6 +637,7 @@ void relayControlTR(void *arg){
 }
 
 void relayControlCP0(){
+  if(configcomcu.fP){return;}
   uint8_t activeCounter = 0;
   for(uint8_t i = 0; i < countof(mySettings.pR); i++)
   {
@@ -969,7 +971,7 @@ void setPanic(const RPC_Data &data){
             doc[PSTR("fP")] = 1;
             configcomcu.fP = 1;
             //setAlarm(666, 1, 1, 10000);
-            stateReset(1);
+            stateReset(2);
         }
         else{
             doc[PSTR("fP")] = 0;
@@ -982,61 +984,72 @@ void setPanic(const RPC_Data &data){
 }
 
 RPC_Response genericClientRPC(const RPC_Data &data){
-  if( xSemaphoreTBSend != NULL){
-    if( xSemaphoreTake( xSemaphoreTBSend, ( TickType_t ) 0 ) == pdTRUE )
-    {
-      if(data[PSTR("cmd")] != nullptr){
-          const char * cmd = data["cmd"].as<const char *>();
-          log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
+  if(data[PSTR("cmd")] != nullptr){
+      const char * cmd = data["cmd"].as<const char *>();
+      log_manager->verbose(PSTR(__func__), PSTR("Received command: %s\n"), cmd);
 
-          if(strcmp(cmd, PSTR("setSwitch")) == 0){
-            if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
-                setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
+      if(strcmp(cmd, PSTR("setSwitch")) == 0){
+        if(data[PSTR("arg")][PSTR("ch")] != nullptr && data[PSTR("arg")][PSTR("st")] != nullptr){
+            setSwitch(data[PSTR("arg")][PSTR("ch")].as<String>(), data[PSTR("arg")][PSTR("st")].as<String>());
+        }
+      }
+      else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
+        myStates.flag_resetPowerSensor = 1;
+      }
+      else if(strcmp(cmd, PSTR("dlCfg")) == 0){
+        if(data[PSTR("dlCfg")] != nullptr){
+          if(data[PSTR("dlCfg")].as<uint8_t>() == 1){
+            processSharedAttributeUpdate(data);
+
+            if(data[PSTR("sav")] != nullptr){
+              if(data[PSTR("sav")].as<uint8_t>() == 1){
+                FLAG_SAVE_CONFIGCOMCU = 1;
+                FLAG_SYNC_CONFIGCOMCU = 1;
+              }
+              else if(data[PSTR("sav")].as<uint8_t>() == 2){
+                FLAG_SAVE_CONFIG = 1;
+              }
+              else if(data[PSTR("sav")].as<uint8_t>() == 3){
+                FLAG_SAVE_SETTINGS = 1;
+              }
             }
           }
-          else if(strcmp(cmd, PSTR("resetPZEM")) == 0){
-            myStates.flag_resetPowerSensor = 1;
-          }
-      }  
-      xSemaphoreGive( xSemaphoreTBSend );
-    }
-    else
-    {
-      log_manager->verbose(PSTR(__func__), PSTR("No semaphore available.\n"));
-    }
-  }
+        }
+      }
+  }  
+    
   return RPC_Response(PSTR("generic"), 1);
 }
 
-void stateReset(bool resetOpMode){
-    if(resetOpMode){
-        mySettings.cpM[0] = 0;
-        mySettings.cpM[1] = 0;
-        mySettings.cpM[2] = 0;
-        mySettings.cpM[3] = 0;
-        log_manager->verbose(PSTR(__func__), PSTR("Relay operations are changed to manual.\n"));
-    }
+void stateReset(uint8_t level){
+  if(level == 0){
     for(uint8_t i = 0; i < countof(mySettings.pR); i++)
     {
-      if(configcomcu.fP){
-        String ch = "ch" + String(i + 1);
-        setSwitch(ch, "OFF");
-        log_manager->verbose(PSTR(__func__), PSTR("%s operation are disabled in panic mode.\n"), ch.c_str());
-      }
-      else if(mySettings.cpM[i] == 0)
+      if(mySettings.cpM[i] == 0)
       {
         String ch = "ch" + String(i + 1);
         String state = myStates.cp0A[i] == mySettings.ON ? "ON" : "OFF";
         setSwitch(ch, state);
         log_manager->verbose(PSTR(__func__), PSTR("%s operation are %s.\n"), ch.c_str(), state.c_str());
       }
-      else
-      {
-        String ch = "ch" + String(i + 1);
-        setSwitch(ch, "OFF");
-        log_manager->verbose(PSTR(__func__), PSTR("%s operation are disabled.\n"), ch.c_str());
-      }
     }
+  }
+  else if(level == 1){
+    for(uint8_t i = 0; i < countof(mySettings.pR); i++)
+    {
+      mySettings.cpM[i] = 0;
+    }
+    log_manager->verbose(PSTR(__func__), PSTR("Relay operations are changed to manual.\n"));
+  }
+  else if(level == 2){
+    for(uint8_t i = 0; i < countof(mySettings.pR); i++)
+    {
+      mySettings.cpM[i] = 0;
+      String ch = "ch" + String(i + 1);
+      setSwitch(ch, "OFF");
+      log_manager->verbose(PSTR(__func__), PSTR("%s's mode is set to manual and disabled on panic.\n"), ch.c_str());
+    }
+  }
 }
 
 void deviceTelemetry(){
