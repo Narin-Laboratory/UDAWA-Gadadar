@@ -86,12 +86,12 @@ void setup()
 void loop(){
   udawa();
   if(!config.SM){
-    if( (millis() - powerSensorTR_last_activity) > 30000){
+    /*if( (millis() - powerSensorTR_last_activity) > 30000){
       setAlarm(121, 1, 5, 1000);
       log_manager->warn(PSTR("powerSensorTR"), PSTR("Task is not responding for: %d\n"), ((millis() - powerSensorTR_last_activity)));
       powerSensorTR_last_activity = millis();
       reboot();
-    }
+    }*/
   }
   vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
 }
