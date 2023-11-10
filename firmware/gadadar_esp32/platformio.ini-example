@@ -12,13 +12,14 @@
 platform = espressif32
 board = esp32doit-devkit-v1
 board_build.partitions = partitions_custom.csv
+board_build.filesystem = littlefs
 framework = arduino
 monitor_speed = 115200
 monitor_filters = esp32_exception_decoder
 upload_protocol = esptool
 upload_port = /dev/ttyUSB0
 ;upload_protocol = espota
-;upload_port = gadadar4.local  ;pompa.local
+;upload_port = sf-jembrana.local  ;pompa.local
 ;upload_flags =
 ;	--port=3232
 ;	--auth=password
@@ -33,10 +34,13 @@ lib_deps =
 	bblanchon/StreamUtils@^1.6.1
 	https://github.com/Narin-Laboratory/libudawa-esp32.git
 	fbiego/ESP32Time@^2.0.0
-	https://github.com/PaulStoffregen/Time.git
+	https://github.com/PaulStoffregen/Time
 	https://github.com/mandulaj/PZEM-004T-v30.git
-	https://github.com/adafruit/Adafruit_BME280_Library.git
-	https://github.com/Links2004/arduinoWebSockets.git
-	https://github.com/akkoyun/Statistical.git
+	https://github.com/me-no-dev/ESPAsyncWebServer.git
 	https://github.com/thingsboard/pubsubclient.git
-	https://github.com/thingsboard/thingsboard-arduino-sdk.git
+	https://github.com/Narin-Laboratory/thingsboard-arduino-sdk.git
+	https://github.com/claws/BH1750.git
+	https://github.com/akkoyun/Statistical.git
+	https://github.com/finitespace/BME280.git
+	https://github.com/Links2004/arduinoWebSockets.git
+	https://github.com/rweather/arduinolibs.git
