@@ -9,6 +9,7 @@
 
 void setup()
 {
+  Wire.begin();
   processSharedAttributeUpdateCb = &attUpdateCb;
   onTbDisconnectedCb = &onTbDisconnected;
   onTbConnectedCb = &onTbConnected;
@@ -25,6 +26,7 @@ void setup()
   onMQTTUpdateEndCb = &onMQTTUpdateEnd;
   if(xSemaphorePowerSensor == NULL){xSemaphorePowerSensor = xSemaphoreCreateMutex();}
   if(xSemaphoreStates == NULL){xSemaphoreStates = xSemaphoreCreateMutex();}
+  
   startup();
   if(!config.SM){
     loadSettings();
@@ -37,8 +39,6 @@ void setup()
   stateReset(0);
 
   tb.setBufferSize(1024);
-
-  Wire.begin();
 
   #ifdef USE_WEB_IFACE
   xQueueWsPayloadPowerSensor = xQueueCreate( 1, sizeof( struct WSPayloadPowerSensor ) );

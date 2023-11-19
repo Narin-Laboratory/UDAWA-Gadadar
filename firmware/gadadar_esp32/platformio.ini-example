@@ -44,3 +44,4 @@ lib_deps =
 	https://github.com/finitespace/BME280.git
 	https://github.com/Links2004/arduinoWebSockets.git
 	https://github.com/rweather/arduinolibs.git
+	https://github.com/Erriez/ErriezDS3231.git
