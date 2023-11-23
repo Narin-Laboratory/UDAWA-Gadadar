@@ -3,7 +3,7 @@
  * Firmware for Actuator 4Ch UDAWA Board (Gadadar)
  * Licensed under aGPLv3
  * Researched and developed by PRITA Research Group & Narin Laboratory
- * prita.undiknas.ac.itD | narin.co.itD
+ * prita.undiknas.ac.itD | narin.co.id
 **/
 #include "main.h"
 
