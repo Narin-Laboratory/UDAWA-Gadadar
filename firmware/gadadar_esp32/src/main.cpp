@@ -1219,6 +1219,8 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("cpM3")] = mySettings.cpM[2];
       doc[PSTR("cpM4")] = mySettings.cpM[3];
       doc[PSTR("seaHpa")] = mySettings.seaHpa;
+      doc[PSTR("s1rx")] = mySettings.s1rx;
+      doc[PSTR("s1tx")] = mySettings.s1tx;
       serializeJson(doc, buffer);
       tbSendAttribute(buffer);
       doc.clear();
