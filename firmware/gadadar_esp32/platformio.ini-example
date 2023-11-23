@@ -12,7 +12,7 @@
 platform = espressif32
 board = esp32doit-devkit-v1
 board_build.partitions = partitions_custom.csv
-board_build.filesystem = littlefs
+board_build.filesystem = spiffs
 framework = arduino
 monitor_speed = 115200
 monitor_filters = esp32_exception_decoder

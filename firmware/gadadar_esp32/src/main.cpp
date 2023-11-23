@@ -112,7 +112,7 @@ void powerSensorTR(void *arg){
   while (true)
   {
     HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, S1_RX, S1_TX);
+    PZEM004Tv30 PZEM(PZEMSerial, mySettings.s1rx, mySettings.s1tx);
     myStates.flag_powerSensor = !isnan(PZEM.voltage());
     if(!myStates.flag_powerSensor){log_manager->warn(PSTR(__func__), PSTR("Failed to initialize powerSensor!\n"));}
 
@@ -452,6 +452,12 @@ void loadSettings()
 
   if(doc["seaHpa"] != nullptr){mySettings.seaHpa = doc["seaHpa"].as<float>();}
   else{mySettings.seaHpa = 1019.00;}
+
+  if(doc["s1rx"] != nullptr){mySettings.s1rx = doc["s1rx"].as<uint8_t>();}
+  else{mySettings.s1rx = 32;}
+
+  if(doc["s1tx"] != nullptr){mySettings.s1tx = doc["s1tx"].as<uint8_t>();}
+  else{mySettings.s1tx = 33;}
 
   if(doc["lbl"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbl"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.lbl); i++) { strlcpy(mySettings.lbl[i], "unnamed", sizeof(mySettings.lbl[i])); } }
@@ -939,6 +945,10 @@ void attUpdateCb(const Shared_Attribute_Data &data)
       if(data["lbl4"] != nullptr){strlcpy(mySettings.lbl[3], data["lbl4"].as<const char*>(), sizeof(mySettings.lbl[3]));}
 
       if(data["seaHpa"] != nullptr){mySettings.seaHpa = data["seaHpa"].as<float>();}
+
+      if(data["s1tx"] != nullptr){mySettings.s1tx = data["s1tx"].as<uint8_t>();}
+      if(data["s1rx"] != nullptr){mySettings.s1rx = data["s1rx"].as<uint8_t>();}
+
       xSemaphoreGive( xSemaphoreSettings );
     }
     else

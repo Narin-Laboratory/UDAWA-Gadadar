@@ -101,6 +101,9 @@ struct Settings
     unsigned long cp4B[4];
     unsigned long cp4BTs[4];
 
+    uint8_t s1tx = 33; //V3.1 33, V3 32
+    uint8_t s1rx = 32; //V3.1 32, V3 4
+
     float seaHpa = 1019.00;
 
     char lbl[4][16];
@@ -143,9 +146,6 @@ struct WSPayloadWeatherSensor
 };
 QueueHandle_t xQueueWsPayloadWeatherSensor;
 #endif
-
-#define S1_TX 32
-#define S1_RX 4
 
 using namespace libudawa;
 Settings mySettings;
