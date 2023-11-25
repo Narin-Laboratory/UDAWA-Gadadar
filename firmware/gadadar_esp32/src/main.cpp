@@ -3,7 +3,7 @@
  * Firmware for Actuator 4Ch UDAWA Board (Gadadar)
  * Licensed under aGPLv3
  * Researched and developed by PRITA Research Group & Narin Laboratory
- * prita.undiknas.ac.itD | narin.co.id
+ * prita.undiknas.ac.id | narin.co.id
 **/
 #include "main.h"
 
@@ -392,6 +392,11 @@ void loadSettings()
 {
   StaticJsonDocument<DOCSIZE_SETTINGS> doc;
   readSettings(doc, settingsPath);
+  if(config.logLev == 5){
+    String loadedSettings;
+    serializeJson(doc, loadedSettings);
+    log_manager->debug(PSTR(__func__), PSTR("%s \n"), loadedSettings.c_str());
+  }
 
   if(doc["ON"] != nullptr) { mySettings.ON = doc["ON"].as<uint8_t>(); } else { mySettings.ON = 1; }
 
@@ -561,7 +566,16 @@ void saveSettings()
 
   doc["seaHpa"] = mySettings.seaHpa;
 
+  doc["s1tx"] = mySettings.s1tx;
+  doc["s1rx"] = mySettings.s1rx;
+
   writeSettings(doc, settingsPath);
+
+  if(config.logLev == 5){
+    String loadedSettings;
+    serializeJson(doc, loadedSettings);
+    log_manager->debug(PSTR(__func__), PSTR("%s \n"), loadedSettings.c_str());
+  }
   log_manager->verbose(PSTR(__func__), PSTR("Settings saved.\n"));
 }
 

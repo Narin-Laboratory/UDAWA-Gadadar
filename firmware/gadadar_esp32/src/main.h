@@ -56,7 +56,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 #define USE_WEB_IFACE
 #define USE_ASYNC_WEB
 #define USE_HW_RTC
-//#define USE_WIFI_OTA
+#define USE_WIFI_OTA
 //#define USE_WIFI_LOGGER
 //#define USE_SDCARD_LOG
 //#define USE_SPIFFS_LOG
