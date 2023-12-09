@@ -178,6 +178,7 @@ void powerSensorTR(void *arg){
           doc[PSTR("watt")] = c;
           doc[PSTR("pf")] = d; 
           doc[PSTR("freq")] = e;
+          doc[PSTR("ener")] = ener;
           #ifdef USE_DISK_LOG  
           writeCardLogger(doc);
           #endif
