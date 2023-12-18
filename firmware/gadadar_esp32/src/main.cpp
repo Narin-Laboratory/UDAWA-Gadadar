@@ -171,7 +171,7 @@ void powerSensorTR(void *arg){
         float d = _pf_.Get_Average();
         float e = _freq_.Get_Average();
         if(!isnan(a) && a > 0.0 && a < 1000.0 && !isnan(b) && b >=0 && 
-          b <= 100.0 && !isnan(c) && c >= 0 && c <= 22000.0 &&
+          b <= 100.0 && !isnan(c) && c >= 0 && c <= mySettings.wattAlrmT &&
           d > 0 && d < 100 && e > 0 && e < 100){
           doc[PSTR("volt")] = a;  
           doc[PSTR("amp")] = b; 
@@ -205,10 +205,10 @@ void powerSensorTR(void *arg){
       else{
         if(volt < 0 || volt > 1000){setAlarm(141, 1, 5, 1000);}
         if(amp < 0 || amp > 100){setAlarm(142, 1, 5, 1000);}
-        if(watt < 0 || watt > 22000){setAlarm(143, 1, 5, 1000);}
+        if(watt < 0 || watt > mySettings.wattAlrmT){setAlarm(143, 1, 5, 1000);}
         if(pf < 0 || pf > 100){setAlarm(144, 1, 5, 1000);}
         if(freq < 0 || freq > 100){setAlarm(144, 1, 5, 1000);}
-        if(watt > 2000 || volt > 275){setAlarm(145, 1, 5, 1000);}
+        if(watt > mySettings.wattAlrmT || volt > 275){setAlarm(145, 1, 5, 1000);}
 
         uint8_t activeRelayCounter = 0;
         for(uint8_t i = 0; i < 4; i++){
@@ -218,7 +218,7 @@ void powerSensorTR(void *arg){
           if(myStates.dutyState[i] == mySettings.ON){activeRelayCounter++;}
 
           if( myStates.dutyState[i] == mySettings.ON && 
-            (millis() - myStates.stateOnTs[i]) > 3600000){
+            (millis() - myStates.stateOnTs[i]) > mySettings.chOvrnAlrm[i] * 1000 && mySettings.chOvrnAlrm[i] != 0){
               setAlarm(216+i, 1, 5, 1000);
             }
         }
@@ -356,14 +356,14 @@ void weatherSensorTR(void *arg){
       if(!myStates.flag_weatherSensor){setAlarm(120, 1, 5, 1000);}
       else{
         if(celc < -80.0 || celc > 80.0){setAlarm(121, 1, 5, 1000);}
-        if(celc > 45.0){setAlarm(122, 1, 5, 1000);}
-        if(celc < 17.0){setAlarm(123, 1, 5, 1000);}
+        if(celc > mySettings.celcAlrmT){setAlarm(122, 1, 5, 1000); log_manager->debug(PSTR(__func__), PSTR("celc = %.2f vs celcAT = %.2f\n"), rh, mySettings.celcAlrmT);}
+        if(celc < mySettings.celcAlrmB){setAlarm(123, 1, 5, 1000); log_manager->debug(PSTR(__func__), PSTR("celc = %.2f vs celcAB = %.2f\n"), rh, mySettings.celcAlrmB);}
         if(rh < 1.0 || rh > 100.0){setAlarm(124, 1, 5, 1000);}
-        if(rh >= 99.0){setAlarm(125, 1, 5, 1000);}
-        if(rh <= 20.0){setAlarm(126, 1, 5, 1000);}
+        if(rh >= mySettings.rhAlrmT){setAlarm(125, 1, 5, 1000); log_manager->debug(PSTR(__func__), PSTR("rH = %.2f vs rHAT = %.2f\n"), rh, mySettings.rhAlrmT);}
+        if(rh <= mySettings.rhAlrmB){setAlarm(126, 1, 5, 1000); log_manager->debug(PSTR(__func__), PSTR("rH = %.2f vs rHAB = %.2f\n"), rh, mySettings.rhAlrmB);}
         if(hpa < 700.0 || hpa > 1013){setAlarm(125, 1, 5, 1000);}
-        if(hpa <= 750.0){setAlarm(126, 1, 5, 1000);}
-        if(hpa >= 1015.0){setAlarm(127, 1, 5, 1000);}
+        if(hpa <= mySettings.hpaAlrmB){setAlarm(126, 1, 5, 1000); log_manager->debug(PSTR(__func__), PSTR("hpa = %.2f vs hpaAT = %.2f\n"), hpa, mySettings.hpaAlrmT);}
+        if(hpa >= mySettings.hpaAlrmT){setAlarm(127, 1, 5, 1000); log_manager->debug(PSTR(__func__), PSTR("hpa = %.2f vs hpaAB = %.2f\n"), hpa, mySettings.hpaAlrmB);}
       }
 
       
@@ -394,9 +394,9 @@ void loadSettings()
   StaticJsonDocument<DOCSIZE_SETTINGS> doc;
   readSettings(doc, settingsPath);
   if(config.logLev == 5){
-    String loadedSettings;
-    serializeJson(doc, loadedSettings);
-    log_manager->debug(PSTR(__func__), PSTR("%s \n"), loadedSettings.c_str());
+    log_manager->debug(PSTR(__func__), PSTR(": "));
+    serializeJson(doc, Serial);
+    Serial.println();
   }
 
   if(doc["ON"] != nullptr) { mySettings.ON = doc["ON"].as<uint8_t>(); } else { mySettings.ON = 1; }
@@ -467,6 +467,30 @@ void loadSettings()
 
   if(doc["lbl"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["lbl"].as<JsonArray>()) { strlcpy(mySettings.lbl[index], v.as<const char*>(), sizeof(mySettings.lbl[index])); index++; } } 
   else { for(uint8_t i = 0; i < countof(mySettings.lbl); i++) { strlcpy(mySettings.lbl[i], "unnamed", sizeof(mySettings.lbl[i])); } }
+
+  if(doc["celcAlrmT"] != nullptr){ mySettings.celcAlrmT = doc["celcAlrmT"].as<float>(); }
+  else {mySettings.celcAlrmT = 42.00;}
+
+  if(doc["celcAlrmB"] != nullptr){ mySettings.celcAlrmB = doc["celcAlrmB"].as<float>(); }
+  else {mySettings.celcAlrmB = 15.00;}
+  
+  if(doc["rhAlrmT"] != nullptr){ mySettings.rhAlrmT = doc["rhAlrmT"].as<float>(); }
+  else {mySettings.rhAlrmT = 99.00;}
+  
+  if(doc["rhAlrmB"] != nullptr){ mySettings.rhAlrmB = doc["rhAlrmB"].as<float>(); }
+  else {mySettings.rhAlrmB = 20.00;}
+  
+  if(doc["hpaAlrmT"] != nullptr){ mySettings.hpaAlrmT = doc["hpaAlrmT"].as<float>(); }
+  else {mySettings.hpaAlrmT = 1013;}
+  
+  if(doc["hpaAlrmB"] != nullptr){ mySettings.hpaAlrmB = doc["hpaAlrmB"].as<float>(); }
+  else {mySettings.hpaAlrmB = 750;}
+  
+  if(doc["wattAlrmT"] != nullptr){ mySettings.wattAlrmT = doc["wattAlrmT"].as<float>(); }
+  else {mySettings.wattAlrmT = 2200;}
+
+  if(doc["chOvrnAlrm"] != nullptr) { uint8_t index = 0; for(JsonVariant v : doc["chOvrnAlrm"].as<JsonArray>()) { mySettings.chOvrnAlrm[index] = v.as<unsigned long>(); index++; } } 
+  else { for(uint8_t i = 0; i < countof(mySettings.chOvrnAlrm); i++) { mySettings.chOvrnAlrm[i] = 0; } }
 }
 
 void loadStates()
@@ -570,12 +594,26 @@ void saveSettings()
   doc["s1tx"] = mySettings.s1tx;
   doc["s1rx"] = mySettings.s1rx;
 
+  doc["celcAlrmT"] = mySettings.celcAlrmT;
+  doc["celcAlrmB"] = mySettings.celcAlrmB;
+  doc["rhAlrmT"] = mySettings.rhAlrmT;
+  doc["rhAlrmB"] = mySettings.rhAlrmB;
+  doc["hpaAlrmT"] = mySettings.hpaAlrmT;
+  doc["hpaAlrmB"] = mySettings.hpaAlrmB;
+  doc["wattAlrmT"] = mySettings.wattAlrmT;
+
+  JsonArray chOvrnAlrm = doc.createNestedArray("chOvrnAlrm");
+  for(uint8_t i=0; i<countof(mySettings.chOvrnAlrm); i++)
+  {
+    chOvrnAlrm.add(mySettings.chOvrnAlrm[i]);
+  }
+
   writeSettings(doc, settingsPath);
 
   if(config.logLev == 5){
-    String loadedSettings;
-    serializeJson(doc, loadedSettings);
-    log_manager->debug(PSTR(__func__), PSTR("%s \n"), loadedSettings.c_str());
+    log_manager->debug(PSTR(__func__), PSTR(": "));
+    serializeJson(doc, Serial);
+    Serial.println();
   }
   log_manager->verbose(PSTR(__func__), PSTR("Settings saved.\n"));
 }
@@ -964,6 +1002,19 @@ void attUpdateCb(const Shared_Attribute_Data &data)
       if(data["s1tx"] != nullptr){mySettings.s1tx = data["s1tx"].as<uint8_t>();}
       if(data["s1rx"] != nullptr){mySettings.s1rx = data["s1rx"].as<uint8_t>();}
 
+      if(data["celcAlrmT"] != nullptr){ mySettings.celcAlrmT = data["celcAlrmT"].as<float>(); }
+      if(data["celcAlrmB"] != nullptr){ mySettings.celcAlrmB = data["celcAlrmB"].as<float>(); }
+      if(data["rhAlrmT"] != nullptr){ mySettings.rhAlrmT = data["rhAlrmT"].as<float>(); }     
+      if(data["rhAlrmB"] != nullptr){ mySettings.rhAlrmB = data["rhAlrmB"].as<float>(); }      
+      if(data["hpaAlrmT"] != nullptr){ mySettings.hpaAlrmT = data["hpaAlrmT"].as<float>(); }     
+      if(data["hpaAlrmB"] != nullptr){ mySettings.hpaAlrmB = data["hpaAlrmB"].as<float>(); }      
+      if(data["wattAlrmT"] != nullptr){ mySettings.wattAlrmT = data["wattAlrmT"].as<float>(); }
+      if(data["ch1OvrnAlrm"] != nullptr) { mySettings.chOvrnAlrm[0] = data["ch1OvrnAlrm"].as<unsigned long>(); } 
+      if(data["ch2OvrnAlrm"] != nullptr) { mySettings.chOvrnAlrm[1] = data["ch2OvrnAlrm"].as<unsigned long>(); } 
+      if(data["ch3OvrnAlrm"] != nullptr) { mySettings.chOvrnAlrm[2] = data["ch3OvrnAlrm"].as<unsigned long>(); } 
+      if(data["ch4OvrnAlrm"] != nullptr) { mySettings.chOvrnAlrm[3] = data["ch4OvrnAlrm"].as<unsigned long>(); } 
+
+
       xSemaphoreGive( xSemaphoreSettings );
     }
     else
@@ -1239,6 +1290,20 @@ void onSyncClientAttr(uint8_t direction){
       serializeJson(doc, buffer);
       tbSendAttribute(buffer);
       doc.clear();
+      doc[PSTR("celcAlrmT")] = mySettings.celcAlrmT;
+      doc[PSTR("celcAlrmB")] = mySettings.celcAlrmB;
+      doc[PSTR("rhAlrmT")] = mySettings.rhAlrmT;
+      doc[PSTR("rhAlrmB")] = mySettings.rhAlrmB;
+      doc[PSTR("hpaAlrmT")] = mySettings.hpaAlrmT;
+      doc[PSTR("hpaAlrmB")] = mySettings.hpaAlrmB;
+      doc[PSTR("wattAlrmT")] = mySettings.wattAlrmT;
+      doc[PSTR("ch1OvrnAlrm")] = mySettings.chOvrnAlrm[0];
+      doc[PSTR("ch2OvrnAlrm")] = mySettings.chOvrnAlrm[1];
+      doc[PSTR("ch3OvrnAlrm")] = mySettings.chOvrnAlrm[2];
+      doc[PSTR("ch4OvrnAlrm")] = mySettings.chOvrnAlrm[3];
+      serializeJson(doc, buffer);
+      tbSendAttribute(buffer);
+      doc.clear();
     }
 
     #ifdef USE_WEB_IFACE
@@ -1338,6 +1403,20 @@ void onSyncClientAttr(uint8_t direction){
       doc[PSTR("ch2")] = (int)myStates.dutyState[1] == mySettings.ON ? 1 : 0;
       doc[PSTR("ch3")] = (int)myStates.dutyState[2] == mySettings.ON ? 1 : 0;
       doc[PSTR("ch4")] = (int)myStates.dutyState[3] == mySettings.ON ? 1 : 0;
+      serializeJson(doc, buffer);
+      wsBroadcastTXT(buffer);
+      doc.clear();
+      doc[PSTR("celcAlrmT")] = mySettings.celcAlrmT;
+      doc[PSTR("celcAlrmB")] = mySettings.celcAlrmB;
+      doc[PSTR("rhAlrmT")] = mySettings.rhAlrmT;
+      doc[PSTR("rhAlrmB")] = mySettings.rhAlrmB;
+      doc[PSTR("hpaAlrmT")] = mySettings.hpaAlrmT;
+      doc[PSTR("hpaAlrmB")] = mySettings.hpaAlrmB;
+      doc[PSTR("wattAlrmT")] = mySettings.wattAlrmT;
+      doc[PSTR("ch1OvrnAlrm")] = mySettings.chOvrnAlrm[0];
+      doc[PSTR("ch2OvrnAlrm")] = mySettings.chOvrnAlrm[1];
+      doc[PSTR("ch3OvrnAlrm")] = mySettings.chOvrnAlrm[2];
+      doc[PSTR("ch4OvrnAlrm")] = mySettings.chOvrnAlrm[3];
       serializeJson(doc, buffer);
       wsBroadcastTXT(buffer);
     }
@@ -1483,6 +1562,7 @@ void onMQTTUpdateStart(){
   if(xHandleWeatherSensor != NULL){vTaskSuspend(xHandleWeatherSensor);}
   if(xHandlePowerSensor != NULL){vTaskSuspend(xHandlePowerSensor);}
   if(xHandleRelayControl != NULL){vTaskSuspend(xHandleRelayControl);}
+
   #ifdef USE_WEB_IFACE
   if(xHandleWsSendTelemetry != NULL){vTaskSuspend(xHandleWsSendTelemetry);}
   if(xHandleIface != NULL){vTaskSuspend(xHandleIface);}

@@ -48,7 +48,7 @@ ny6l9/duT2POAsUN5IwHGDu8b2NT+vCUQRFVHY31
 )EOF";
 
 #define CURRENT_FIRMWARE_TITLE "Gadadar"
-#define CURRENT_FIRMWARE_VERSION "0.0.14"
+#define CURRENT_FIRMWARE_VERSION "0.0.15"
 #define DOCSIZE 2048
 #define DOCSIZE_MIN 512
 #define DOCSIZE_SETTINGS 4096
@@ -107,6 +107,18 @@ struct Settings
     float seaHpa = 1019.00;
 
     char lbl[4][16];
+
+    float celcAlrmT = 42.00;
+    float celcAlrmB = 15.00;
+
+    float rhAlrmT = 90.00;
+    float rhAlrmB = 20.00;
+
+    float hpaAlrmT = 1013;
+    float hpaAlrmB = 750;
+
+    float wattAlrmT = 2200;
+    unsigned long chOvrnAlrm[4] = {0,0,0,0};
 };
 
 struct States
@@ -208,14 +220,14 @@ void publishSwitch();
  *   120 Weather sensor
  *      120 = The weather sensor failed to initialize; please check the module integration and wiring.
  *      121 = The weather sensor measurement is abnormal; The ambient temperature is out of range.
- *      122 = The weather sensor measurement is showing an extreme value; The ambient temperature is exceeding 40°C; please monitor the device's operation closely.
- *      123 = The weather sensor measurement is showing an extreme value; The ambient temperature is less than 17°C; please monitor the device's operation closely.
+ *      122 = The weather sensor measurement is showing an extreme value; The ambient temperature is exceeding safe threshold; please monitor the device's operation closely.
+ *      123 = The weather sensor measurement is showing an extreme value; The ambient temperature is less than safe threshold; please monitor the device's operation closely.
  *      124 = The weather sensor measurement is abnormal; The ambient humidity is out of range.
- *      125 = The weather sensor measurement is showing an extreme value; The ambient humidity is nearly 100%; please monitor the device's operation closely.
- *      126 = The weather sensor measurement is showing an extreme value; The ambient humidity is below 20%; please monitor the device's operation closely.
+ *      125 = The weather sensor measurement is showing an extreme value; The ambient humidity is exceeding safe threshold; please monitor the device's operation closely.
+ *      126 = The weather sensor measurement is showing an extreme value; The ambient humidity is below safe threshold; please monitor the device's operation closely.
  *      127 = The weather sensor measurement is abnormal; The barometric pressure is out of range.
- *      128 = The weather sensor measurement is showing an extreme value; The barometric pressure is more than 1010hPa; please monitor the device's operation closely.
- *      129 = The weather sensor measurement is showing an extreme value; The barometric pressure is less than 100hPa; please monitor the device's operation closely.
+ *      128 = The weather sensor measurement is showing an extreme value; The barometric pressure is more than safe threshold; please monitor the device's operation closely.
+ *      129 = The weather sensor measurement is showing an extreme value; The barometric pressure is less than safe threshold; please monitor the device's operation closely.
  *
  *   130 SD Card
  *      130 = The SD Card failed to initialize; please check the module integration and wiring.
@@ -240,10 +252,10 @@ void publishSwitch();
  *      213 = Switch number three is active, but the power sensor detects no power utilization. Please check the connected instrument to prevent failures.
  *      214 = Switch number four is active, but the power sensor detects no power utilization. Please check the connected instrument to prevent failures.
  *      215 = All switches are inactive, but the power sensor detects large power utilization. Please check the device relay module to prevent relay malfunction.
- *      216 = Switch numner one is active for more than one hour!
- *      217 = Switch number two is active for more than one hour!
- *      218 = Switch number three is active for more than one hour!
- *      219 = Switch number four is active for more than one hour! 
+ *      216 = Switch numner one is active for more than safe duration!
+ *      217 = Switch number two is active for more than safe duration!
+ *      218 = Switch number three is active for more than safe duration!
+ *      219 = Switch number four is active for more than safe duration! 
  * 
  */
 #endif
