@@ -40,8 +40,9 @@ lib_deps =
 	https://github.com/thingsboard/pubsubclient.git
 	https://github.com/Narin-Laboratory/thingsboard-arduino-sdk.git
 	https://github.com/claws/BH1750.git
-	https://github.com/akkoyun/Statistical.git
 	https://github.com/finitespace/BME280.git
 	https://github.com/Links2004/arduinoWebSockets.git
 	https://github.com/rweather/arduinolibs.git
 	https://github.com/Erriez/ErriezDS3231.git
+	akkoyun/Statistical@2.4.1
+	https://github.com/arduino-libraries/ArduinoHttpClient.git
