@@ -99,6 +99,8 @@ const unsigned long intvAttr = 5;
 const unsigned long intvTele = 900;
 const int maxWatt = 2000;
 const bool relayON = false;
+const bool fPowerSensorDummy = false;
+const unsigned long powerSensorAlarmTimer = 30;
 const std::array<String, 4> availableRelayMode = {PSTR("Manual"), PSTR("Duty Cycle"), PSTR("Time Daily"), PSTR("Specific Datetime")};
 const uint8_t maxTimers = 10;
 

@@ -46,6 +46,8 @@ void storageConvertAppConfig(JsonDocument &doc, bool direction, bool load_defaul
     if(!doc["intvTele"].isNull()) appConfig.intvTele = doc["intvTele"].as<unsigned long>(); else if(load_defaults) appConfig.intvTele = intvTele;
     if(!doc["maxWatt"].isNull()) appConfig.maxWatt = doc["maxWatt"].as<int>(); else if(load_defaults) appConfig.maxWatt = maxWatt;
     if(!doc["relayON"].isNull()) appConfig.relayON = doc["relayON"].as<bool>(); else if(load_defaults) appConfig.relayON = relayON;
+    if(!doc["fPowerSensorDummy"].isNull()) appConfig.fPowerSensorDummy = doc["fPowerSensorDummy"].as<bool>(); else if(load_defaults) appConfig.fPowerSensorDummy = fPowerSensorDummy;
+    if(!doc["powerSensorAlarmTimer"].isNull()) appConfig.powerSensorAlarmTimer = doc["powerSensorAlarmTimer"].as<unsigned long>(); else if(load_defaults) appConfig.powerSensorAlarmTimer = powerSensorAlarmTimer;
   }
   else{ // from config to doc
     doc[PSTR("s1tx")] = appConfig.s1tx;
@@ -55,6 +57,8 @@ void storageConvertAppConfig(JsonDocument &doc, bool direction, bool load_defaul
     doc[PSTR("intvTele")] = appConfig.intvTele;
     doc[PSTR("maxWatt")] = appConfig.maxWatt;
     doc[PSTR("relayON")] = appConfig.relayON;
+    doc[PSTR("fPowerSensorDummy")] = appConfig.fPowerSensorDummy;
+    doc[PSTR("powerSensorAlarmTimer")] = appConfig.powerSensorAlarmTimer;
   }
 }
 

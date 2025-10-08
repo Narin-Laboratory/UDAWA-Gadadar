@@ -1166,140 +1166,157 @@ void coreroutineSetFInit(bool fInit){
 }
 
 
-void coreroutinePowerSensorTaskRoutine(void *arg){
-  float volt; float amp; float watt; float freq; float pf; float ener;
+void coreroutinePowerSensorTaskRoutine(void *arg) {
+    float volt, amp, watt, freq, pf, ener;
 
-  unsigned long timerTelemetry = millis();
-  unsigned long timerAttribute = millis();
-  unsigned long timerWebIface = millis();
-  unsigned long timerAlarm = millis();
+    // Variables for averaging telemetry data
+    float volt_sum = 0, amp_sum = 0, watt_sum = 0, freq_sum = 0, pf_sum = 0;
+    long reading_count = 0;
 
-  while (true)
-  {
-    HardwareSerial PZEMSerial(1);
-    PZEM004Tv30 PZEM(PZEMSerial, appConfig.s1rx, appConfig.s1tx);
+    unsigned long timerTelemetry = millis();
+    unsigned long timerAttribute = millis();
+    unsigned long timerWebIface = millis();
+    unsigned long timerAlarm = millis();
 
-    appState.fPowerSensor = !isnan(PZEM.voltage());
-    if(!appState.fPowerSensor){
-      //logger->warn(PSTR(__func__), PSTR("Failed to initialize powerSensor!\n"));
-    }
+    while (true) {
+        HardwareSerial PZEMSerial(1);
+        PZEM004Tv30 PZEM(PZEMSerial, appConfig.s1rx, appConfig.s1tx);
 
-    bool fFailureReadings = false;
-    if(appState.fPowerSensor){
-      volt = PZEM.voltage();
-      amp = PZEM.current();
-      watt = PZEM.power();
-      freq = PZEM.frequency();
-      pf = PZEM.pf();
-      ener = PZEM.energy();
-    }
+        bool fFailureReadings = false;
 
-    if(isnan(volt) || isnan(amp) || isnan(watt) || isnan(freq) || isnan(pf) ||
-    isnan(ener) || volt < 0.0 || volt > 1000.0 || amp < 0.0 || amp > 100.0 || watt < .0 ||
-    watt > 22000.0 || freq < 0.0 || freq > 100.0 || ener > 9999.0 ){
-      fFailureReadings = true;
-      //logger->debug(PSTR(__func__), PSTR("Power sensor abnormal reading: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f\n"), volt, amp, watt, freq, pf, ener);
-    }
-
-    unsigned long now = millis();
-    if(appState.fPowerSensor && !fFailureReadings)
-    {
-      JsonDocument doc;
-      String buffer;
-      JsonObject powerSensor = doc[PSTR("powerSensor")].to<JsonObject>();
-
-      #ifdef USE_LOCAL_WEB_INTERFACE
-      if( (now - timerWebIface) > (appConfig.intvWeb * 1000))
-      {
-        powerSensor[PSTR("volt")] = volt;
-        powerSensor[PSTR("amp")] = amp;
-        powerSensor[PSTR("watt")] = watt;
-        powerSensor[PSTR("freq")] = freq;
-        powerSensor[PSTR("pf")] = pf;
-        powerSensor[PSTR("ener")] = ener;
-        wsBcast(doc);
-        doc.clear();
-
-        timerWebIface = now;
-      }
-      #endif
-
-      #ifdef USE_IOT
-      if( (now - timerAttribute) > (appConfig.intvAttr * 1000))
-      {
-        doc[PSTR("_volt")] = volt;
-        doc[PSTR("_amp")] = amp;
-        doc[PSTR("_watt")] = watt;
-        doc[PSTR("_freq")] = freq;
-        doc[PSTR("_pf")] = pf;
-        doc[PSTR("_ener")] = ener;
-        iotSendAttr(doc);
-        doc.clear();
-
-        timerAttribute = now;
-      }
-
-      if( (now - timerTelemetry) > (appConfig.intvTele * 1000) )
-      {
-
-        doc[PSTR("volt")] = volt;
-        doc[PSTR("amp")] = amp;
-        doc[PSTR("watt")] = watt;
-        doc[PSTR("pf")] = pf;
-        doc[PSTR("freq")] = freq;
-        doc[PSTR("ener")] = ener;
-        #ifdef USE_DISK_LOG
-        writeCardLogger(doc);
-        #endif
-        //iotSendTelemetry(doc);
-        doc.clear();
-
-        timerTelemetry = now;
-      }
-      #endif
-
-    }
-
-    if( (now - timerAlarm) > 30000 )
-    {
-      if(!appState.fPowerSensor){coreroutineSetAlarm(140, 1, 5, 1000);}
-      else{
-        if(volt < 0 || volt > 1000){coreroutineSetAlarm(141, 1, 5, 1000);}
-        if(amp < 0 || amp > 100){coreroutineSetAlarm(142, 1, 5, 1000);}
-        if(watt < 0 || watt > appConfig.maxWatt){coreroutineSetAlarm(143, 1, 5, 1000);}
-        if(pf < 0 || pf > 100){coreroutineSetAlarm(144, 1, 5, 1000);}
-        if(freq < 0 || freq > 100){coreroutineSetAlarm(144, 1, 5, 1000);}
-        if(watt > appConfig.maxWatt || volt > 275){coreroutineSetAlarm(145, 1, 5, 1000);}
-
-        uint8_t activeRelayCounter = 0;
-        for(uint8_t i = 0; i < 4; i++){
-          if(relays[i].state == true &&
-          watt < 6.0){coreroutineSetAlarm(210+i, 1, 5, 1000);}
-
-          if(relays[i].state == true){activeRelayCounter++;}
-
-          if( relays[i].state == true &&
-            (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000 && relays[i].overrunInSec != 0){
-              coreroutineSetAlarm(215+i, 1, 5, 1000);
+        if (appConfig.fPowerSensorDummy) {
+            appState.fPowerSensor = true;
+            // Generate dummy data
+            volt = 220.0 + (rand() % 20 - 10); // 210-230V
+            amp = 1.0 + (rand() % 10 / 10.0);    // 1.0-1.9A
+            watt = volt * amp;
+            freq = 50.0 + (rand() % 5 / 10.0 - 0.2); // 49.8-50.2Hz
+            pf = 0.9 + (rand() % 10 / 100.0);   // 0.9-0.99
+            ener += watt * (1.0/3600.0); // Increment energy based on dummy power
+        } else {
+            appState.fPowerSensor = !isnan(PZEM.voltage());
+            if (appState.fPowerSensor) {
+                volt = PZEM.voltage();
+                amp = PZEM.current();
+                watt = PZEM.power();
+                freq = PZEM.frequency();
+                pf = PZEM.pf();
+                ener = PZEM.energy();
+            } else {
+                fFailureReadings = true;
             }
         }
 
-        if(activeRelayCounter == 0 && watt > 6){coreroutineSetAlarm(214, 1, 5, 1000);}
-      }
+        if (appState.fPowerSensor && !fFailureReadings) {
+            if (isnan(volt) || isnan(amp) || isnan(watt) || isnan(freq) || isnan(pf) ||
+                isnan(ener) || volt < 0.0 || volt > 1000.0 || amp < 0.0 || amp > 100.0 || watt < .0 ||
+                watt > 22000.0 || freq < 0.0 || freq > 100.0 || ener > 999999.0) {
+                fFailureReadings = true;
+            }
+        }
 
+        unsigned long now = millis();
+        if (appState.fPowerSensor && !fFailureReadings) {
+            // Accumulate for averaging
+            volt_sum += volt;
+            amp_sum += amp;
+            watt_sum += watt;
+            freq_sum += freq;
+            pf_sum += pf;
+            reading_count++;
 
-      timerAlarm = now;
+            JsonDocument doc;
+
+            #ifdef USE_LOCAL_WEB_INTERFACE
+            if ((now - timerWebIface) > (appConfig.intvWeb * 1000)) {
+                JsonObject powerSensor = doc[PSTR("powerSensor")].to<JsonObject>();
+                powerSensor[PSTR("volt")] = volt;
+                powerSensor[PSTR("amp")] = amp;
+                powerSensor[PSTR("watt")] = watt;
+                powerSensor[PSTR("freq")] = freq;
+                powerSensor[PSTR("pf")] = pf;
+                powerSensor[PSTR("ener")] = ener;
+                wsBcast(doc);
+                doc.clear();
+                timerWebIface = now;
+            }
+            #endif
+
+            #ifdef USE_IOT
+            if ((now - timerAttribute) > (appConfig.intvAttr * 1000)) {
+                doc[PSTR("_volt")] = volt;
+                doc[PSTR("_amp")] = amp;
+                doc[PSTR("_watt")] = watt;
+                doc[PSTR("_freq")] = freq;
+                doc[PSTR("_pf")] = pf;
+                doc[PSTR("_ener")] = ener;
+                iotSendAttr(doc);
+                doc.clear();
+                timerAttribute = now;
+            }
+
+            if ((now - timerTelemetry) > (appConfig.intvTele * 1000)) {
+                if (reading_count > 0) {
+                    doc[PSTR("volt")] = volt_sum / reading_count;
+                    doc[PSTR("amp")] = amp_sum / reading_count;
+                    doc[PSTR("watt")] = watt_sum / reading_count;
+                    doc[PSTR("pf")] = pf_sum / reading_count;
+                    doc[PSTR("freq")] = freq_sum / reading_count;
+                    doc[PSTR("ener")] = ener; // Send the latest total energy
+                    iotSendTele(doc);
+                    doc.clear();
+
+                    // Reset accumulators
+                    volt_sum = 0;
+                    amp_sum = 0;
+                    watt_sum = 0;
+                    freq_sum = 0;
+                    pf_sum = 0;
+                    reading_count = 0;
+                }
+                timerTelemetry = now;
+            }
+            #endif
+        }
+
+        if ((now - timerAlarm) > (appConfig.powerSensorAlarmTimer * 1000)) {
+            if (!appState.fPowerSensor) {
+                coreroutineSetAlarm(140, 1, 5, 1000);
+            } else if (!fFailureReadings) {
+                if (volt < 0 || volt > 1000) coreroutineSetAlarm(141, 1, 5, 1000);
+                if (amp < 0 || amp > 100) coreroutineSetAlarm(142, 1, 5, 1000);
+                if (watt < 0 || watt > appConfig.maxWatt) coreroutineSetAlarm(143, 1, 5, 1000);
+                if (pf < 0 || pf > 1) coreroutineSetAlarm(144, 1, 5, 1000);
+                if (freq < 0 || freq > 100) coreroutineSetAlarm(144, 1, 5, 1000);
+                if (watt > appConfig.maxWatt || volt > 275) coreroutineSetAlarm(145, 1, 5, 1000);
+
+                uint8_t activeRelayCounter = 0;
+                for (uint8_t i = 0; i < 4; i++) {
+                    if (relays[i].state == true) {
+                        activeRelayCounter++;
+                        if (watt < 6.0) coreroutineSetAlarm(210 + i, 1, 5, 1000);
+                        if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
+                            coreroutineSetAlarm(215 + i, 1, 5, 1000);
+                        }
+                    }
+                }
+                if (activeRelayCounter == 0 && watt > 6) coreroutineSetAlarm(214, 1, 5, 1000);
+            }
+            timerAlarm = now;
+        }
+
+        if (appState.fResetPowerSensor) {
+            appState.fResetPowerSensor = false;
+            logger->warn(PSTR(__func__), PSTR("Resetting power sensor energy counter.\n"));
+            if (!appConfig.fPowerSensorDummy) {
+                PZEM.resetEnergy();
+            }
+            ener = 0; // Reset dummy energy as well
+        }
+
+        appState.powerSensorTaskRoutineLastActivity = millis();
+        vTaskDelay((const TickType_t)1000 / portTICK_PERIOD_MS);
     }
-
-    if(appState.fResetPowerSensor){
-      appState.fResetPowerSensor = false;
-      logger->warn(PSTR(__func__), PSTR("Resetting power sensor.\n"));
-      PZEM.resetEnergy();
-    }
-
-    appState.powerSensorTaskRoutineLastActivity = millis();
-    vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
-  }
 }
 
 void coreroutineRelayControlTaskRoutine(void *arg){
