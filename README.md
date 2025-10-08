@@ -1,2 +1,4 @@
-# UDAWA-Neo
-Neo version of UDAWA Smart System
+# UDAWA-Gadadar
+
+Firmware repository for UDAWA Gadadar, a version of UDAWA Smart System
+
