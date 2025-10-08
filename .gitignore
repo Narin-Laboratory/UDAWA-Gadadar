@@ -10,3 +10,4 @@ platformio.ini
 **/*.log
 **/config.json
 src/set.cpp
+.vscode/extensions.json
