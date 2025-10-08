@@ -1,0 +1,10 @@
+#include "main.h"
+#include "set.h"
+
+void setCredentials() {
+    strcpy(config.state.wssid, "YOUR_WIFI_SSID");
+    strcpy(config.state.wpass, "YOUR_WIFI_PASSWORD");
+    strcpy(config.state.provDK, "YOUR_PROVISION_DEVICE_KEY");
+    strcpy(config.state.provDS, "YOUR_PROVISION_DEVICE_SECRET");
+    config.save();
+}

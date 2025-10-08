@@ -1,0 +1,13 @@
+{
+    "name": "ThingsBoard",
+    "keywords": "thingsboard, esp32, arduino",
+    "description": "Arduino library to connect with ThingsBoard IoT Platform over MQTT or HTTP/S using esp32",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Narin-Laboratory/thingsboard-client-sdk"
+    },
+    "version": "0.16.0",
+    "examples": "examples/*/*.ino",
+    "frameworks": "*",
+    "license": "MIT"
+}
