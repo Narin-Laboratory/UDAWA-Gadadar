@@ -2,37 +2,30 @@
 
 name: PlatformIO Build Test
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events for the "main" branch
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checks-out your repository under $GITHUB_WORKSPACE
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Sets up Python, which is required by PlatformIO
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      # 3. Installs PlatformIO Core
       - name: Install PlatformIO
         run: pip install -U platformio
 
-      # 4. Compiles the project using your specific environment name
+      # Run the build command from within the project's subfolder
       - name: Build PlatformIO Project
         run: pio run -e Gadadar4Ch
+        working-directory: ./UDAWA-Gadadar
