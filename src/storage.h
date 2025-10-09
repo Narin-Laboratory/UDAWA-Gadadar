@@ -82,6 +82,8 @@ struct AppConfig {
     unsigned long intvTele;
     int maxWatt;
     bool relayON;
+    bool fPowerSensorDummy;
+    unsigned long powerSensorAlarmTimer;
 };
 
 struct AppState {
