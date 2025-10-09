@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checks-out your repository
+      # 1. Checks-out the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. (FIX) Run your environment setup script
+      # 2. Run the environment setup script
       - name: Run environment setup script
         run: |
           chmod +x setup_env.sh
