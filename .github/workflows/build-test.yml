@@ -18,9 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. (NEW) List all files recursively to find platformio.ini
-      - name: List files in repository
-        run: ls -laR
+      # 2. (FIX) Run your environment setup script
+      - name: Run environment setup script
+        run: |
+          chmod +x setup_env.sh
+          ./setup_env.sh
 
       # 3. Sets up Python
       - name: Set up Python
@@ -32,6 +34,6 @@ jobs:
       - name: Install PlatformIO
         run: pip install -U platformio
 
-      # 5. Tries to build the project
+      # 5. Builds the project
       - name: Build PlatformIO Project
         run: pio run -e Gadadar4Ch
