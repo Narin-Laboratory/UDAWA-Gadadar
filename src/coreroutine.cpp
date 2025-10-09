@@ -287,6 +287,7 @@ void coreroutineDoInit(){
     http.serveStatic("/css/pico.blue.min.css", LittleFS, "/ui/css/pico.blue.min.css");
     http.serveStatic("/css/index.css", LittleFS, "/ui/css/index.css");
     http.serveStatic("/assets/bundle.js", LittleFS, "/ui/assets/bundle.js");
+    http.serveStatic("/assets/chunk-browser-ponyfill.js", LittleFS, "/ui/assets/chunk-browser-ponyfill.js");
 
 
     ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
@@ -338,6 +339,7 @@ void coreroutineStartServices(){
       http.serveStatic("/css/pico.blue.min.css", LittleFS, "/ui/css/pico.blue.min.css");
       http.serveStatic("/css/index.css", LittleFS, "/ui/css/index.css");
       http.serveStatic("/assets/bundle.js", LittleFS, "/ui/assets/bundle.js");
+      http.serveStatic("/assets/chunk-browser-ponyfill.js", LittleFS, "/ui/assets/chunk-browser-ponyfill.js");
 
       ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
           coreroutineOnWsEvent(server, client, type, arg, data, len);
