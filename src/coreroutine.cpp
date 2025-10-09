@@ -284,11 +284,9 @@ void coreroutineDoInit(){
     #ifdef USE_LOCAL_WEB_INTERFACE
     logger->debug(PSTR(__func__), PSTR("Starting web service...\n"));
     http.serveStatic("/", LittleFS, "/ui").setDefaultFile("index.html");
-    http.serveStatic("/css/pico.blue.min.css", LittleFS, "/ui/css/pico.blue.min.css");
-    http.serveStatic("/css/index.css", LittleFS, "/ui/css/index.css");
-    http.serveStatic("/assets/bundle.js", LittleFS, "/ui/assets/bundle.js");
-    http.serveStatic("/assets/chunk-browser-ponyfill.js", LittleFS, "/ui/assets/chunk-browser-ponyfill.js");
-
+    http.serveStatic("/css", LittleFS, "/ui/css");
+    http.serveStatic("/assets", LittleFS, "/ui/assets");
+    http.serveStatic("/locales", LittleFS, "/ui/locales");
 
     ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
         coreroutineOnWsEvent(server, client, type, arg, data, len);
@@ -336,10 +334,9 @@ void coreroutineStartServices(){
     if(config.state.fWeb && !crashState.fSafeMode){
       logger->debug(PSTR(__func__), PSTR("Starting web wervice...\n"));
       http.serveStatic("/", LittleFS, "/ui").setDefaultFile("index.html");
-      http.serveStatic("/css/pico.blue.min.css", LittleFS, "/ui/css/pico.blue.min.css");
-      http.serveStatic("/css/index.css", LittleFS, "/ui/css/index.css");
-      http.serveStatic("/assets/bundle.js", LittleFS, "/ui/assets/bundle.js");
-      http.serveStatic("/assets/chunk-browser-ponyfill.js", LittleFS, "/ui/assets/chunk-browser-ponyfill.js");
+      http.serveStatic("/css", LittleFS, "/ui/css");
+      http.serveStatic("/assets", LittleFS, "/ui/assets");
+      http.serveStatic("/locales", LittleFS, "/ui/locales");
 
       ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
           coreroutineOnWsEvent(server, client, type, arg, data, len);
