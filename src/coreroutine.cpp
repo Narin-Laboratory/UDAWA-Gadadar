@@ -169,17 +169,6 @@ void coreroutineLoop(){
       }
     }
 
-    if(crashState.fFSDownloading){
-      if(WiFi.status() == WL_CONNECTED){
-        logger->warn(PSTR(__func__), PSTR("Filesystem update is started.\n"));
-        crashState.fFSDownloading = false;
-        coreroutineFSDownloader();
-      }
-      else{
-        //logger->warn(PSTR(__func__), PSTR("Filesystem update is postponed until WiFi is available.\n"));
-      }
-    }
-
     if(crashState.fStartServices){
       crashState.fStartServices = false;
       coreroutineStartServices();
@@ -571,7 +560,38 @@ void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount,
   
 }
 
+void coreroutineSaveAllStorage() {
+    JsonDocument doc;
+
+    // Save appConfig
+    storageConvertAppConfig(doc, false);
+    appConfigGC.save(doc);
+    doc.clear();
+
+    // Save appState
+    storageConvertAppState(doc, false);
+    appStateGC.save(doc);
+    doc.clear();
+
+    // Save appRelays
+    storageConvertAppRelay(doc, false);
+    appRelaysGC.save(doc);
+    doc.clear();
+
+    // Save crashStateConfig
+    coreroutineCrashStateTruthKeeper(2);
+
+    // Save main config (UdawaConfig)
+    config.save();
+}
+
+static void coreroutineFSDownloaderTask(void *arg){
+  coreroutineFSDownloader();
+  vTaskDelete(NULL);
+}
+
 void coreroutineFSDownloader() {
+    coreroutineSaveAllStorage();
     // We need a WiFiClient for ArduinoHttpClient
     WiFiClient wifi;
 
@@ -661,10 +681,20 @@ void coreroutineFSDownloader() {
     }
 
     Update.onProgress([](size_t progress, size_t size) {
-        Serial.printf("LittleFS Updater: %d/%d\n", (int)progress, (int)size);
+        JsonDocument doc;
+        int calculatedProgress = progress + (size * 0.90);
+        if(calculatedProgress > size){calculatedProgress = size; doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("finished");}
+        else{doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("downloading");}
+        doc[PSTR("FSUpdate")][PSTR("progress")] = calculatedProgress;
+        doc[PSTR("FSUpdate")][PSTR("total")] = size;
+        wsBcast(doc);
     });
 
     logger->info(PSTR(__func__), PSTR("Begin LittleFS OTA. This may take 2 - 5 mins to complete. Things might be quiet for a while.. Patience!\n"));
+    JsonDocument doc;
+    doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("start");
+    wsBcast(doc);
+    doc.clear();
 
     size_t written = Update.writeStream(http);
 
@@ -673,26 +703,37 @@ void coreroutineFSDownloader() {
     } else {
         logger->warn(PSTR(__func__), PSTR("Written only : %d / %d. Premature end of stream? Error: %s\n"), (int)written, (int)updateSize, Update.errorString());
         Update.abort();
-        config.save();
+        coreroutineSaveAllStorage();
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("fail");
+        doc[PSTR("FSUpdate")][PSTR("error")] = Update.errorString();
+        wsBcast(doc);
         reboot(3);
         return;
     }
 
     if (!Update.end()) {
         logger->warn(PSTR(__func__), PSTR("An Update Error Occurred: %d\n"), Update.getError());
-        config.save();
+        coreroutineSaveAllStorage();
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("fail");
+        doc[PSTR("FSUpdate")][PSTR("error")] = Update.getError();
+        wsBcast(doc);
         reboot(3);
         return;
     }
     
     if (Update.isFinished()) {
         logger->info(PSTR(__func__), PSTR("Update completed successfully.\n"));
-        config.save();
+        coreroutineSaveAllStorage();
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("success");
+        wsBcast(doc);
         delay(1000); // Ensure configuration is saved before reboot
         reboot(3);
     } else {
-        config.save();
+        coreroutineSaveAllStorage();
         logger->warn(PSTR(__func__), PSTR("Update not finished! Something went wrong!\n"));
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("fail");
+        doc[PSTR("FSUpdate")][PSTR("error")] = "Update not finished";
+        wsBcast(doc);
         reboot(3);
     }
 
@@ -992,7 +1033,14 @@ void coreroutineOnWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client
         }
 
         else if(doc[PSTR("FSUpdate")].is<bool>()){
-          crashState.fFSDownloading = true;
+          xTaskCreate(
+              coreroutineFSDownloaderTask,    // Function that implements the task.
+              "FSDownloader",                 // Text name for the task.
+              8192,                           // Stack size in words, not bytes.
+              NULL,                           // Parameter passed into the task.
+              1,                              // Priority at which the task is created.
+              NULL                            // Used to pass out the created task's handle.
+          );
         }
 
         else if(doc[PSTR("setRelayState")].is<JsonObject>()){
@@ -1745,6 +1793,27 @@ void coreroutineRunIoT(){
             }
             else{
               logger->warn(PSTR(__func__), PSTR("Failed to subscribe configSave RPC.\n"));
+            }
+          }
+
+          if(!iotState.fFSUpdateRPCSubscribed){
+            RPC_Callback fsUpdateCallback("FSUpdate", [](const JsonVariantConst& params, JsonDocument& result) {
+                xTaskCreate(
+                    coreroutineFSDownloaderTask,    // Function that implements the task.
+                    "FSDownloader",                 // Text name for the task.
+                    8192,                           // Stack size in words, not bytes.
+                    NULL,                           // Parameter passed into the task.
+                    1,                              // Priority at which the task is created.
+                    NULL                            // Used to pass out the created task's handle.
+                );
+                result["status"] = "FS Update task started";
+            });
+            iotState.fFSUpdateRPCSubscribed = IAPIRPC.RPC_Subscribe(fsUpdateCallback); // Pass the callback directly
+            if(iotState.fFSUpdateRPCSubscribed){
+              logger->verbose(PSTR(__func__), PSTR("FSUpdate RPC subscribed successfuly.\n"));
+            }
+            else{
+              logger->warn(PSTR(__func__), PSTR("Failed to subscribe FSUpdate RPC.\n"));
             }
           }
 

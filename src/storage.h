@@ -15,7 +15,6 @@ struct CrashState{
     bool fRTCHwDetected = false;
     unsigned long lastRecordedDatetime = 0;
     unsigned long lastRecordedDatetimeSavedTimer = 0;
-    bool fFSDownloading = false;
     bool fStartServices = false;
     bool fStopServices = false;
     bool fDoInit = false;
