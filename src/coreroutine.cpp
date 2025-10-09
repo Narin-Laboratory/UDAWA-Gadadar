@@ -1147,6 +1147,9 @@ void coreroutineSyncClientAttr(uint8_t direction){
     cfg[PSTR("wpass")] = config.state.wpass;
     cfg[PSTR("fInit")] = config.state.fInit;
     cfg[PSTR("binURL")] = config.state.binURL;
+    cfg[PSTR("fIoT")] = config.state.fIoT;
+    cfg[PSTR("tbAddr")] = config.state.tbAddr;
+    cfg[PSTR("tbPort")] = config.state.tbPort;
     wsBcast(doc);
 
     doc.clear();
