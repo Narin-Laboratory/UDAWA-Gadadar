@@ -169,17 +169,6 @@ void coreroutineLoop(){
       }
     }
 
-    if(crashState.fFSDownloading){
-      if(WiFi.status() == WL_CONNECTED){
-        logger->warn(PSTR(__func__), PSTR("Filesystem update is started.\n"));
-        crashState.fFSDownloading = false;
-        coreroutineFSDownloader();
-      }
-      else{
-        //logger->warn(PSTR(__func__), PSTR("Filesystem update is postponed until WiFi is available.\n"));
-      }
-    }
-
     if(crashState.fStartServices){
       crashState.fStartServices = false;
       coreroutineStartServices();
@@ -589,19 +578,20 @@ void coreroutineSaveAllStorage() {
     appRelaysGC.save(doc);
     doc.clear();
 
-    // Save udawaConfig
-    storageConvertUdawaConfig(doc, false);
-    udawaConfigGC.save(doc);
-    doc.clear();
-
     // Save crashStateConfig
     coreroutineCrashStateTruthKeeper(2);
 
-    // Save main config
+    // Save main config (UdawaConfig)
     config.save();
 }
 
+static void coreroutineFSDownloaderTask(void *arg){
+  coreroutineFSDownloader();
+  vTaskDelete(NULL);
+}
+
 void coreroutineFSDownloader() {
+    coreroutineSaveAllStorage();
     // We need a WiFiClient for ArduinoHttpClient
     WiFiClient wifi;
 
@@ -1022,7 +1012,14 @@ void coreroutineOnWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client
         }
 
         else if(doc[PSTR("FSUpdate")].is<bool>()){
-          crashState.fFSDownloading = true;
+          xTaskCreate(
+              coreroutineFSDownloaderTask,    // Function that implements the task.
+              "FSDownloader",                 // Text name for the task.
+              8192,                           // Stack size in words, not bytes.
+              NULL,                           // Parameter passed into the task.
+              1,                              // Priority at which the task is created.
+              NULL                            // Used to pass out the created task's handle.
+          );
         }
 
         else if(doc[PSTR("setRelayState")].is<JsonObject>()){
@@ -1780,9 +1777,15 @@ void coreroutineRunIoT(){
 
           if(!iotState.fFSUpdateRPCSubscribed){
             RPC_Callback fsUpdateCallback("FSUpdate", [](const JsonVariantConst& params, JsonDocument& result) {
-                coreroutineSaveAllStorage();
-                crashState.fFSDownloading = true;
-                result["status"] = "FS Update started";
+                xTaskCreate(
+                    coreroutineFSDownloaderTask,    // Function that implements the task.
+                    "FSDownloader",                 // Text name for the task.
+                    8192,                           // Stack size in words, not bytes.
+                    NULL,                           // Parameter passed into the task.
+                    1,                              // Priority at which the task is created.
+                    NULL                            // Used to pass out the created task's handle.
+                );
+                result["status"] = "FS Update task started";
             });
             iotState.fFSUpdateRPCSubscribed = IAPIRPC.RPC_Subscribe(fsUpdateCallback); // Pass the callback directly
             if(iotState.fFSUpdateRPCSubscribed){
