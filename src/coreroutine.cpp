@@ -681,10 +681,18 @@ void coreroutineFSDownloader() {
     }
 
     Update.onProgress([](size_t progress, size_t size) {
-        Serial.printf("LittleFS Updater: %d/%d\n", (int)progress, (int)size);
+        JsonDocument doc;
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("progress");
+        doc[PSTR("FSUpdate")][PSTR("progress")] = progress;
+        doc[PSTR("FSUpdate")][PSTR("total")] = size;
+        wsBcast(doc);
     });
 
     logger->info(PSTR(__func__), PSTR("Begin LittleFS OTA. This may take 2 - 5 mins to complete. Things might be quiet for a while.. Patience!\n"));
+    JsonDocument doc;
+    doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("start");
+    wsBcast(doc);
+    doc.clear();
 
     size_t written = Update.writeStream(http);
 
@@ -693,26 +701,37 @@ void coreroutineFSDownloader() {
     } else {
         logger->warn(PSTR(__func__), PSTR("Written only : %d / %d. Premature end of stream? Error: %s\n"), (int)written, (int)updateSize, Update.errorString());
         Update.abort();
-        config.save();
+        coreroutineSaveAllStorage();
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("fail");
+        doc[PSTR("FSUpdate")][PSTR("error")] = Update.errorString();
+        wsBcast(doc);
         reboot(3);
         return;
     }
 
     if (!Update.end()) {
         logger->warn(PSTR(__func__), PSTR("An Update Error Occurred: %d\n"), Update.getError());
-        config.save();
+        coreroutineSaveAllStorage();
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("fail");
+        doc[PSTR("FSUpdate")][PSTR("error")] = Update.getError();
+        wsBcast(doc);
         reboot(3);
         return;
     }
     
     if (Update.isFinished()) {
         logger->info(PSTR(__func__), PSTR("Update completed successfully.\n"));
-        config.save();
+        coreroutineSaveAllStorage();
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("success");
+        wsBcast(doc);
         delay(1000); // Ensure configuration is saved before reboot
         reboot(3);
     } else {
-        config.save();
+        coreroutineSaveAllStorage();
         logger->warn(PSTR(__func__), PSTR("Update not finished! Something went wrong!\n"));
+        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("fail");
+        doc[PSTR("FSUpdate")][PSTR("error")] = "Update not finished";
+        wsBcast(doc);
         reboot(3);
     }
 
