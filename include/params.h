@@ -20,12 +20,12 @@
     #define THINGSBOARD_ENABLE_STREAM_UTILS true
     #define USE_IOT_SECURE
     #define USE_IOT_OTA
-    #define IOT_RECEIVE_BUFFER_SIZE   2048UL       // was 2048
-    #define IOT_SEND_BUFFER_SIZE      2048UL       // was 2048
-    #define IOT_DEFAULT_MAX_STACK_SIZE     2048UL       // was 2048
-    #define IOT_DEFAULT_MAX_RESPONSE_SIZE  2048UL       // was 2048
-    #define IOT_MAX_ATTRIBUTES             8UL          // was 10 (adjust if needed)
-    #define IOT_BUFFERING_SIZE             2048UL       // was 2048
+    #define IOT_RECEIVE_BUFFER_SIZE   4096UL       // was 2048
+    #define IOT_SEND_BUFFER_SIZE      4096UL       // was 2048
+    #define IOT_DEFAULT_MAX_STACK_SIZE     4096UL       // was 2048
+    #define IOT_DEFAULT_MAX_RESPONSE_SIZE  4096UL       // was 2048
+    #define IOT_MAX_ATTRIBUTES             128UL          // was 10 (adjust if needed)
+    #define IOT_BUFFERING_SIZE             4096UL       // was 2048
     #define IOT_REQUEST_TIMEOUT_MICROSECONDS 3000000UL  // 3 seconds (was 3000 µs)
     #define IOT_OTA_UPDATE_FAILURE_RETRY 12U
     #define IOT_OTA_UPDATE_PACKET_SIZE 4096U
@@ -99,7 +99,7 @@ const unsigned long intvAttr = 5;
 const unsigned long intvTele = 900;
 const int maxWatt = 2000;
 const bool relayON = false;
-const bool fPowerSensorDummy = false;
+const bool fPowerSensorDummy = true;
 const unsigned long powerSensorAlarmTimer = 30;
 const std::array<String, 4> availableRelayMode = {PSTR("Manual"), PSTR("Duty Cycle"), PSTR("Time Daily"), PSTR("Specific Datetime")};
 const uint8_t maxTimers = 10;

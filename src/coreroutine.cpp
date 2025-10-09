@@ -1664,9 +1664,8 @@ void coreroutineRunIoT(){
           if(!iotState.fSharedAttributesSubscribed){
             Shared_Attribute_Callback coreroutineThingsboardSharedAttributesUpdateCallback(
                 [](const JsonVariantConst& data) {
-                    String jsonData;
-                    serializeJson(data, jsonData);
-                    logger->verbose(PSTR(__func__), PSTR("Received shared attribute update(s): %s\n"), jsonData.c_str());
+                    logger->verbose(PSTR(__func__), PSTR("Received shared attribute update(s): \n"));
+                    serializeJson(data, Serial);
 
                     JsonDocument doc;
                     DeserializationError error = deserializeJson(doc, data.as<String>());
