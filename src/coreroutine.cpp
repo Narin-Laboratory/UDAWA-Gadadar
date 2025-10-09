@@ -683,7 +683,7 @@ void coreroutineFSDownloader() {
     Update.onProgress([](size_t progress, size_t size) {
         JsonDocument doc;
         doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("progress");
-        doc[PSTR("FSUpdate")][PSTR("progress")] = progress;
+        doc[PSTR("FSUpdate")][PSTR("progress")] = progress + (progress * 0.80);
         doc[PSTR("FSUpdate")][PSTR("total")] = size;
         wsBcast(doc);
     });
