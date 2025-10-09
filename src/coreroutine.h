@@ -21,6 +21,7 @@ struct IoTState{
     bool fRebootRPCSubscribed = false;
     bool fConfigSaveRPCSubscribed = false;
     bool fSetRelayRPCSubscribed = false;
+    bool fFSUpdateRPCSubscribed = false;
     bool fIoTCurrentFWSent = false;
     bool fIoTUpdateRequestSent = false;
     bool fIoTUpdateStarted = false;
@@ -77,6 +78,7 @@ void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount,
     void coreroutineOnWiFiOTAError(ota_error_t error);
 #endif
 void coreroutineFSDownloader();
+void coreroutineSaveAllStorage();
 void coreroutineSyncClientAttr(uint8_t direction);
 #ifdef USE_LOCAL_WEB_INTERFACE
     String hmacSha256(String htP, String salt);

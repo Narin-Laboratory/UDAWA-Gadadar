@@ -571,6 +571,36 @@ void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount,
   
 }
 
+void coreroutineSaveAllStorage() {
+    JsonDocument doc;
+
+    // Save appConfig
+    storageConvertAppConfig(doc, false);
+    appConfigGC.save(doc);
+    doc.clear();
+
+    // Save appState
+    storageConvertAppState(doc, false);
+    appStateGC.save(doc);
+    doc.clear();
+
+    // Save appRelays
+    storageConvertAppRelay(doc, false);
+    appRelaysGC.save(doc);
+    doc.clear();
+
+    // Save udawaConfig
+    storageConvertUdawaConfig(doc, false);
+    udawaConfigGC.save(doc);
+    doc.clear();
+
+    // Save crashStateConfig
+    coreroutineCrashStateTruthKeeper(2);
+
+    // Save main config
+    config.save();
+}
+
 void coreroutineFSDownloader() {
     // We need a WiFiClient for ArduinoHttpClient
     WiFiClient wifi;
@@ -1745,6 +1775,21 @@ void coreroutineRunIoT(){
             }
             else{
               logger->warn(PSTR(__func__), PSTR("Failed to subscribe configSave RPC.\n"));
+            }
+          }
+
+          if(!iotState.fFSUpdateRPCSubscribed){
+            RPC_Callback fsUpdateCallback("FSUpdate", [](const JsonVariantConst& params, JsonDocument& result) {
+                coreroutineSaveAllStorage();
+                crashState.fFSDownloading = true;
+                result["status"] = "FS Update started";
+            });
+            iotState.fFSUpdateRPCSubscribed = IAPIRPC.RPC_Subscribe(fsUpdateCallback); // Pass the callback directly
+            if(iotState.fFSUpdateRPCSubscribed){
+              logger->verbose(PSTR(__func__), PSTR("FSUpdate RPC subscribed successfuly.\n"));
+            }
+            else{
+              logger->warn(PSTR(__func__), PSTR("Failed to subscribe FSUpdate RPC.\n"));
             }
           }
 
