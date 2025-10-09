@@ -1170,8 +1170,11 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
     float volt, amp, watt, freq, pf, ener, ener_start_period;
 
     // Variables for telemetry data aggregation
-    float volt_sum = 0, watt_sum = 0;
+    float volt_sum = 0, amp_sum = 0, watt_sum = 0, pf_sum = 0, freq_sum = 0;
     float volt_min_period = 999, volt_max_period = 0;
+    float amp_min_period = 999, amp_max_period = 0;
+    float pf_min_period = 999, pf_max_period = 0;
+    float freq_min_period = 999, freq_max_period = 0;
     long reading_count = 0;
 
     unsigned long timerTelemetry = millis();
@@ -1203,17 +1206,15 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
             }
 
             if (total_wattage > 0) {
-                 watt = total_wattage + (rand() % 10 - 5); // Add some noise
+                 watt = total_wattage + (rand() % 10 - 5);
             } else {
-                 watt = 2.5 + (rand() % 10 / 10.0); // Standby power
+                 watt = 5.0 + (rand() % 10 / 10.0); // Standby power 5-6W
             }
 
             volt = 220.0 + (rand() % 20 - 10);
             amp = watt / volt;
             freq = 50.0 + (rand() % 5 / 10.0 - 0.2);
             pf = 0.95 + (rand() % 10 / 100.0);
-            // Increment energy based on dummy power (1 second interval)
-            // Energy (kWh) = (Power (W) * Time (s)) / 3,600,000
             ener += watt / 3600000.0;
 
         } else {
@@ -1242,9 +1243,20 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
         if (appState.fPowerSensor && !fFailureReadings) {
             // Accumulate for aggregation
             volt_sum += volt;
+            amp_sum += amp;
             watt_sum += watt;
+            pf_sum += pf;
+            freq_sum += freq;
+
             if (volt < volt_min_period) volt_min_period = volt;
             if (volt > volt_max_period) volt_max_period = volt;
+            if (amp < amp_min_period) amp_min_period = amp;
+            if (amp > amp_max_period) amp_max_period = amp;
+            if (pf < pf_min_period) pf_min_period = pf;
+            if (pf > pf_max_period) pf_max_period = pf;
+            if (freq < freq_min_period) freq_min_period = freq;
+            if (freq > freq_max_period) freq_max_period = freq;
+
             reading_count++;
 
             JsonDocument doc;
@@ -1284,19 +1296,33 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
                     doc[PSTR("volt_avg")] = volt_sum / reading_count;
                     doc[PSTR("volt_min")] = volt_min_period;
                     doc[PSTR("volt_max")] = volt_max_period;
-                    doc[PSTR("watt")] = watt_sum / reading_count;
+
+                    doc[PSTR("amp_avg")] = amp_sum / reading_count;
+                    doc[PSTR("amp_min")] = amp_min_period;
+                    doc[PSTR("amp_max")] = amp_max_period;
+
+                    doc[PSTR("pf_avg")] = pf_sum / reading_count;
+                    doc[PSTR("pf_min")] = pf_min_period;
+                    doc[PSTR("pf_max")] = pf_max_period;
+
+                    doc[PSTR("freq_avg")] = freq_sum / reading_count;
+                    doc[PSTR("freq_min")] = freq_min_period;
+                    doc[PSTR("freq_max")] = freq_max_period;
+
+                    doc[PSTR("watt_avg")] = watt_sum / reading_count;
                     doc[PSTR("ener_total_kwh")] = ener;
                     doc[PSTR("energy_consumed_wh")] = energy_consumed_kwh * 1000.0;
                     iotSendTele(doc);
                     doc.clear();
 
                     // Reset accumulators for next period
-                    volt_sum = 0;
-                    watt_sum = 0;
-                    volt_min_period = 999;
-                    volt_max_period = 0;
+                    volt_sum = 0; watt_sum = 0; amp_sum = 0; pf_sum = 0; freq_sum = 0;
+                    volt_min_period = 999; volt_max_period = 0;
+                    amp_min_period = 999; amp_max_period = 0;
+                    pf_min_period = 999; pf_max_period = 0;
+                    freq_min_period = 999; freq_max_period = 0;
                     reading_count = 0;
-                    ener_start_period = ener; // Set start for next period
+                    ener_start_period = ener;
                 }
                 timerTelemetry = now;
             }
@@ -1307,24 +1333,24 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
             if (!appState.fPowerSensor) {
                 coreroutineSetAlarm(140, 1, 5, 1000);
             } else if (!fFailureReadings) {
-                if (volt < 180 || volt > 260) coreroutineSetAlarm(141, 1, 5, 1000); // Realistic voltage alarm
+                if (volt < 180 || volt > 260) coreroutineSetAlarm(141, 1, 5, 1000);
                 if (amp < 0 || amp > 100) coreroutineSetAlarm(142, 1, 5, 1000);
                 if (watt < 0 || watt > appConfig.maxWatt) coreroutineSetAlarm(143, 1, 5, 1000);
                 if (pf < 0 || pf > 1) coreroutineSetAlarm(144, 1, 5, 1000);
-                if (freq < 48 || freq > 52) coreroutineSetAlarm(144, 1, 5, 1000); // Realistic freq alarm
+                if (freq < 48 || freq > 52) coreroutineSetAlarm(144, 1, 5, 1000);
                 if (watt > appConfig.maxWatt || volt > 275) coreroutineSetAlarm(145, 1, 5, 1000);
 
                 uint8_t activeRelayCounter = 0;
                 for (uint8_t i = 0; i < 4; i++) {
                     if (relays[i].state == true) {
                         activeRelayCounter++;
-                        if (watt < (relays[i].wattage * 0.1)) coreroutineSetAlarm(210 + i, 1, 5, 1000); // Alarm if power is <10% of expected
+                        if (watt < (relays[i].wattage * 0.1)) coreroutineSetAlarm(210 + i, 1, 5, 1000);
                         if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
                             coreroutineSetAlarm(215 + i, 1, 5, 1000);
                         }
                     }
                 }
-                if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(214, 1, 5, 1000); // Alarm for ghost power > 10W
+                if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(214, 1, 5, 1000);
             }
             timerAlarm = now;
         }
@@ -1335,7 +1361,7 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
             if (!appConfig.fPowerSensorDummy) {
                 pzem.resetEnergy();
             }
-            ener = 0; // Reset dummy energy as well
+            ener = 0;
             ener_start_period = 0;
         }
 
