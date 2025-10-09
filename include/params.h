@@ -4,7 +4,7 @@
 
 #define SERIAL_BAUD_RATE 115200UL
 #define COMPILED __DATE__ " " __TIME__
-#define CURRENT_FIRMWARE_TITLE "Gadadar4Ch"
+#define CURRENT_FIRMWARE_TITLE "Gadadar"
 #define CURRENT_FIRMWARE_VERSION "0.0.1"
 
 #define USE_WIFI_OTA
@@ -74,9 +74,9 @@ static constexpr char tbAddr[] PROGMEM = "prita.undiknas.ac.id";
 static const int tbPort = 1883;
 static constexpr char tbAddr[] PROGMEM = "udawa.local";
 #endif
-static constexpr char binURL[] PROGMEM = "http://udawa.or.id/cdn/firmware/gadadar4ch.bin";
-static constexpr char model[] PROGMEM = "Gadadar4Ch";
-static constexpr char hname[] PROGMEM = "gadadar4ch";
+static constexpr char binURL[] PROGMEM = "http://udawa.or.id/cdn/firmware/gadadar.bin";
+static constexpr char model[] PROGMEM = "Gadadar";
+static constexpr char hname[] PROGMEM = "gadadar";
 static constexpr char group[] PROGMEM = "Gadadar";
 static constexpr char logIP[] PROGMEM = "255.255.255.255";
 static const uint8_t logLev = 5;
