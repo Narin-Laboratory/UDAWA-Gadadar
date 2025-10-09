@@ -74,7 +74,7 @@ static constexpr char tbAddr[] PROGMEM = "prita.undiknas.ac.id";
 static const int tbPort = 1883;
 static constexpr char tbAddr[] PROGMEM = "udawa.local";
 #endif
-static constexpr char binURL[] PROGMEM = "http://udawa.or.id/cdn/firmware/gadadar-webiface.bin";
+static constexpr char binURL[] PROGMEM = "http://udawa.or.id/cdn/gadadar/littlefs.bin";
 static constexpr char model[] PROGMEM = "Gadadar";
 static constexpr char hname[] PROGMEM = "gadadar";
 static constexpr char group[] PROGMEM = "Gadadar";
