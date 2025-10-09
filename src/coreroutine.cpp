@@ -681,11 +681,15 @@ void coreroutineFSDownloader() {
     }
 
     Update.onProgress([](size_t progress, size_t size) {
-        JsonDocument doc;
-        doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("progress");
-        doc[PSTR("FSUpdate")][PSTR("progress")] = progress + (progress * 0.80);
-        doc[PSTR("FSUpdate")][PSTR("total")] = size;
-        wsBcast(doc);
+      JsonDocument doc;
+      doc[PSTR("FSUpdate")][PSTR("status")] = PSTR("progress");
+      
+      // Calculate progress to fit in the 80% to 100% range
+      size_t calculated_progress = (size_t)((size * 0.80) + (progress * 0.20));
+      
+      doc[PSTR("FSUpdate")][PSTR("progress")] = calculated_progress;
+      doc[PSTR("FSUpdate")][PSTR("total")] = size;
+      wsBcast(doc);
     });
 
     logger->info(PSTR(__func__), PSTR("Begin LittleFS OTA. This may take 2 - 5 mins to complete. Things might be quiet for a while.. Patience!\n"));
