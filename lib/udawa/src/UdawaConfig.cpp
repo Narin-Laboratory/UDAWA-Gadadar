@@ -261,7 +261,6 @@ bool GenericConfig::save(JsonDocument &data){
       if( xSemaphoreTake( xSemaphoreConfig, ( TickType_t ) 5000 ) == pdTRUE )
       {
         if(!LittleFS.remove(_path)){
-            Serial.println(_path);
             _logger->warn(PSTR(__func__),PSTR("Failed to delete the old file: %s\n"), _path);
         }
         
