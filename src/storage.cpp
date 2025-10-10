@@ -177,6 +177,17 @@ void storageConvertUdawaConfig(JsonDocument &doc, bool direction, bool load_defa
   }
   else{ // from config to doc
     doc[PSTR("ipad")] = WiFi.localIP().toString();
+    doc[PSTR("compdate")] = COMPILED;
+    doc[PSTR("fmTitle")] = CURRENT_FIRMWARE_TITLE;
+    doc[PSTR("fmVersion")] = CURRENT_FIRMWARE_VERSION;
+    doc[PSTR("stamac")] = WiFi.macAddress();
+    doc[PSTR("apmac")] = WiFi.softAPmacAddress();
+    doc[PSTR("flFree")] = ESP.getFreeSketchSpace();
+    doc[PSTR("fwSize")] = ESP.getSketchSize();
+    doc[PSTR("flSize")] = ESP.getFlashChipSize();
+    doc[PSTR("dSize")] = LittleFS.totalBytes();
+    doc[PSTR("dUsed")] = LittleFS.usedBytes();
+    doc[PSTR("sdkVer")] = ESP.getSdkVersion();
     doc[PSTR("fInit")] = config.state.fInit;
     doc[PSTR("hwid")] = config.state.hwid;
     doc[PSTR("name")] = config.state.name;
