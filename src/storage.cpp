@@ -176,6 +176,7 @@ void storageConvertUdawaConfig(JsonDocument &doc, bool direction, bool load_defa
     if(!doc["pinBuzz"].isNull()) config.state.pinBuzz = doc["pinBuzz"].as<uint8_t>();
   }
   else{ // from config to doc
+    doc[PSTR("batt")] = 100;
     doc[PSTR("ipad")] = WiFi.localIP().toString();
     doc[PSTR("compdate")] = COMPILED;
     doc[PSTR("fmTitle")] = CURRENT_FIRMWARE_TITLE;
