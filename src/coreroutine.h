@@ -19,7 +19,7 @@ struct IoTState{
     SemaphoreHandle_t xSemaphoreThingsboard = NULL;
     bool fSharedAttributesSubscribed = false;
     bool fRebootRPCSubscribed = false;
-    bool fConfigSaveRPCSubscribed = false;
+    bool fStateSaveRPCSubscribed = false;
     bool fSetRelayRPCSubscribed = false;
     bool fFSUpdateRPCSubscribed = false;
     bool fIoTCurrentFWSent = false;

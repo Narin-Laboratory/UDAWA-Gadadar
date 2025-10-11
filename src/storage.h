@@ -99,6 +99,7 @@ struct AppState {
     bool fsaveAppRelay = false;
     bool fSaveAppState = false;
     bool fsyncClientAttributes = false;
+    bool fSaveAllState = false;
 
     // Transient state variables, moved from coreroutineLoop
     bool panic_action_taken = false;

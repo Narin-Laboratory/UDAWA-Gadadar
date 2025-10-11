@@ -223,6 +223,11 @@ void coreroutineLoop(){
         }
     }
 
+    if (appState.fSaveAllState){
+      coreroutineSaveAllStorage();
+      appState.fSaveAllState = false;
+    }
+
     #ifdef USE_LOCAL_WEB_INTERFACE
       if(ws.count() > 0 && (now - appState.lastWebBcast > (appConfig.intvWeb * 1000))){
         JsonDocument doc;
@@ -1766,6 +1771,7 @@ void coreroutineRunIoT(){
               logger->warn(PSTR(__func__), PSTR("Failed to subscribe setRelay RPC.\n"));
             }
           }
+          
           if(!iotState.fRebootRPCSubscribed){
             RPC_Callback rebootCallback("reboot", [](const JsonVariantConst& params, JsonDocument& result) {
                 int countdown = 0;
@@ -1773,7 +1779,7 @@ void coreroutineRunIoT(){
                     countdown = params.as<int>();
                 }
                 reboot(countdown);
-                result["status"] = "rebooting";
+                result["status"] = "success";
             });
             iotState.fRebootRPCSubscribed = IAPIRPC.RPC_Subscribe(rebootCallback); // Pass the callback directly
             if(iotState.fRebootRPCSubscribed){
@@ -1784,17 +1790,17 @@ void coreroutineRunIoT(){
             }
           }
 
-          if(!iotState.fConfigSaveRPCSubscribed){
-            RPC_Callback configSaveCallback("configSave", [](const JsonVariantConst& params, JsonDocument& result) {
-                config.save();
-                result["status"] = "config saved";
+          if(!iotState.fStateSaveRPCSubscribed){
+            RPC_Callback stateSaveCallback("stateSave", [](const JsonVariantConst& params, JsonDocument& result) {
+                appState.fSaveAllState = true;
+                result["status"] = "success";
             });
-            iotState.fConfigSaveRPCSubscribed = IAPIRPC.RPC_Subscribe(configSaveCallback); // Pass the callback directly
-            if(iotState.fConfigSaveRPCSubscribed){
-              logger->verbose(PSTR(__func__), PSTR("configSave RPC subscribed successfuly.\n"));
+            iotState.fStateSaveRPCSubscribed = IAPIRPC.RPC_Subscribe(stateSaveCallback); // Pass the callback directly
+            if(iotState.fStateSaveRPCSubscribed){
+              logger->verbose(PSTR(__func__), PSTR("reboot RPC subscribed successfuly.\n"));
             }
             else{
-              logger->warn(PSTR(__func__), PSTR("Failed to subscribe configSave RPC.\n"));
+              logger->warn(PSTR(__func__), PSTR("Failed to subscribe reboot RPC.\n"));
             }
           }
 
@@ -1808,7 +1814,7 @@ void coreroutineRunIoT(){
                     1,                              // Priority at which the task is created.
                     NULL                            // Used to pass out the created task's handle.
                 );
-                result["status"] = "FS Update task started";
+                result["status"] = "success";
             });
             iotState.fFSUpdateRPCSubscribed = IAPIRPC.RPC_Subscribe(fsUpdateCallback); // Pass the callback directly
             if(iotState.fFSUpdateRPCSubscribed){
@@ -1822,7 +1828,7 @@ void coreroutineRunIoT(){
           if(!iotState.fSyncAttributeRPCSubscribed){
             RPC_Callback syncAttributeCallback("syncAttribute", [](const JsonVariantConst& params, JsonDocument& result) {
               appState.fsyncClientAttributes = true;
-              result["status"] = "syncAttribute triggered";
+              result["status"] = "success";
             });
             iotState.fSyncAttributeRPCSubscribed = IAPIRPC.RPC_Subscribe(syncAttributeCallback);
             if(iotState.fSyncAttributeRPCSubscribed){
