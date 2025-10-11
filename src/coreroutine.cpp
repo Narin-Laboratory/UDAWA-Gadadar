@@ -1819,6 +1819,20 @@ void coreroutineRunIoT(){
             }
           }
 
+          if(!iotState.fSyncAttributeRPCSubscribed){
+            RPC_Callback syncAttributeCallback("syncAttribute", [](const JsonVariantConst& params, JsonDocument& result) {
+              appState.fsyncClientAttributes = true;
+              result["status"] = "syncAttribute triggered";
+            });
+            iotState.fSyncAttributeRPCSubscribed = IAPIRPC.RPC_Subscribe(syncAttributeCallback);
+            if(iotState.fSyncAttributeRPCSubscribed){
+              logger->verbose(PSTR(__func__), PSTR("syncAttribute RPC subscribed successfully.\n"));
+            }
+            else{
+              logger->warn(PSTR(__func__), PSTR("Failed to subscribe syncAttribute RPC.\n"));
+            }
+          }
+
           #ifdef USE_IOT_OTA
           const OTA_Update_Callback coreroutineIoTUpdaterOTACallback(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION, &IoTUpdater, &iotFinishedCallback, &iotProgressCallback, &iotUpdateStartingCallback, IOT_OTA_UPDATE_FAILURE_RETRY, IOT_OTA_UPDATE_PACKET_SIZE);
           if (IAPIOta.Start_Firmware_Update(coreroutineIoTUpdaterOTACallback)) {

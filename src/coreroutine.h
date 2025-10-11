@@ -25,6 +25,7 @@ struct IoTState{
     bool fIoTCurrentFWSent = false;
     bool fIoTUpdateRequestSent = false;
     bool fIoTUpdateStarted = false;
+    bool fSyncAttributeRPCSubscribed = false;
 };
 #endif
 
