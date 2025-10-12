@@ -1573,16 +1573,16 @@ void coreroutineSetRelay(uint8_t index, bool output){
       relays[index].lastActive = millis();
       relays[index].lastChanged = millis();
       logger->debug(PSTR(__func__), PSTR("Relay %d is ON. %d was written to relay.\n"), index+1, appConfig.relayON);
-      appState.fsyncClientAttributes = true;
       appState.fsaveAppRelay = true;
+      appState.fsyncClientAttributes = true;
     }
     else{
       IOExtender.digitalWrite(relays[index].pin, !appConfig.relayON);
       relays[index].state = false;
       relays[index].lastChanged = millis();
       logger->debug(PSTR(__func__), PSTR("Relay %d is OFF. %d was written to relay.\n"), index+1, !appConfig.relayON);
-      appState.fsyncClientAttributes = true;
       appState.fsaveAppRelay = true;
+      appState.fsyncClientAttributes = true;      
     }
 
     #ifdef USE_IOT
@@ -1719,8 +1719,8 @@ void coreroutineRunIoT(){
           if(!iotState.fSharedAttributesSubscribed){
             Shared_Attribute_Callback coreroutineThingsboardSharedAttributesUpdateCallback(
                 [](const JsonVariantConst& data) {
-                    logger->verbose(PSTR(__func__), PSTR("Received shared attribute update(s): \n"));
-                    serializeJson(data, Serial);
+                    //logger->verbose(PSTR(__func__), PSTR("Received shared attribute update(s): \n"));
+                    //serializeJson(data, Serial);
 
                     JsonDocument doc;
                     DeserializationError error = deserializeJson(doc, data.as<String>());
@@ -1745,24 +1745,18 @@ void coreroutineRunIoT(){
           }
 
           if(!iotState.fSetRelayRPCSubscribed){
-            RPC_Callback setRelayCallback("setRelay", [](const JsonVariantConst& params, JsonDocument& result) {
-              serializeJsonPretty(params, Serial);
-                if (params.is<JsonObjectConst>()) {
-                  JsonObjectConst paramObj = params.as<JsonObjectConst>();
-                  if (paramObj[PSTR("pin")].is<uint8_t>() && paramObj[PSTR("state")].is<bool>()) {
-                    uint8_t pin = paramObj[PSTR("pin")].as<uint8_t>();
-                    bool state = paramObj[PSTR("state")].as<bool>();
-                    coreroutineSetRelay(pin, state);
-                    result["status"] = "success";
-                  } else {
-                    result["status"] = "error";
-                    result["error"] = "Invalid parameters";
-                  }
+            RPC_Callback setRelayCallback("setRelayState", [](const JsonVariantConst& params, JsonDocument& result) {
+              if (params[PSTR("pin")].is<uint8_t>() && params[PSTR("state")].is<bool>()) {
+                  uint8_t pin = params[PSTR("pin")].as<uint8_t>();
+                  bool state = params[PSTR("state")].as<bool>();
+                  coreroutineSetRelay(pin, state);
+                  result["status"] = "success";
                 } else {
                   result["status"] = "error";
-                  result["error"] = "Invalid request format";
+                  result["error"] = "Invalid parameters";
                 }
-            });
+              }
+            );
             iotState.fSetRelayRPCSubscribed = IAPIRPC.RPC_Subscribe(setRelayCallback);
             if(iotState.fSetRelayRPCSubscribed){
               logger->verbose(PSTR(__func__), PSTR("setRelay RPC subscribed successfuly.\n"));
