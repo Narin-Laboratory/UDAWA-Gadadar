@@ -9,6 +9,8 @@
 
 #define USE_WIFI_OTA
 
+#define USE_CO_MCU
+
 #define USE_LOCAL_WEB_INTERFACE
 #ifdef USE_LOCAL_WEB_INTERFACE
     #define WS_BLOCKED_DURATION 60000UL
@@ -78,7 +80,7 @@ static constexpr char binURL[] PROGMEM = "http://udawa.or.id/cdn/gadadar/littlef
 static constexpr char model[] PROGMEM = "Gadadar";
 static constexpr char hname[] PROGMEM = "gadadar";
 static constexpr char group[] PROGMEM = "Gadadar";
-static constexpr char logIP[] PROGMEM = "255.255.255.255";
+#define DEFAULT_LOG_IP "255.255.255.255"
 static const uint8_t logLev = 5;
 static const bool fIoT = true;
 static const bool fWOTA = true;
@@ -99,10 +101,21 @@ const unsigned long intvAttr = 5;
 const unsigned long intvTele = 900;
 const int maxWatt = 2000;
 const bool relayON = false;
-const bool fPowerSensorDummy = true;
+const bool fPowerSensorDummy = false;
 const unsigned long powerSensorAlarmTimer = 30;
 const std::array<String, 4> availableRelayMode = {PSTR("Manual"), PSTR("Duty Cycle"), PSTR("Time Daily"), PSTR("Specific Datetime")};
 const uint8_t maxTimers = 10;
 
+#ifdef USE_CO_MCU
+const uint8_t s2rx = 16;
+const uint8_t s2tx = 17;
+const uint16_t coMCUBuzzFreq = 1600;
+const bool coMCUFBuzzer = true;
+const uint8_t coMCUPinBuzzer = 2;
+const uint8_t coMCUPinLEDR = 3;
+const uint8_t coMCUPinLEDG = 5;
+const uint8_t coMCUPinLEDB = 6;
+const uint8_t coMCULON = 255;
+#endif
 
 #endif

@@ -90,6 +90,25 @@ bool UdawaConfig::load(){
                 if(data[PSTR("tbAddr")].is<const char*>()){strlcpy(state.tbAddr, data[PSTR("tbAddr")].as<const char*>(), sizeof(state.tbAddr));}
                 #endif
                 if(data[PSTR("binURL")].is<const char*>()){strlcpy(state.binURL, data[PSTR("binURL")].as<const char*>(), sizeof(state.binURL));}
+
+                #ifdef USE_IOT
+                if(data[PSTR("s2rx")].is<uint8_t>()){state.s2rx = data[PSTR("s2rx")].as<uint8_t>();}
+                if(data[PSTR("s2tx")].is<uint8_t>()){state.s2tx = data[PSTR("s2tx")].as<uint8_t>();}
+                if(data[PSTR("coMCUBuzzFreq")].is<uint16_t>()){state.coMCUBuzzFreq = data[PSTR("coMCUBuzzFreq")].as<uint16_t>();}
+                if(data[PSTR("coMCUFBuzzer")].is<bool>()){state.coMCUFBuzzer = data[PSTR("coMCUFBuzzer")].as<bool>();}
+                if(data[PSTR("coMCUPinBuzzer")].is<uint8_t>()){state.coMCUPinBuzzer = data[PSTR("coMCUPinBuzzer")].as<uint8_t>();}
+                if(data[PSTR("coMCUPinLEDR")].is<uint8_t>()){state.coMCUPinLEDR = data[PSTR("coMCUPinLEDR")].as<uint8_t>();}
+                if(data[PSTR("coMCUPinLEDG")].is<uint8_t>()){state.coMCUPinLEDG = data[PSTR("coMCUPinLEDG")].as<uint8_t>();}
+                if(data[PSTR("coMCUPinLEDB")].is<uint8_t>()){state.coMCUPinLEDB = data[PSTR("coMCUPinLEDB")].as<uint8_t>();}
+                if(data[PSTR("coMCULON")].is<uint8_t>()){state.coMCULON = data[PSTR("coMCULON")].as<uint8_t>();}
+                if (data[PSTR("coMCURelayPin")].is<JsonArray>()) {
+                    JsonArray arr = data[PSTR("coMCURelayPin")].as<JsonArray>();
+                    for (size_t i = 0; i < arr.size() && i < 4; ++i) {
+                        state.coMCURelayPin[i] = arr[i].as<uint8_t>();
+                    }
+                }
+                #endif
+
             }
             else{
                 _logger->error(PSTR(__func__), PSTR("%s is not valid JSON!\n"), _path);
@@ -109,7 +128,7 @@ bool UdawaConfig::load(){
                 strlcpy(state.dpass, dpass, sizeof(state.dpass));
                 strlcpy(state.upass, upass, sizeof(state.upass));
                 strlcpy(state.hname, hname, sizeof(state.hname));
-                strlcpy(state.logIP, logIP, sizeof(state.logIP));
+                strlcpy(state.logIP, DEFAULT_LOG_IP, sizeof(state.logIP));
                 strlcpy(state.htU, htU, sizeof(state.htU));
                 strlcpy(state.htP, htP, sizeof(state.htP));
                 state.logLev = logLev;
@@ -134,6 +153,20 @@ bool UdawaConfig::load(){
                 state.tbPort = tbPort;
                 #endif
                 strlcpy(state.binURL, binURL, sizeof(binURL));
+
+                #ifdef USE_CO_MCU
+                state.s2rx = s2rx;
+                state.s2tx = s2tx;
+                state.coMCUBuzzFreq = 1600;
+                state.coMCUFBuzzer = true;
+                state.coMCUPinBuzzer = 2;
+                state.coMCUPinLEDR = coMCUPinLEDR;
+                state.coMCUPinLEDG = coMCUPinLEDG;
+                state.coMCUPinLEDB = coMCUPinLEDB;
+                state.coMCULON = coMCULON;
+                for (int i = 0; i < 4; ++i) state.coMCURelayPin[i] = 7+i;
+                #endif
+
                 file.close();
                 xSemaphoreGive( xSemaphoreConfig );
                 return false;
@@ -201,6 +234,21 @@ bool UdawaConfig::save(){
         data[PSTR("pinLEDG")] = state.pinLEDG;
         data[PSTR("pinLEDB")] = state.pinLEDB;
         data[PSTR("pinBuzz")] = state.pinBuzz;
+
+        #ifdef USE_CO_MCU
+        data[PSTR("s2rx")] = state.s2rx;
+        data[PSTR("s2tx")] = state.s2tx;
+        data[PSTR("coMCUBuzzFreq")] = state.coMCUBuzzFreq;
+        data[PSTR("coMCUFBuzzer")] = state.coMCUFBuzzer;
+        data[PSTR("coMCUPinBuzzer")] = state.coMCUPinBuzzer;
+        data[PSTR("coMCUPinLEDR")] = state.coMCUPinLEDR;
+        data[PSTR("coMCUPinLEDG")] = state.coMCUPinLEDG;
+        data[PSTR("coMCUPinLEDB")] = state.coMCUPinLEDB;
+        data[PSTR("coMCULON")] = state.coMCULON;
+        for (int i = 0; i < 4; ++i) {
+            data[PSTR("coMCURelayPin")][i] = state.coMCURelayPin[i];
+        }
+        #endif
 
         serializeJson(data, file);
 

@@ -2,7 +2,9 @@
 #include <PZEM004Tv30.h>
 #include "PCF8575.h"
 
+#ifndef USE_CO_MCU
 PCF8575 IOExtender(0x20);
+#endif
 
 ESP32Time RTC(0);
 #ifdef USE_HW_RTC
@@ -40,6 +42,12 @@ Espressif_Updater<> IoTUpdater;
 OTA_Firmware_Update<> IAPIOta;
 ThingsBoard tb(mqttClient);
 #endif
+
+#ifdef USE_CO_MCU
+SemaphoreHandle_t xSemaphoreSerialCoMCUWrite = NULL;
+SemaphoreHandle_t xSemaphoreSerialCoMCURead = NULL;
+#endif
+
 
 void reboot(int countDown = 0){
   crashState.plannedRebootCountDown = countDown;
@@ -91,12 +99,21 @@ void coreroutineSetup(){
         }
     }
     }
-    coreroutineSetAlarm(0, 0, 3, 50);
+    coreroutineSetAlarm(0, 1, 3, 50);
+
 
     crashState.rtcp = 0;
 
     #ifdef USE_LOCAL_WEB_INTERFACE
     if(xSemaphoreWSBroadcast == NULL){xSemaphoreWSBroadcast = xSemaphoreCreateMutex();}
+    #endif
+
+    #ifdef USE_CO_MCU
+    if(xSemaphoreSerialCoMCUWrite == NULL){xSemaphoreSerialCoMCUWrite = xSemaphoreCreateMutex();}
+    if(xSemaphoreSerialCoMCURead == NULL){xSemaphoreSerialCoMCURead = xSemaphoreCreateMutex();}
+    Serial2.begin(115200, SERIAL_8N1, config.state.s2rx, config.state.s2tx);
+    logger->debug(PSTR(__func__), PSTR("Serial 2 (S2RX %d - S2TX %d) - CoMCU Activated!\n"), config.state.s2rx, config.state.s2tx);
+    coreroutineSyncConfigCoMCU();    
     #endif
 
     #ifdef USE_IOT
@@ -458,10 +475,12 @@ void coreroutineSetAlarm(uint16_t code, uint8_t color, int32_t blinkCount, uint1
 }
 
 void coreroutineAlarmTaskRoutine(void *arg){
+  #ifndef USE_CO_MCU
   pinMode(config.state.pinLEDR, OUTPUT);
   pinMode(config.state.pinLEDG, OUTPUT);
   pinMode(config.state.pinLEDB, OUTPUT);
   pinMode(config.state.pinBuzz, OUTPUT);
+  #endif
   while(true){
     if( xQueueAlarm != NULL ){
       AlarmMessage alarmMsg;
@@ -488,6 +507,58 @@ void coreroutineAlarmTaskRoutine(void *arg){
 
 void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount, uint16_t blinkDelay){
   uint8_t r, g, b;
+  
+  #ifdef USE_CO_MCU
+  switch (color){
+    //Auto by network
+    case 0:
+      if(false){
+        r = config.state.coMCULON;
+        g = config.state.coMCULON == 0 ? 255 : 0;
+        b = config.state.coMCULON == 0 ? 255 : 0;
+      }
+      else if(WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_MODE_STA){
+        r = config.state.coMCULON == 0 ? 255 : 0;
+        g = config.state.coMCULON;
+        b = config.state.coMCULON == 0 ? 255 : 0;
+      }
+      else if(WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_MODE_AP && WiFi.softAPgetStationNum() > 0){
+        r = config.state.coMCULON == 0 ? 255 : 0;
+        g = config.state.coMCULON;
+        b = config.state.coMCULON == 0 ? 255 : 0;
+      }
+      else{
+        r = config.state.coMCULON;
+        g = config.state.coMCULON == 0 ? 255 : 0;
+        b = config.state.coMCULON == 0 ? 255 : 0;
+      }
+      break;
+    //RED
+    case 1:
+      r = config.state.coMCULON;
+      g = config.state.coMCULON == 0 ? 255 : 0;
+      b = config.state.coMCULON == 0 ? 255 : 0;
+      break;
+    //GREEN
+    case 2:
+      r = config.state.coMCULON == 0 ? 255 : 0;
+      g = config.state.coMCULON;
+      b = config.state.coMCULON == 0 ? 255 : 0;
+      break;
+    //BLUE
+    case 3:
+      r = config.state.coMCULON == 0 ? 255 : 0;
+      g = config.state.coMCULON == 0 ? 255 : 0;
+      b = config.state.coMCULON;
+      break;
+    default:
+      r = config.state.coMCULON;
+      g = config.state.coMCULON;
+      b = config.state.coMCULON;
+  }
+  coreroutineCoMCUSetLed(r, g, b, isBlink, blinkCount, blinkDelay);
+  coreroutineCoMCUSetBuzzer(blinkCount, blinkDelay);
+  #else
   switch (color)
   {
   //Auto by network
@@ -561,7 +632,7 @@ void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount,
     digitalWrite(config.state.pinLEDG, g);
     digitalWrite(config.state.pinLEDB, b);
   }
-  
+  #endif
 }
 
 void coreroutineSaveAllStorage() {
@@ -1117,6 +1188,9 @@ void wsBcast(JsonDocument &doc){
 #endif
 
 void coreroutineSyncClientAttr(uint8_t direction){
+  #ifdef USE_CO_MCU
+  coreroutineSyncConfigCoMCU();
+  #endif
   JsonDocument doc;
   String ip = WiFi.localIP().toString();
   
@@ -1426,10 +1500,12 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
 }
 
 void coreroutineRelayControlTaskRoutine(void *arg){
+  #ifndef USE_CO_MCU
   for(uint8_t i = 0; i < 4; i++){
     IOExtender.pinMode(relays[i].pin, OUTPUT);
     logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
   }
+  
 
   appState.fIOExtender =  IOExtender.begin();
 
@@ -1439,6 +1515,7 @@ void coreroutineRelayControlTaskRoutine(void *arg){
   else{
     logger->verbose(PSTR(__func__), PSTR("IOExtender initialized.\n"));
   }
+  #endif
 
   for(uint8_t i = 0; i < 4; i++){
     if(relays[i].mode == 0){
@@ -1450,18 +1527,21 @@ void coreroutineRelayControlTaskRoutine(void *arg){
   unsigned long timerAlarm = millis();
   while (true)
   {
+    #ifndef USE_CO_MCU
     if(!appState.fIOExtender){
       for(uint8_t i = 0; i < 4; i++){
         IOExtender.pinMode(relays[i].pin, OUTPUT);
       }
       appState.fIOExtender = IOExtender.begin();
     }
+    #endif
 
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
     if(appState.fPanic){continue;}
     unsigned long now = millis();
 
     /* Start alarm section */
+    #ifndef USE_CO_MCU
     if(now - timerAlarm > 30000){
       if(!appState.fIOExtender){
         coreroutineSetAlarm(220, 1, 10, 500);
@@ -1469,6 +1549,7 @@ void coreroutineRelayControlTaskRoutine(void *arg){
 
       timerAlarm = now;
     }
+    #endif
     /* End alarm section */
 
     for(uint8_t i = 0; i < 4; i++){
@@ -1566,9 +1647,14 @@ void coreroutineRelayControlTaskRoutine(void *arg){
 }
 
 void coreroutineSetRelay(uint8_t index, bool output){
+  logger->debug(PSTR(__func__), PSTR("called with index: %d, output: %d\n"), index, output);
   if(index < 4){
     if(output){
+      #ifndef USE_CO_MCU
       IOExtender.digitalWrite(relays[index].pin, appConfig.relayON);
+      #else
+      coreroutineSetCoMCUPin(config.state.coMCURelayPin[index], 1, 1, 0, appConfig.relayON);
+      #endif
       relays[index].state = true;
       relays[index].lastActive = millis();
       relays[index].lastChanged = millis();
@@ -1577,7 +1663,11 @@ void coreroutineSetRelay(uint8_t index, bool output){
       appState.fsyncClientAttributes = true;
     }
     else{
+      #ifndef USE_CO_MCU
       IOExtender.digitalWrite(relays[index].pin, !appConfig.relayON);
+      #else
+      coreroutineSetCoMCUPin(config.state.coMCURelayPin[index], 1, 1, 0, !appConfig.relayON);
+      #endif
       relays[index].state = false;
       relays[index].lastChanged = millis();
       logger->debug(PSTR(__func__), PSTR("Relay %d is OFF. %d was written to relay.\n"), index+1, !appConfig.relayON);
@@ -1887,5 +1977,108 @@ bool iotSendTele(JsonDocument &doc){
     }
   }
   return res;
+}
+#endif
+
+#ifdef USE_CO_MCU
+void coreroutineSyncConfigCoMCU(){
+  JsonDocument doc;
+  doc[PSTR("fP")] = appState.fPanic;
+  doc[PSTR("bFr")] = config.state.coMCUBuzzFreq;
+  doc[PSTR("fB")] = config.state.coMCUFBuzzer;
+  doc[PSTR("pBz")] = config.state.coMCUPinBuzzer;
+  doc[PSTR("method")] = PSTR("sCfg");
+  coreroutineSerialWriteToCoMcu(doc, 0);
+  doc.clear();
+  doc[PSTR("pLR")] = config.state.coMCUPinLEDR;
+  doc[PSTR("pLG")] = config.state.coMCUPinLEDG;
+  doc[PSTR("pLB")] = config.state.coMCUPinLEDB;
+  doc[PSTR("lON")] = config.state.coMCULON;
+  doc[PSTR("method")] = PSTR("sCfg");
+  coreroutineSerialWriteToCoMcu(doc, 0);
+  doc.clear();
+}
+
+
+void coreroutineSerialWriteToCoMcu(JsonDocument &doc, bool isRpc, int wait)
+{
+  if( xSemaphoreSerialCoMCUWrite != NULL ){
+    if( xSemaphoreTake( xSemaphoreSerialCoMCUWrite, ( TickType_t ) 30000 ) == pdTRUE )
+    {
+      serializeJson(doc, Serial2);
+      StringPrint stream;
+      serializeJson(doc, stream);
+      String result = stream.str();
+      logger->verbose(PSTR(__func__),PSTR("Sent to CoMCU: %s\n"), result.c_str());
+      if(isRpc)
+      {
+        vTaskDelay((const TickType_t) wait / portTICK_PERIOD_MS);
+        doc.clear();
+        coreroutineSerialReadFromCoMcu(doc);
+      }
+      xSemaphoreGive( xSemaphoreSerialCoMCUWrite );
+    }
+    else
+    {
+        logger->debug(PSTR(__func__), PSTR("Undable to get semaphore.\n"));
+    }
+  }
+}
+
+void coreroutineSerialReadFromCoMcu(JsonDocument &doc){
+  if( xSemaphoreSerialCoMCURead != NULL ){
+    if( xSemaphoreTake( xSemaphoreSerialCoMCURead, ( TickType_t ) 10000 ) == pdTRUE )
+    {
+      StringPrint stream;
+      String result;
+      ReadLoggingStream loggingStream(Serial2, stream);
+      DeserializationError err = deserializeJson(doc, loggingStream);
+      result = stream.str();
+      if (err == DeserializationError::Ok)
+      {
+        logger->verbose(PSTR(__func__),PSTR("Received from CoMCU: %s\n"), result.c_str());
+      }
+      else
+      {
+        logger->verbose(PSTR(__func__),PSTR("Serial2CoMCU DeserializeJson() returned: %s, content: %s\n"), err.c_str(), result.c_str());
+        return;
+      }
+      xSemaphoreGive( xSemaphoreSerialCoMCURead );
+    }
+    else
+    {
+      logger->debug(PSTR(__func__), PSTR("Undable to get semaphore.\n"));
+    }
+  }
+}
+
+void coreroutineSetCoMCUPin(uint8_t pin, uint8_t op, uint8_t mode, uint16_t aval, uint8_t state){
+  JsonDocument doc;
+  doc[PSTR("method")] = PSTR("sPin");
+  doc[PSTR("params")][PSTR("pin")] = pin;
+  doc[PSTR("params")][PSTR("mode")] = mode;
+  doc[PSTR("params")][PSTR("op")] = op;
+  doc[PSTR("params")][PSTR("state")] = state;
+  doc[PSTR("params")][PSTR("aval")] = aval;
+  coreroutineSerialWriteToCoMcu(doc, false);
+}
+
+void coreroutineCoMCUSetBuzzer(int32_t beepCount, uint16_t beepDelay){
+  JsonDocument doc;
+  doc[PSTR("method")] = PSTR("sBuz");
+  doc[PSTR("params")][PSTR("beepCount")] = beepCount;
+  doc[PSTR("params")][PSTR("beepDelay")] = beepDelay;
+  coreroutineSerialWriteToCoMcu(doc, 0);
+}
+
+void coreroutineCoMCUSetLed(uint8_t r, uint8_t g, uint8_t b, uint8_t isBlink, int32_t blinkCount, uint16_t blinkDelay){
+  JsonDocument doc;
+  doc[PSTR("params")][PSTR("r")] = r;
+  doc[PSTR("params")][PSTR("g")] = g;
+  doc[PSTR("params")][PSTR("b")] = b;
+  doc[PSTR("params")][PSTR("isBlink")] = isBlink;
+  doc[PSTR("params")][PSTR("blinkCount")] = blinkCount;
+  doc[PSTR("params")][PSTR("blinkDelay")] = blinkDelay;
+  coreroutineSerialWriteToCoMcu(doc, 0);
 }
 #endif

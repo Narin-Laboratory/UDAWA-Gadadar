@@ -39,6 +39,11 @@ extern QueueHandle_t xQueueAlarm;
 extern TaskHandle_t xHandlePowerSensor;
 extern TaskHandle_t xHandleRelayControl;
 
+#ifdef USE_CO_MCU
+extern SemaphoreHandle_t xSemaphoreSerialCoMCUWrite;
+extern SemaphoreHandle_t xSemaphoreSerialCoMCURead;
+#endif
+
 #ifdef USE_IOT
 extern IoTState iotState;
 #ifdef USE_IOT_SECURE
@@ -95,6 +100,15 @@ void coreroutineSyncClientAttr(uint8_t direction);
     void iotUpdateStartingCallback();
     void iotProgressCallback(const size_t & currentChunk, const size_t & totalChuncks);
     void iotFinishedCallback(const bool & success);
+#endif
+
+#ifdef USE_CO_MCU
+void coreroutineSerialWriteToCoMcu(JsonDocument &doc, bool isRpc, int wait = 50);
+void coreroutineSerialReadFromCoMcu(JsonDocument &doc);
+void coreroutineSyncConfigCoMCU();
+void coreroutineCoMCUSetBuzzer(int32_t beepCount, uint16_t beepDelay);
+void coreroutineCoMCUSetLed(uint8_t r, uint8_t g, uint8_t b, uint8_t isBlink, int32_t blinkCount, uint16_t blinkDelay);
+void coreroutineSetCoMCUPin(uint8_t pin, uint8_t op, uint8_t mode, uint16_t aval, uint8_t state);
 #endif
 
 void coreroutinePowerSensorTaskRoutine(void *arg);

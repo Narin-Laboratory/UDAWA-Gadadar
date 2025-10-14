@@ -152,6 +152,8 @@
   "ws_connection_failed_body": "Tidak dapat terhubung ke agen. Pastikan Anda berada di jaringan Wi-Fi yang sama dengan perangkat. Jika alamat telah berubah, Anda dapat memasukkan yang baru di bawah ini.",
   "device_address_label": "Alamat Perangkat",
   "device_address_placeholder": "cth., gadadar4ch.local atau 192.168.1.100",
+  "password_label": "Kata Sandi",
+  "password_placeholder": "Masukkan kata sandi Anda",
   "reconnect_button": "Hubungkan Kembali",
   "fs_update_title": "Memperbarui Antarmuka Web",
   "fs_update_error_title": "Terjadi kesalahan:",

@@ -174,6 +174,26 @@ void storageConvertUdawaConfig(JsonDocument &doc, bool direction, bool load_defa
     if(!doc["pinLEDG"].isNull()) config.state.pinLEDG = doc["pinLEDG"].as<uint8_t>();
     if(!doc["pinLEDB"].isNull()) config.state.pinLEDB = doc["pinLEDB"].as<uint8_t>();
     if(!doc["pinBuzz"].isNull()) config.state.pinBuzz = doc["pinBuzz"].as<uint8_t>();
+
+    #ifdef USE_CO_MCU
+      if(!doc["s2rx"].isNull()) config.state.s2rx = doc["s2rx"].as<uint8_t>();
+      if(!doc["s2tx"].isNull()) config.state.s2tx = doc["s2tx"].as<uint8_t>();
+      if(!doc["coMCUBuzzFreq"].isNull()) config.state.coMCUBuzzFreq = doc["coMCUBuzzFreq"].as<uint16_t>();
+      if(!doc["coMCUFBuzzer"].isNull()) config.state.coMCUFBuzzer = doc["coMCUFBuzzer"].as<bool>();
+      if(!doc["coMCUPinBuzzer"].isNull()) config.state.coMCUPinBuzzer = doc["coMCUPinBuzzer"].as<uint8_t>();
+      if(!doc["coMCUPinLEDR"].isNull()) config.state.coMCUPinLEDR = doc["coMCUPinLEDR"].as<uint8_t>();
+      if(!doc["coMCUPinLEDG"].isNull()) config.state.coMCUPinLEDG = doc["coMCUPinLEDG"].as<uint8_t>();
+      if(!doc["coMCUPinLEDB"].isNull()) config.state.coMCUPinLEDB = doc["coMCUPinLEDB"].as<uint8_t>();
+      if(!doc["coMCULON"].isNull()) config.state.coMCULON = doc["coMCULON"].as<uint8_t>();
+      if(!doc["coMCURelayPin"].isNull()) {
+        JsonArrayConst relayPins_arr = doc["coMCURelayPin"].as<JsonArrayConst>();
+        for(uint8_t i = 0; i < 4; i++) {
+          if (i < relayPins_arr.size() && !relayPins_arr[i].isNull()) {
+            config.state.coMCURelayPin[i] = relayPins_arr[i].as<uint8_t>();
+          }
+        }
+      }
+    #endif
   }
   else{ // from config to doc
     doc[PSTR("batt")] = 100;
@@ -223,5 +243,21 @@ void storageConvertUdawaConfig(JsonDocument &doc, bool direction, bool load_defa
     doc[PSTR("pinLEDG")] = config.state.pinLEDG;
     doc[PSTR("pinLEDB")] = config.state.pinLEDB;
     doc[PSTR("pinBuzz")] = config.state.pinBuzz;
+
+    #ifdef USE_CO_MCU
+      doc[PSTR("s2rx")] = config.state.s2rx;
+      doc[PSTR("s2tx")] = config.state.s2tx;
+      doc[PSTR("coMCUBuzzFreq")] = config.state.coMCUBuzzFreq;
+      doc[PSTR("coMCUFBuzzer")] = config.state.coMCUFBuzzer;
+      doc[PSTR("coMCUPinBuzzer")] = config.state.coMCUPinBuzzer;
+      doc[PSTR("coMCUPinLEDR")] = config.state.coMCUPinLEDR;
+      doc[PSTR("coMCUPinLEDG")] = config.state.coMCUPinLEDG;
+      doc[PSTR("coMCUPinLEDB")] = config.state.coMCUPinLEDB;
+      doc[PSTR("coMCULON")] = config.state.coMCULON;
+      JsonArray relayPins = doc[PSTR("coMCURelayPin")].to<JsonArray>();
+      for(uint8_t i = 0; i < 4; i++) {
+        relayPins.add(config.state.coMCURelayPin[i]);
+      }
+    #endif
   }
 }

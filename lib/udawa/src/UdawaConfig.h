@@ -42,14 +42,27 @@ struct UdawaConfigStruct{
   char htU[64];
   char htP[64];
 
-  char logIP[16] = "255.255.255.255";
-  uint16_t logPort = 29514;
+  char logIP[16] = DEFAULT_LOG_IP;
+  uint16_t logPort = logPort;
 
   bool LEDOn = false;
-  uint8_t pinLEDR = 27;
-  uint8_t pinLEDG = 14;
-  uint8_t pinLEDB = 12;
-  uint8_t pinBuzz = 32;
+  uint8_t pinLEDR = pinLEDR;
+  uint8_t pinLEDG = pinLEDG;
+  uint8_t pinLEDB = pinLEDB;
+  uint8_t pinBuzz = pinBuzz;
+
+  #ifdef USE_CO_MCU
+  uint8_t s2rx = s2rx;
+  uint8_t s2tx = s2tx;
+  uint16_t coMCUBuzzFreq = 1600;
+  bool coMCUFBuzzer = true;
+  uint8_t coMCUPinBuzzer = 2;
+  uint8_t coMCUPinLEDR = coMCUPinLEDR;
+  uint8_t coMCUPinLEDG = coMCUPinLEDG;
+  uint8_t coMCUPinLEDB = coMCUPinLEDB;
+  uint8_t coMCULON = coMCULON;
+  uint8_t coMCURelayPin[4] = {7, 8, 8, 10};
+  #endif
 };
 
 extern SemaphoreHandle_t xSemaphoreConfig; 

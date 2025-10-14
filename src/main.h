@@ -63,8 +63,9 @@
 #endif
 
 #include <PZEM004Tv30.h>
+#ifndef USE_CO_MCU
 #include "PCF8575.h"
-
+#endif
 #include "storage.h"
 #include "logging.h"
 #include "networking.h"

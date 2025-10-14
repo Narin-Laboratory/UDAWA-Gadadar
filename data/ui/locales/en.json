@@ -152,6 +152,8 @@
   "ws_connection_failed_body": "Unable to connect to the agent. Please ensure you are on the same Wi-Fi network as the device. If the address has changed, you can enter the new one below.",
   "device_address_label": "Device Address",
   "device_address_placeholder": "e.g., gadadar4ch.local or 192.168.1.100",
+  "password_label": "Password",
+  "password_placeholder": "Enter your password",
   "reconnect_button": "Reconnect",
   "fs_update_title": "Updating Web Interface",
   "fs_update_error_title": "An error occurred:",
