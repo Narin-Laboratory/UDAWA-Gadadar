@@ -91,7 +91,7 @@ bool UdawaConfig::load(){
                 #endif
                 if(data[PSTR("binURL")].is<const char*>()){strlcpy(state.binURL, data[PSTR("binURL")].as<const char*>(), sizeof(state.binURL));}
 
-                #ifdef USE_IOT
+                #ifdef USE_CO_MCU
                 if(data[PSTR("s2rx")].is<uint8_t>()){state.s2rx = data[PSTR("s2rx")].as<uint8_t>();}
                 if(data[PSTR("s2tx")].is<uint8_t>()){state.s2tx = data[PSTR("s2tx")].as<uint8_t>();}
                 if(data[PSTR("coMCUBuzzFreq")].is<uint16_t>()){state.coMCUBuzzFreq = data[PSTR("coMCUBuzzFreq")].as<uint16_t>();}

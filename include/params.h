@@ -9,7 +9,7 @@
 
 #define USE_WIFI_OTA
 
-#define USE_CO_MCU
+//#define USE_CO_MCU
 
 #define USE_LOCAL_WEB_INTERFACE
 #ifdef USE_LOCAL_WEB_INTERFACE
