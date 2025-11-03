@@ -1881,10 +1881,10 @@ void coreroutineRunIoT(){
             });
             iotState.fStateSaveRPCSubscribed = IAPIRPC.RPC_Subscribe(stateSaveCallback); // Pass the callback directly
             if(iotState.fStateSaveRPCSubscribed){
-              logger->verbose(PSTR(__func__), PSTR("reboot RPC subscribed successfuly.\n"));
+              logger->verbose(PSTR(__func__), PSTR("stateSave RPC subscribed successfuly.\n"));
             }
             else{
-              logger->warn(PSTR(__func__), PSTR("Failed to subscribe reboot RPC.\n"));
+              logger->warn(PSTR(__func__), PSTR("Failed to subscribe stateSave RPC.\n"));
             }
           }
 
