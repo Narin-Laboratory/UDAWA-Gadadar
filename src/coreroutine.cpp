@@ -515,6 +515,12 @@ void coreroutineAlarmTaskRoutine(void *arg){
           #ifdef USE_LOCAL_WEB_INTERFACE
           wsBcast(doc);
           #endif
+
+          #ifdef USE_IOT
+          doc.clear();
+          doc["alarm"] = alarmMsg.code;
+          iotSendTele(doc);
+          #endif
         }
         coreroutineSetLEDBuzzer(alarmMsg.color, alarmMsg.blinkCount > 0 ? true : false, alarmMsg.blinkCount, alarmMsg.blinkDelay);
         logger->debug(PSTR(__func__), PSTR("Alarm code: %d, color: %d, blinkCount: %d, blinkDelay: %d\n"), alarmMsg.code, alarmMsg.color, alarmMsg.blinkCount, alarmMsg.blinkDelay);
@@ -1440,45 +1446,45 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
 
             if ((now - timerTelemetry) > (appConfig.intvTele * 1000)) {
                 if (reading_count > 0) {
-                    float energy_consumed_kwh = ener - ener_start_period;
+                  float energy_consumed_kwh = ener - ener_start_period;
 
-                    doc[PSTR("volt_avg")] = volt_sum / reading_count;
-                    doc[PSTR("volt_min")] = volt_min_period;
-                    doc[PSTR("volt_max")] = volt_max_period;
+                  doc[PSTR("volt_avg")] = volt_sum / reading_count;
+                  doc[PSTR("volt_min")] = volt_min_period;
+                  doc[PSTR("volt_max")] = volt_max_period;
 
-                    doc[PSTR("amp_avg")] = amp_sum / reading_count;
-                    doc[PSTR("amp_min")] = amp_min_period;
-                    doc[PSTR("amp_max")] = amp_max_period;
+                  doc[PSTR("amp_avg")] = amp_sum / reading_count;
+                  doc[PSTR("amp_min")] = amp_min_period;
+                  doc[PSTR("amp_max")] = amp_max_period;
 
-                    doc[PSTR("pf_avg")] = pf_sum / reading_count;
-                    doc[PSTR("pf_min")] = pf_min_period;
-                    doc[PSTR("pf_max")] = pf_max_period;
+                  doc[PSTR("pf_avg")] = pf_sum / reading_count;
+                  doc[PSTR("pf_min")] = pf_min_period;
+                  doc[PSTR("pf_max")] = pf_max_period;
 
-                    doc[PSTR("freq_avg")] = freq_sum / reading_count;
-                    doc[PSTR("freq_min")] = freq_min_period;
-                    doc[PSTR("freq_max")] = freq_max_period;
+                  doc[PSTR("freq_avg")] = freq_sum / reading_count;
+                  doc[PSTR("freq_min")] = freq_min_period;
+                  doc[PSTR("freq_max")] = freq_max_period;
 
-                    doc[PSTR("watt_avg")] = watt_sum / reading_count;
-                    doc[PSTR("ener_total_kwh")] = ener;
-                    doc[PSTR("energy_consumed_wh")] = energy_consumed_kwh * 1000.0;
-                    iotSendTele(doc);
-                    doc.clear();
+                  doc[PSTR("watt_avg")] = watt_sum / reading_count;
+                  doc[PSTR("ener_total_kwh")] = ener;
+                  doc[PSTR("energy_consumed_wh")] = energy_consumed_kwh * 1000.0;
+                  iotSendTele(doc);
+                  doc.clear();
 
-                    // Reset accumulators for next period
-                    volt_sum = 0; watt_sum = 0; amp_sum = 0; pf_sum = 0; freq_sum = 0;
-                    volt_min_period = 999; volt_max_period = 0;
-                    amp_min_period = 999; amp_max_period = 0;
-                    pf_min_period = 999; pf_max_period = 0;
-                    freq_min_period = 999; freq_max_period = 0;
-                    reading_count = 0;
-                    ener_start_period = ener;
-                }
-                timerTelemetry = now;
-            }
-            #endif
-        }
+                  // Reset accumulators for next period
+                  volt_sum = 0; watt_sum = 0; amp_sum = 0; pf_sum = 0; freq_sum = 0;
+                  volt_min_period = 999; volt_max_period = 0;
+                  amp_min_period = 999; amp_max_period = 0;
+                  pf_min_period = 999; pf_max_period = 0;
+                  freq_min_period = 999; freq_max_period = 0;
+                  reading_count = 0;
+                  ener_start_period = ener;
+              }
+            timerTelemetry = now;
+          }
+        #endif
+      }
 
-        if ((now - timerAlarm) > (appConfig.powerSensorAlarmTimer * 1000)) {
+    if ((now - timerAlarm) > (appConfig.powerSensorAlarmTimer * 1000)) {
       if (!appState.fPowerSensor) {
         coreroutineSetAlarm(ALARM_AC_SENSOR_INIT_FAIL, 1, 5, 1000);
       } else if (!fFailureReadings) {
@@ -1489,34 +1495,34 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
         if (freq < 48 || freq > 52) coreroutineSetAlarm(ALARM_AC_PF_FREQ_OUT_OF_RANGE, 1, 5, 1000);
         if (watt > appConfig.maxWatt || volt > 275) coreroutineSetAlarm(ALARM_AC_OVERLIMIT, 1, 5, 1000);
 
-                uint8_t activeRelayCounter = 0;
-                for (uint8_t i = 0; i < 4; i++) {
-                    if (relays[i].state == true) {
-                        activeRelayCounter++;
-                        if (watt < (relays[i].wattage * 0.1)) coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_NO_POWER + i, 1, 5, 1000);
-                        if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
-                            coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_TOO_LONG + i, 1, 5, 1000);
-                        }
-                    }
-                }
-                if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(ALARM_ALL_SWITCHES_OFF_POWER_DETECTED, 1, 5, 1000);
+        uint8_t activeRelayCounter = 0;
+          for (uint8_t i = 0; i < 4; i++) {
+            if (relays[i].state == true) {
+              activeRelayCounter++;
+              if (watt < 7) coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_NO_POWER + i, 1, 5, 1000);
+              if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
+              coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_TOO_LONG + i, 1, 5, 1000);
             }
-            timerAlarm = now;
+          }
         }
+        if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(ALARM_ALL_SWITCHES_OFF_POWER_DETECTED, 1, 5, 1000);
+      }
+        timerAlarm = now;
+      }
 
-        if (appState.fResetPowerSensor) {
-            appState.fResetPowerSensor = false;
-            logger->warn(PSTR(__func__), PSTR("Resetting power sensor energy counter.\n"));
-            if (!appConfig.fPowerSensorDummy) {
-                pzem.resetEnergy();
-            }
-            ener = 0;
-            ener_start_period = 0;
+      if (appState.fResetPowerSensor) {
+        appState.fResetPowerSensor = false;
+        logger->warn(PSTR(__func__), PSTR("Resetting power sensor energy counter.\n"));
+        if (!appConfig.fPowerSensorDummy) {
+            pzem.resetEnergy();
         }
+        ener = 0;
+        ener_start_period = 0;
+      }
 
-        appState.powerSensorTaskRoutineLastActivity = millis();
-        vTaskDelay((const TickType_t)1000 / portTICK_PERIOD_MS);
-    }
+    appState.powerSensorTaskRoutineLastActivity = millis();
+    vTaskDelay((const TickType_t)1000 / portTICK_PERIOD_MS);
+  }
 }
 
 void coreroutineRelayControlTaskRoutine(void *arg){

@@ -89,9 +89,9 @@ static const int gmtOff = 28880;
 static const uint16_t logPort = 29514;
 static const bool fInit = false;
 static const bool LEDOn = false;
-static const uint8_t pinLEDR = 27;
+static const uint8_t pinLEDR = 12;
 static const uint8_t pinLEDG = 14;
-static const uint8_t pinLEDB = 12;
+static const uint8_t pinLEDB = 27;
 static const uint8_t pinBuzz = 32;
 
 const uint8_t s1tx = 26; //Neo 26, V3.1 33, V3 32
