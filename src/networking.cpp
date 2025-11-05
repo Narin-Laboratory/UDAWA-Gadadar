@@ -19,17 +19,17 @@ void networkingSetup(){
 }
 
 void networkingOnWiFiConnected(){
-    coreroutineSetAlarm(0, 0, 3, 50);
+    coreroutineSetLEDBuzzer(2, 1, 3, 50);
 }
 void networkingOnWiFiDisconnected(){
-    coreroutineSetAlarm(0, 0, 3, 50);
+    coreroutineSetLEDBuzzer(1, 1, 3, 50);
 }
 void networkingOnWiFiGotIP(){
     crashState.fStartServices = true;
-    coreroutineSetAlarm(0, 0, 3, 50);
+    coreroutineSetLEDBuzzer(2, 1, 3, 50);
 }
 void networkingOnWiFiAPNewClientIP(){}
 void networkingOnWiFiAPStart(){
     crashState.fDoInit = true;
-    coreroutineSetAlarm(0, 0, 3, 50);
+    coreroutineSetLEDBuzzer(2, 1, 3, 50);
 }

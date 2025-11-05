@@ -115,4 +115,8 @@ void coreroutinePowerSensorTaskRoutine(void *arg);
 void coreroutineRelayControlTaskRoutine(void *arg);
 void coreroutineSetRelay(uint8_t index, bool output);
 
+#ifdef USE_I2C
+void coreroutineScanI2C();
+#endif
+
 #endif

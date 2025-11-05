@@ -58,6 +58,8 @@ void coreroutineSetup(){
     #ifdef USE_I2C
     Wire.begin();
     Wire.setClock(400000);
+    // Scan I2C bus to detect connected devices
+    coreroutineScanI2C();
     #endif
 
     coreroutineCrashStateTruthKeeper(1);
@@ -99,7 +101,7 @@ void coreroutineSetup(){
         }
     }
     }
-    coreroutineSetAlarm(0, 1, 3, 50);
+  coreroutineSetLEDBuzzer(1, 0, 3, 50);
 
 
     crashState.rtcp = 0;
@@ -309,6 +311,15 @@ void coreroutineDoInit(){
     http.serveStatic("/css", LittleFS, "/ui/css");
     http.serveStatic("/assets", LittleFS, "/ui/assets");
     http.serveStatic("/locales", LittleFS, "/ui/locales");
+    http.on("/damodar", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->redirect("/");
+    });
+    http.on("/gadadar", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->redirect("/");
+    });
+    http.on("/murari", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->redirect("/");
+    });
 
     ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
         coreroutineOnWsEvent(server, client, type, arg, data, len);
@@ -359,6 +370,15 @@ void coreroutineStartServices(){
       http.serveStatic("/css", LittleFS, "/ui/css");
       http.serveStatic("/assets", LittleFS, "/ui/assets");
       http.serveStatic("/locales", LittleFS, "/ui/locales");
+      http.on("/damodar", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->redirect("/");
+      });
+      http.on("/gadadar", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->redirect("/");
+      });
+      http.on("/murari", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->redirect("/");
+      });
 
       ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
           coreroutineOnWsEvent(server, client, type, arg, data, len);
@@ -564,42 +584,42 @@ void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount,
   //Auto by network
   case 0:
     if(false){
-      r = config.state.LEDOn == false ? true : false;
-      g = config.state.LEDOn == false ? true : false;
+      r = config.state.LEDOn;
+      g = config.state.LEDOn;
       b = config.state.LEDOn;
     }
     else if(WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_MODE_STA){
-      r = config.state.LEDOn == false ? true : false;
+      r = !config.state.LEDOn;
       g = config.state.LEDOn;
-      b = config.state.LEDOn == false ? true : false;
+      b = !config.state.LEDOn;
     }
     else if(WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_MODE_AP && WiFi.softAPgetStationNum() > 0){
-      r = config.state.LEDOn == false ? true : false;
+      r = !config.state.LEDOn;
       g = config.state.LEDOn;
-      b = config.state.LEDOn == false ? true : false;
+      b = !config.state.LEDOn;
     }
     else{
       r = config.state.LEDOn;
-      g = config.state.LEDOn == false ? true : false;
-      b = config.state.LEDOn == false ? true : false;
+      g = config.state.LEDOn;
+      b = config.state.LEDOn;
     }
     break;
   //RED
   case 1:
     r = config.state.LEDOn;
-    g = config.state.LEDOn == false ? true : false;
-    b = config.state.LEDOn == false ? true : false;
+    g = !config.state.LEDOn;
+    b = !config.state.LEDOn;
     break;
   //GREEN
   case 2:
-    r = config.state.LEDOn == false ? true : false;
+    r = !config.state.LEDOn;
     g = config.state.LEDOn;
-    b = config.state.LEDOn == false ? true : false;
+    b = !config.state.LEDOn;
     break;
   //BLUE
   case 3:
-    r = config.state.LEDOn == false ? true : false;
-    g = config.state.LEDOn == false ? true : false;
+    r = !config.state.LEDOn;
+    g = !config.state.LEDOn;
     b = config.state.LEDOn;
     break;
   default:
@@ -612,15 +632,15 @@ void coreroutineSetLEDBuzzer(uint8_t color, uint8_t isBlink, int32_t blinkCount,
     int32_t blinkCounter = 0;
     while (blinkCounter < blinkCount)
     {
-      digitalWrite(config.state.pinLEDR, config.state.LEDOn == false ? true : false);
-      digitalWrite(config.state.pinLEDG, config.state.LEDOn == false ? true : false);
-      digitalWrite(config.state.pinLEDB, config.state.LEDOn == false ? true : false);
-      digitalWrite(config.state.pinBuzz, HIGH);
-      //logger->debug(PSTR(__func__), PSTR("Blinking LED and Buzzing, blinkDelay: %d, blinkCount: %d\n"), blinkDelay, blinkCount);
-      vTaskDelay(pdMS_TO_TICKS(blinkDelay));
       digitalWrite(config.state.pinLEDR, r);
       digitalWrite(config.state.pinLEDG, g);
       digitalWrite(config.state.pinLEDB, b);
+      digitalWrite(config.state.pinBuzz, HIGH);
+      //logger->debug(PSTR(__func__), PSTR("Blinking LED and Buzzing, blinkDelay: %d, blinkCount: %d\n"), blinkDelay, blinkCount);
+      vTaskDelay(pdMS_TO_TICKS(blinkDelay));
+      digitalWrite(config.state.pinLEDR, !r);
+      digitalWrite(config.state.pinLEDG, !g);
+      digitalWrite(config.state.pinLEDB, !b);
       digitalWrite(config.state.pinBuzz, LOW);
       //logger->debug(PSTR(__func__), PSTR("Stop Blinking LED and Buzzing.\n"));
       vTaskDelay(pdMS_TO_TICKS(blinkDelay));
@@ -1459,27 +1479,27 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
         }
 
         if ((now - timerAlarm) > (appConfig.powerSensorAlarmTimer * 1000)) {
-            if (!appState.fPowerSensor) {
-                coreroutineSetAlarm(140, 1, 5, 1000);
-            } else if (!fFailureReadings) {
-                if (volt < 180 || volt > 260) coreroutineSetAlarm(141, 1, 5, 1000);
-                if (amp < 0 || amp > 100) coreroutineSetAlarm(142, 1, 5, 1000);
-                if (watt < 0 || watt > appConfig.maxWatt) coreroutineSetAlarm(143, 1, 5, 1000);
-                if (pf < 0 || pf > 1) coreroutineSetAlarm(144, 1, 5, 1000);
-                if (freq < 48 || freq > 52) coreroutineSetAlarm(144, 1, 5, 1000);
-                if (watt > appConfig.maxWatt || volt > 275) coreroutineSetAlarm(145, 1, 5, 1000);
+      if (!appState.fPowerSensor) {
+        coreroutineSetAlarm(ALARM_AC_SENSOR_INIT_FAIL, 1, 5, 1000);
+      } else if (!fFailureReadings) {
+        if (volt < 180 || volt > 260) coreroutineSetAlarm(ALARM_AC_VOLTAGE_OUT_OF_RANGE, 1, 5, 1000);
+        if (amp < 0 || amp > 100) coreroutineSetAlarm(ALARM_AC_CURRENT_OUT_OF_RANGE, 1, 5, 1000);
+        if (watt < 0 || watt > appConfig.maxWatt) coreroutineSetAlarm(ALARM_AC_POWER_OUT_OF_RANGE, 1, 5, 1000);
+        if (pf < 0 || pf > 1) coreroutineSetAlarm(ALARM_AC_PF_FREQ_OUT_OF_RANGE, 1, 5, 1000);
+        if (freq < 48 || freq > 52) coreroutineSetAlarm(ALARM_AC_PF_FREQ_OUT_OF_RANGE, 1, 5, 1000);
+        if (watt > appConfig.maxWatt || volt > 275) coreroutineSetAlarm(ALARM_AC_OVERLIMIT, 1, 5, 1000);
 
                 uint8_t activeRelayCounter = 0;
                 for (uint8_t i = 0; i < 4; i++) {
                     if (relays[i].state == true) {
                         activeRelayCounter++;
-                        if (watt < (relays[i].wattage * 0.1)) coreroutineSetAlarm(210 + i, 1, 5, 1000);
+                        if (watt < (relays[i].wattage * 0.1)) coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_NO_POWER + i, 1, 5, 1000);
                         if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
-                            coreroutineSetAlarm(215 + i, 1, 5, 1000);
+                            coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_TOO_LONG + i, 1, 5, 1000);
                         }
                     }
                 }
-                if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(214, 1, 5, 1000);
+                if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(ALARM_ALL_SWITCHES_OFF_POWER_DETECTED, 1, 5, 1000);
             }
             timerAlarm = now;
         }
@@ -1500,21 +1520,22 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
 }
 
 void coreroutineRelayControlTaskRoutine(void *arg){
-  #ifndef USE_CO_MCU
-  for(uint8_t i = 0; i < 4; i++){
-    IOExtender.pinMode(relays[i].pin, OUTPUT);
-    logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
-  }
-  
+  #ifndef USE_CO_MCU 
 
   appState.fIOExtender =  IOExtender.begin();
 
   if(!appState.fIOExtender){
-    //logger->error(PSTR(__func__), PSTR("Failed to initialize IOExtender!\n"));
+    logger->error(PSTR(__func__), PSTR("Failed to initialize IOExtender!\n"));
   }
   else{
+    for(uint8_t i = 0; i < 4; i++){
+      IOExtender.pinMode(relays[i].pin, OUTPUT);
+      logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
+    }
     logger->verbose(PSTR(__func__), PSTR("IOExtender initialized.\n"));
   }
+
+  
   #endif
 
   for(uint8_t i = 0; i < 4; i++){
@@ -1528,7 +1549,7 @@ void coreroutineRelayControlTaskRoutine(void *arg){
   while (true)
   {
     #ifndef USE_CO_MCU
-    if(!appState.fIOExtender){
+      if(!appState.fIOExtender){
       for(uint8_t i = 0; i < 4; i++){
         IOExtender.pinMode(relays[i].pin, OUTPUT);
       }
@@ -1544,7 +1565,7 @@ void coreroutineRelayControlTaskRoutine(void *arg){
     #ifndef USE_CO_MCU
     if(now - timerAlarm > 30000){
       if(!appState.fIOExtender){
-        coreroutineSetAlarm(220, 1, 10, 500);
+        coreroutineSetAlarm(ALARM_IOEXTENDER_INIT_FAIL, 1, 10, 500);
       }
 
       timerAlarm = now;
@@ -1937,7 +1958,8 @@ void coreroutineRunIoT(){
           }
           #endif
 
-          coreroutineSyncClientAttr(2);          
+          coreroutineSyncClientAttr(2);   
+          coreroutineSetLEDBuzzer(3, 0, 3, 50);       
           logger->info(PSTR(__func__),PSTR("IoT Connected!\n"));
         }
       }
@@ -2080,5 +2102,58 @@ void coreroutineCoMCUSetLed(uint8_t r, uint8_t g, uint8_t b, uint8_t isBlink, in
   doc[PSTR("params")][PSTR("blinkCount")] = blinkCount;
   doc[PSTR("params")][PSTR("blinkDelay")] = blinkDelay;
   coreroutineSerialWriteToCoMcu(doc, 0);
+}
+#endif
+
+#ifdef USE_I2C
+void coreroutineScanI2C(){
+  logger->info(PSTR(__func__), PSTR("Scanning I2C bus...\n"));
+  
+  byte error, address;
+  int nDevices = 0;
+  
+  for(address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmission to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+    
+    if (error == 0) {
+      logger->info(PSTR(__func__), PSTR("I2C device found at address 0x%02X\n"), address);
+      
+      // Add device name hints
+      if (address == 0x48) {
+        logger->info(PSTR(__func__), PSTR(" (ADS1115 or similar ADC)\n"));
+      } else if (address == 0x49) {
+        logger->info(PSTR(__func__), PSTR(" (ADS1115 alternate address)\n"));
+      } else if (address == 0x36) {
+        logger->info(PSTR(__func__), PSTR(" (MAX17048 Battery Gauge)\n"));
+      } else if (address == 0x68) {
+        logger->info(PSTR(__func__), PSTR(" (DS3231 RTC or MPU6050)\n"));
+      } else if (address == 0x76 || address == 0x77) {
+        logger->info(PSTR(__func__), PSTR(" (BME280 or BMP280)\n"));
+      } else if (address == 0x20 || address == 0x21 || address == 0x22 || address == 0x23) {
+        logger->info(PSTR(__func__), PSTR(" (PCF8574 IO Extender)\n"));
+      } else {
+        logger->info(PSTR(__func__), PSTR(" (Unknown device)\n"));
+      }
+      
+      nDevices++;
+    } else if (error == 4) {
+      logger->error(PSTR(__func__), PSTR("Unknown error at address 0x%02X\n"), address);
+    }
+  }
+  
+  if (nDevices == 0) {
+    logger->warn(PSTR(__func__), PSTR("No I2C devices found!\n"));
+    logger->warn(PSTR(__func__), PSTR("Check connections:\n"));
+    logger->warn(PSTR(__func__), PSTR("  - SDA (GPIO21) connected?\n"));
+    logger->warn(PSTR(__func__), PSTR("  - SCL (GPIO22) connected?\n"));
+    logger->warn(PSTR(__func__), PSTR("  - Pull-up resistors (4.7kΩ to 3.3V)?\n"));
+    logger->warn(PSTR(__func__), PSTR("  - Device power supply (VDD/GND)?\n"));
+  } else {
+    logger->info(PSTR(__func__), PSTR("I2C scan complete. Found %d device(s)\n"), nDevices);
+  }
 }
 #endif
