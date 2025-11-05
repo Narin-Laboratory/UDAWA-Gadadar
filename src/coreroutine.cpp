@@ -1557,7 +1557,7 @@ void coreroutineRelayControlTaskRoutine(void *arg){
   while (true)
   {
     #ifndef USE_CO_MCU
-      if(!appState.fIOExtender){
+    if(!appState.fIOExtender){
       for(uint8_t i = 0; i < 4; i++){
         IOExtender.pinMode(relays[i].pin, OUTPUT);
       }
