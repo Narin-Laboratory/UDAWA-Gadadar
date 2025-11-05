@@ -1499,7 +1499,9 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
           for (uint8_t i = 0; i < 4; i++) {
             if (relays[i].state == true) {
               activeRelayCounter++;
-              if (watt < 7) coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_NO_POWER + i, 1, 5, 1000);
+              float totalActiveRelayWattage = 0;
+              totalActiveRelayWattage += relays[i].wattage;
+              if (watt < 7 || watt < totalActiveRelayWattage) coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_NO_POWER + i, 1, 5, 1000);
               if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
               coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_TOO_LONG + i, 1, 5, 1000);
             }
