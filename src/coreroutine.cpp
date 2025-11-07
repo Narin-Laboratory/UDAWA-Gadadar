@@ -16,6 +16,8 @@ BaseType_t xReturnedAlarm;
 QueueHandle_t xQueueAlarm = xQueueCreate( 10, sizeof( struct AlarmMessage ) );
 TaskHandle_t xHandlePowerSensor = NULL;
 TaskHandle_t xHandleRelayControl = NULL;
+TaskHandle_t xHandleArduinoOTA = NULL;
+BaseType_t xReturnedArduinoOTA;
 
 #ifdef USE_LOCAL_WEB_INTERFACE
 AsyncWebServer http(80);
@@ -83,11 +85,17 @@ void coreroutineSetup(){
       #endif
 
     if(xHandleAlarm == NULL){
-        xReturnedAlarm = xTaskCreatePinnedToCore(coreroutineAlarmTaskRoutine, PSTR("coreroutineAlarmTaskRoutine"), ALARM_STACKSIZE, NULL, 1, &xHandleAlarm, 1);
-        if(xReturnedAlarm == pdPASS){
-          logger->warn(PSTR(__func__), PSTR("Task alarmTaskRoutine has been created.\n"));
-        }
+      xReturnedAlarm = xTaskCreatePinnedToCore(coreroutineAlarmTaskRoutine, PSTR("coreroutineAlarmTaskRoutine"), ALARM_STACKSIZE, NULL, 1, &xHandleAlarm, 1);
+      if(xReturnedAlarm == pdPASS){
+        logger->warn(PSTR(__func__), PSTR("Task alarmTaskRoutine has been created.\n"));
       }
+    }
+    /*if(xHandleArduinoOTA == NULL){
+      xReturnedArduinoOTA = xTaskCreatePinnedToCore(coreroutineArduinoOTATaskRoutine, PSTR("coreroutineArduinoOTATaskRoutine"), OTA_STACKSIZE, NULL, 1, &xHandleAlarm, 1);
+      if(xReturnedArduinoOTA == pdPASS){
+        logger->warn(PSTR(__func__), PSTR("Task coreroutineArduinoOTATaskRoutine has been created.\n"));
+      }
+    }*/
     if(xHandlePowerSensor == NULL){
         appState.xReturnedPowerSensor = xTaskCreatePinnedToCore(coreroutinePowerSensorTaskRoutine, PSTR("powerSensor"), 4096, NULL, 1, &appState.xHandlePowerSensor, 1);
         if(appState.xReturnedPowerSensor == pdPASS){
@@ -101,8 +109,7 @@ void coreroutineSetup(){
         }
     }
     }
-  coreroutineSetLEDBuzzer(1, 0, 3, 50);
-
+  coreroutineSetAlarm(0, 1, 3, 50);
 
     crashState.rtcp = 0;
 
@@ -141,16 +148,17 @@ void coreroutineSetup(){
     tb.Subscribe_API_Implementation(IAPISharedAttrReq);
     tb.Subscribe_API_Implementation(IAPIOta);
     #endif
+  coreroutineSetAlarm(0, 1, 3, 50);
 }
 
 void coreroutineLoop(){
     unsigned long now = millis();
 
-    wiFiHelper.run();
-
     #ifdef USE_WIFI_OTA
     ArduinoOTA.handle();
     #endif
+
+    wiFiHelper.run();
 
     #ifdef USE_LOCAL_WEB_INTERFACE
     ws.cleanupClients();
@@ -1530,20 +1538,19 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
 void coreroutineRelayControlTaskRoutine(void *arg){
   #ifndef USE_CO_MCU 
 
-  appState.fIOExtender =  IOExtender.begin();
+  appState.fIOExtender = IOExtender.begin();
 
   if(!appState.fIOExtender){
     logger->error(PSTR(__func__), PSTR("Failed to initialize IOExtender!\n"));
   }
   else{
-    for(uint8_t i = 0; i < 4; i++){
-      IOExtender.pinMode(relays[i].pin, OUTPUT);
-      logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
-    }
     logger->verbose(PSTR(__func__), PSTR("IOExtender initialized.\n"));
   }
 
-  
+  for(uint8_t i = 0; i < 4; i++){
+    IOExtender.pinMode(relays[i].pin, OUTPUT);
+    logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
+  }
   #endif
 
   for(uint8_t i = 0; i < 4; i++){
@@ -1556,18 +1563,34 @@ void coreroutineRelayControlTaskRoutine(void *arg){
   unsigned long timerAlarm = millis();
   while (true)
   {
-    #ifndef USE_CO_MCU
-    if(!appState.fIOExtender){
-      for(uint8_t i = 0; i < 4; i++){
-        IOExtender.pinMode(relays[i].pin, OUTPUT);
-      }
-      appState.fIOExtender = IOExtender.begin();
-    }
-    #endif
-
     vTaskDelay((const TickType_t) 1000 / portTICK_PERIOD_MS);
     if(appState.fPanic){continue;}
     unsigned long now = millis();
+
+    #ifndef USE_CO_MCU 
+
+    if(!appState.fIOExtender){
+      appState.fIOExtender = IOExtender.begin();
+
+      if(!appState.fIOExtender){
+        logger->error(PSTR(__func__), PSTR("Failed to initialize IOExtender!\n"));
+      }
+      else{
+        logger->verbose(PSTR(__func__), PSTR("IOExtender initialized.\n"));
+          for(uint8_t i = 0; i < 4; i++){
+            if(relays[i].mode == 0){
+              coreroutineSetRelay(i, relays[i].state);
+              logger->debug(PSTR(__func__), PSTR("Relay %d is initialized as %d.\n"), i+1, relays[i].state);
+            }
+          }
+      }
+
+      for(uint8_t i = 0; i < 4; i++){
+        IOExtender.pinMode(relays[i].pin, OUTPUT);
+        logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
+      }
+    }
+    #endif
 
     /* Start alarm section */
     #ifndef USE_CO_MCU
@@ -2163,5 +2186,12 @@ void coreroutineScanI2C(){
   } else {
     logger->info(PSTR(__func__), PSTR("I2C scan complete. Found %d device(s)\n"), nDevices);
   }
+}
+#endif
+
+#ifdef USE_WIFI_OTA
+void coreroutineArduinoOTATaskRoutine(void *arg) {
+  ArduinoOTA.handle();
+  vTaskDelay((const TickType_t)10 / portTICK_PERIOD_MS);
 }
 #endif

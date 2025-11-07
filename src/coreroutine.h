@@ -38,6 +38,9 @@ extern BaseType_t xReturnedAlarm;
 extern QueueHandle_t xQueueAlarm;
 extern TaskHandle_t xHandlePowerSensor;
 extern TaskHandle_t xHandleRelayControl;
+extern TaskHandle_t xHandleArduinoOTA;
+extern BaseType_t xReturnedArduinoOTA;
+
 
 #ifdef USE_CO_MCU
 extern SemaphoreHandle_t xSemaphoreSerialCoMCUWrite;
@@ -114,6 +117,10 @@ void coreroutineSetCoMCUPin(uint8_t pin, uint8_t op, uint8_t mode, uint16_t aval
 void coreroutinePowerSensorTaskRoutine(void *arg);
 void coreroutineRelayControlTaskRoutine(void *arg);
 void coreroutineSetRelay(uint8_t index, bool output);
+
+#ifdef USE_WIFI_OTA
+void coreroutineArduinoOTATaskRoutine(void *arg);
+#endif
 
 #ifdef USE_I2C
 void coreroutineScanI2C();

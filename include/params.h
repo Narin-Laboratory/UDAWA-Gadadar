@@ -8,6 +8,9 @@
 #define CURRENT_FIRMWARE_VERSION "0.0.1"
 
 #define USE_WIFI_OTA
+#ifdef USE_WIFI_OTA
+#define OTA_STACKSIZE 4096UL
+#endif
 
 //#define USE_CO_MCU
 
