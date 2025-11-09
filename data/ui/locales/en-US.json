@@ -7,7 +7,7 @@
   "all_channels_off": "All OFF",
   "udawa_model": "UDAWA {{model}}",
   "setup_completed_title": "Agent Setup Completed!",
-  "setup_completed_body": "Now you can connect to WiFi <strong>{{wssid}}</strong> and access the agent built-in web interface via <br/><br/><a href=\"http://{{hname}}.local\"><strong>http://{{hname}}.local</strong></a><br/><br/><br/>Thank you and happy farming!",
+  "setup_completed_body": "The agent will be accessible from local web interface via <br/><br/><a href=\"http://{{hname}}.local\"><strong>http://{{hname}}.local</strong></a><br/><br/>To access the agent from the cloud, please contact the cloud provider at <a href=\"https://{{tbAddr}}\" target=\"_blank\"><strong>https://{{tbAddr}}</strong></a> with the following hardware ID: <br/><br/><strong>{{hwid}}</strong><br/><br/>Thank you and happy farming!",
   "psti_undiknas": "PSTI UNDIKNAS",
   "damodar_dashboard_title": "Damodar Dashboard",
   "damodar_dashboard_placeholder": "This is a placeholder for the Damodar device dashboard.",
