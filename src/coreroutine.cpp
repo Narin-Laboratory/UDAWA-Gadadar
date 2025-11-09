@@ -1046,7 +1046,7 @@ void coreroutineOnWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client
           }
           if (doc[PSTR("setConfig")][PSTR("cfg")][PSTR("wpass")].is<const char*>() && strlen(doc[PSTR("setConfig")][PSTR("cfg")][PSTR("wpass")].as<const char*>()) > 0) {
           strlcpy(config.state.wpass, doc[PSTR("setConfig")][PSTR("cfg")][PSTR("wpass")].as<const char*>(), sizeof(config.state.wpass));
-          logger->debug(PSTR(__func__), PSTR("wpass: %s\n"), doc[PSTR("setConfig")][PSTR("cfg")][PSTR("wpass")].as<const char*>());
+          //logger->debug(PSTR(__func__), PSTR("wpass: %s\n"), doc[PSTR("setConfig")][PSTR("cfg")][PSTR("wpass")].as<const char*>());
           }
           if (doc[PSTR("setConfig")][PSTR("cfg")][PSTR("gmtOff")].is<int>()) {
           config.state.gmtOff = doc[PSTR("setConfig")][PSTR("cfg")][PSTR("gmtOff")].as<int>();
@@ -1249,6 +1249,7 @@ void coreroutineSyncClientAttr(uint8_t direction){
 
     doc.clear();
     JsonObject cfg = doc[PSTR("cfg")].to<JsonObject>();
+    cfg[PSTR("hwid")] = config.state.hwid;
     cfg[PSTR("name")] = config.state.name;
     cfg[PSTR("model")] = config.state.model;
     cfg[PSTR("group")] = config.state.group;
@@ -1511,10 +1512,11 @@ void coreroutinePowerSensorTaskRoutine(void *arg) {
               totalActiveRelayWattage += relays[i].wattage;
               if (watt < 7 || watt < totalActiveRelayWattage) coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_NO_POWER + i, 1, 5, 1000);
               if (relays[i].overrunInSec != 0 && (millis() - relays[i].lastActive) > relays[i].overrunInSec * 1000) {
-              coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_TOO_LONG + i, 1, 5, 1000);
+                coreroutineSetAlarm(ALARM_SWITCH1_ACTIVE_TOO_LONG + i, 1, 5, 1000);
+                coreroutineSetRelay(i, false);
+              }
             }
           }
-        }
         if (activeRelayCounter == 0 && watt > 10) coreroutineSetAlarm(ALARM_ALL_SWITCHES_OFF_POWER_DETECTED, 1, 5, 1000);
       }
         timerAlarm = now;
@@ -1573,21 +1575,21 @@ void coreroutineRelayControlTaskRoutine(void *arg){
       appState.fIOExtender = IOExtender.begin();
 
       if(!appState.fIOExtender){
-        logger->error(PSTR(__func__), PSTR("Failed to initialize IOExtender!\n"));
+        //logger->error(PSTR(__func__), PSTR("Failed to initialize IOExtender!\n"));
       }
       else{
         logger->verbose(PSTR(__func__), PSTR("IOExtender initialized.\n"));
           for(uint8_t i = 0; i < 4; i++){
             if(relays[i].mode == 0){
               coreroutineSetRelay(i, relays[i].state);
-              logger->debug(PSTR(__func__), PSTR("Relay %d is initialized as %d.\n"), i+1, relays[i].state);
+              //logger->debug(PSTR(__func__), PSTR("Relay %d is initialized as %d.\n"), i+1, relays[i].state);
             }
           }
       }
 
       for(uint8_t i = 0; i < 4; i++){
         IOExtender.pinMode(relays[i].pin, OUTPUT);
-        logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
+        //logger->verbose(PSTR(__func__), PSTR("Relay %d initialized as output.\n"), relays[i].pin);
       }
     }
     #endif
@@ -1819,11 +1821,11 @@ void coreroutineRunIoT(){
         const Provision_Callback provisionCallback(Access_Token(), &coreroutineProcessTBProvResp, config.state.provDK, config.state.provDS, config.state.hwid, IOT_PROVISIONING_TIMEOUT * 1000000, &coreroutineIoTProvRequestTimedOut);
         if(IAPIProv.Provision_Request(provisionCallback))
         {
-          logger->info(PSTR(__func__),PSTR("Connected to provisioning server: %s:%d. Sending provisioning response: DK: %s, DS: %s, Id: %s \n"),  
-            config.state.tbAddr, config.state.tbPort, config.state.provDK, config.state.provDS, config.state.hwid);
+          logger->info(PSTR(__func__),PSTR("Connected to provisioning server: %s:%d. ID: %s \n"),  
+            config.state.tbAddr, config.state.tbPort, config.state.hwid);
         }
         else{
-          logger->warn(PSTR(__func__), PSTR("Provision request failed: %s:%d DK:%s DS:%s ID:%S\n"), config.state.tbAddr, config.state.tbPort, config.state.provDK, config.state.provDS, config.state.hwid);
+          logger->warn(PSTR(__func__), PSTR("Provision request failed: %s:%d. ID:%S\n"), config.state.tbAddr, config.state.tbPort, config.state.hwid);
         }
       }
       else

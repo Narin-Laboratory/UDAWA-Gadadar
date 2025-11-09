@@ -16,10 +16,10 @@ struct WiFiHelperState {
     unsigned long softAPTimeout = 300;
     unsigned long softAPClientAvailCheckTimeout = 5;
     int STADisconnectCounter = 0;
-    int STAMaximumDisconnectCount = 30;
+    int STAMaximumDisconnectCount = 5;
     bool fSTAGotIP = false;
     int STADHCPFailedCounter = 0;
-    int STADHCPFailedTimedout = 10;
+    int STADHCPFailedTimedout = 5;
 };
 
 class UdawaWiFiHelper{
@@ -62,6 +62,7 @@ class UdawaWiFiHelper{
         std::vector<WiFiAPStartCallback> _onAPStartCallbacks;
         void modeSTA();
         void modeAP(bool open = false);
+        void connectToStrongestAP();
         unsigned long _lastRun;
 };
 

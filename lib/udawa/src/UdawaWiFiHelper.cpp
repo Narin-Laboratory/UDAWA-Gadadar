@@ -11,10 +11,46 @@ void UdawaWiFiHelper::modeSTA(){
     WiFi.enableAP(false);
     WiFi.enableSTA(true);
     WiFi.mode(WIFI_MODE_STA);
-    _logger->debug(PSTR(__func__), PSTR("STA %s started, trying to connect to AP: %s using password %s\n"), _hname, _wssid, _wpass);
+    _logger->debug(PSTR(__func__), PSTR("STA %s started, trying to connect to AP: %s.\n"), _hname, _wssid);
     WiFi.setHostname(_hname);
     WiFi.setAutoReconnect(true);
-    WiFi.begin(_wssid, _wpass);
+    connectToStrongestAP();
+}
+
+void UdawaWiFiHelper::connectToStrongestAP() {
+    _logger->debug(PSTR(__func__), PSTR("Scanning for strongest AP with SSID: %s\n"), _wssid);
+
+    int n = WiFi.scanNetworks();
+    if (n == 0) {
+        _logger->warn(PSTR(__func__), PSTR("No networks found.\n"));
+        _logger->debug(PSTR(__func__), PSTR("Falling back to default WiFi.begin()\n"));
+        WiFi.begin(_wssid, _wpass);
+        return;
+    }
+
+    _logger->debug(PSTR(__func__), PSTR("Found %d networks.\n"), n);
+
+    int bestRSSI = -100;
+    int bestNetworkIndex = -1;
+
+    for (int i = 0; i < n; ++i) {
+        if (WiFi.SSID(i) == _wssid) {
+            _logger->debug(PSTR(__func__), PSTR("Found matching network %s with RSSI: %d\n"), WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+            if (WiFi.RSSI(i) > bestRSSI) {
+                bestRSSI = WiFi.RSSI(i);
+                bestNetworkIndex = i;
+            }
+        }
+    }
+
+    if (bestNetworkIndex != -1) {
+        _logger->debug(PSTR(__func__), PSTR("Connecting to strongest AP: %s (BSSID: %s, RSSI: %d)\n"), WiFi.SSID(bestNetworkIndex).c_str(), WiFi.BSSIDstr(bestNetworkIndex).c_str(), WiFi.RSSI(bestNetworkIndex));
+        WiFi.begin(_wssid, _wpass, 0, WiFi.BSSID(bestNetworkIndex));
+    } else {
+        _logger->warn(PSTR(__func__), PSTR("No AP with matching SSID found.\n"));
+        _logger->debug(PSTR(__func__), PSTR("Falling back to default WiFi.begin()\n"));
+        WiFi.begin(_wssid, _wpass);
+    }
 }
 
 void UdawaWiFiHelper::modeAP(bool open){
@@ -145,8 +181,9 @@ void UdawaWiFiHelper::run(){
             modeAP(false);
         }  
 
-        if(_fInit && WiFi.getMode() == WIFI_MODE_STA && !_state.fSTAGotIP && _state.STADHCPFailedCounter > _state.STADHCPFailedTimedout){
+        if(_fInit && WiFi.getMode() == WIFI_MODE_STA && !_state.fSTAGotIP && _state.STADHCPFailedCounter >= _state.STADHCPFailedTimedout){
             _state.STADHCPFailedCounter = 0;
+            _state.STADisconnectCounter++;
             _logger->error(PSTR(__func__), PSTR("DHCP timedout! Trying to reconnect... \n"));
             WiFi.disconnect(true, true);
             modeSTA();

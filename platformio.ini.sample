@@ -19,10 +19,10 @@ monitor_filters = esp32_exception_decoder
 upload_protocol = esptool
 upload_port = COM3
 ;upload_protocol = espota
-;upload_port = gadadar4ch.local  ;gadadar4ch.local
+;upload_port = gadadar.local  ;gadadar.local
 ;upload_flags =
 ;	--port=3232
-;	--auth=harinama
+;	--auth=secret
 ;	--host_port=3232
 build_flags =
 	${env.build_flags}

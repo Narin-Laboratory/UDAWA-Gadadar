@@ -7,7 +7,7 @@
   "all_channels_off": "Semua MATI",
   "udawa_model": "UDAWA {{model}}",
   "setup_completed_title": "Pengaturan Agen Selesai!",
-  "setup_completed_body": "Sekarang Anda dapat terhubung ke WiFi <strong>{{wssid}}</strong> dan mengakses antarmuka web bawaan agen melalui <br/><br/><a href=\"http://{{hname}}.local\"><strong>http://{{hname}}.local</strong></a><br/><br/><br/>Terima kasih dan selamat bertani!",
+  "setup_completed_body": "Agen akan dapat diakses dari antarmuka web lokal melalui <br/><br/><a href=\"http://{{hname}}.local\"><strong>http://{{hname}}.local</strong></a><br/><br/>Untuk mengakses agen dari cloud, silakan hubungi penyedia cloud di <a href=\"https://{{tbAddr}}\" target=\"_blank\"><strong>https://{{tbAddr}}</strong></a> dengan ID perangkat keras berikut: <br/><br/><strong>{{hwid}}</strong><br/><br/>Terima kasih dan selamat bertani!",
   "psti_undiknas": "PSTI UNDIKNAS",
   "damodar_dashboard_title": "Dasbor Damodar",
   "damodar_dashboard_placeholder": "Ini adalah placeholder untuk dasbor perangkat Damodar.",
