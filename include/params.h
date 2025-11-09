@@ -4,15 +4,15 @@
 
 #define SERIAL_BAUD_RATE 115200UL
 #define COMPILED __DATE__ " " __TIME__
-#define CURRENT_FIRMWARE_TITLE "Gadadar-Legacy"
-#define CURRENT_FIRMWARE_VERSION "0.0.2-legacy"
+#define CURRENT_FIRMWARE_TITLE "Gadadar"
+#define CURRENT_FIRMWARE_VERSION "0.0.2"
 
 #define USE_WIFI_OTA
 #ifdef USE_WIFI_OTA
 #define OTA_STACKSIZE 4096UL
 #endif
 
-#define USE_CO_MCU
+//#define USE_CO_MCU
 
 #define USE_LOCAL_WEB_INTERFACE
 #ifdef USE_LOCAL_WEB_INTERFACE
