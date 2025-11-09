@@ -18,24 +18,24 @@ void UdawaWiFiHelper::modeSTA(){
 }
 
 void UdawaWiFiHelper::connectToStrongestAP() {
-    _logger->debug(PSTR(__func__), PSTR("Scanning for strongest AP with SSID: %s"), _wssid);
+    _logger->debug(PSTR(__func__), PSTR("Scanning for strongest AP with SSID: %s\n"), _wssid);
 
     int n = WiFi.scanNetworks();
     if (n == 0) {
-        _logger->warn(PSTR(__func__), PSTR("No networks found."));
-        _logger->debug(PSTR(__func__), PSTR("Falling back to default WiFi.begin()"));
+        _logger->warn(PSTR(__func__), PSTR("No networks found.\n"));
+        _logger->debug(PSTR(__func__), PSTR("Falling back to default WiFi.begin()\n"));
         WiFi.begin(_wssid, _wpass);
         return;
     }
 
-    _logger->debug(PSTR(__func__), PSTR("Found %d networks."), n);
+    _logger->debug(PSTR(__func__), PSTR("Found %d networks.\n"), n);
 
     int bestRSSI = -100;
     int bestNetworkIndex = -1;
 
     for (int i = 0; i < n; ++i) {
         if (WiFi.SSID(i) == _wssid) {
-            _logger->debug(PSTR(__func__), PSTR("Found matching network %s with RSSI: %d"), WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+            _logger->debug(PSTR(__func__), PSTR("Found matching network %s with RSSI: %d\n"), WiFi.SSID(i).c_str(), WiFi.RSSI(i));
             if (WiFi.RSSI(i) > bestRSSI) {
                 bestRSSI = WiFi.RSSI(i);
                 bestNetworkIndex = i;
@@ -44,11 +44,11 @@ void UdawaWiFiHelper::connectToStrongestAP() {
     }
 
     if (bestNetworkIndex != -1) {
-        _logger->debug(PSTR(__func__), PSTR("Connecting to strongest AP: %s (BSSID: %s, RSSI: %d)"), WiFi.SSID(bestNetworkIndex).c_str(), WiFi.BSSIDstr(bestNetworkIndex).c_str(), WiFi.RSSI(bestNetworkIndex));
+        _logger->debug(PSTR(__func__), PSTR("Connecting to strongest AP: %s (BSSID: %s, RSSI: %d)\n"), WiFi.SSID(bestNetworkIndex).c_str(), WiFi.BSSIDstr(bestNetworkIndex).c_str(), WiFi.RSSI(bestNetworkIndex));
         WiFi.begin(_wssid, _wpass, 0, WiFi.BSSID(bestNetworkIndex));
     } else {
-        _logger->warn(PSTR(__func__), PSTR("No AP with matching SSID found."));
-        _logger->debug(PSTR(__func__), PSTR("Falling back to default WiFi.begin()"));
+        _logger->warn(PSTR(__func__), PSTR("No AP with matching SSID found.\n"));
+        _logger->debug(PSTR(__func__), PSTR("Falling back to default WiFi.begin()\n"));
         WiFi.begin(_wssid, _wpass);
     }
 }
