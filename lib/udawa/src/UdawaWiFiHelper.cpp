@@ -11,7 +11,7 @@ void UdawaWiFiHelper::modeSTA(){
     WiFi.enableAP(false);
     WiFi.enableSTA(true);
     WiFi.mode(WIFI_MODE_STA);
-    _logger->debug(PSTR(__func__), PSTR("STA %s started, trying to connect to AP: %s using password %s\n"), _hname, _wssid, _wpass);
+    _logger->debug(PSTR(__func__), PSTR("STA %s started, trying to connect to AP: %s.\n"), _hname, _wssid);
     WiFi.setHostname(_hname);
     WiFi.setAutoReconnect(true);
     connectToStrongestAP();
@@ -181,8 +181,9 @@ void UdawaWiFiHelper::run(){
             modeAP(false);
         }  
 
-        if(_fInit && WiFi.getMode() == WIFI_MODE_STA && !_state.fSTAGotIP && _state.STADHCPFailedCounter > _state.STADHCPFailedTimedout){
+        if(_fInit && WiFi.getMode() == WIFI_MODE_STA && !_state.fSTAGotIP && _state.STADHCPFailedCounter >= _state.STADHCPFailedTimedout){
             _state.STADHCPFailedCounter = 0;
+            _state.STADisconnectCounter++;
             _logger->error(PSTR(__func__), PSTR("DHCP timedout! Trying to reconnect... \n"));
             WiFi.disconnect(true, true);
             modeSTA();
